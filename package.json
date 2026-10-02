@@ -1,0 +1,28 @@
+{
+  "name": "codex-local-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "build": "tsc",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "test": "tsx --test test/*.test.ts",
+    "test:live": "tsx scripts/smoke.ts",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openai/codex-sdk": "0.160.0",
+    "ajv": "^8.20.0",
+    "fastify": "^5.12.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
