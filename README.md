@@ -20,6 +20,18 @@ npm run build
 npm start
 ```
 
+Windows PowerShell (NVM for Windows requires an explicit version; use any installed Node 22.13+):
+
+```powershell
+nvm use 22.23.3
+npm ci
+.\node_modules\.bin\codex.cmd login
+.\node_modules\.bin\codex.cmd login status
+Copy-Item .env.example .env
+npm run build
+npm start
+```
+
 Development: `npm run dev`. `Ctrl+C` dừng server và hủy các lượt đang chạy. Không cần `OPENAI_API_KEY`; gateway buộc auth bằng ChatGPT, không kế thừa API key từ môi trường.
 
 Đặt `DEFAULT_MODEL` và `DEFAULT_REASONING_EFFORT` trong `.env` để chọn mặc định cho chat và session. Mặc định là `gpt-6.1-sol` và `medium`. Body từng request vẫn nhận `model` và `reasoning_effort` (hoặc alias `reasoning`) để override. Model phải được tài khoản Codex của bạn cấp quyền; nếu không hãy chọn model khả dụng. Gateway vẫn dùng hạn mức của tài khoản ChatGPT. Health chỉ cho biết HTTP server hoạt động, không kiểm tra đăng nhập/hạn mức.
