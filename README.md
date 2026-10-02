@@ -8,7 +8,7 @@ Python / app / agent → HTTP → Fastify → Codex SDK → Codex CLI → ChatGP
 
 ## Chạy
 
-Node **22+** (khuyên dùng Node 24). Máy hiện tại có Node 24 qua nvm; chạy `nvm use` trước vì shell có thể đang dùng Node 16.
+Node **22.13+** (khuyên dùng Node 24). Máy hiện tại có Node 24 qua nvm; chạy `nvm use` trước vì shell có thể đang dùng Node 16.
 
 ```bash
 nvm use
@@ -35,6 +35,9 @@ Development: `npm run dev`. `Ctrl+C` dừng server và hủy các lượt đang 
 | `POST /v1/sessions` | Tạo session, chưa gọi model |
 | `POST /v1/sessions/:id/messages` | Tiếp tục cùng Codex thread |
 | `DELETE /v1/sessions/:id` | Xóa session khỏi gateway, trả `204` |
+| `GET /dashboard` | Trang thống kê server |
+| `GET /api/stats/overview` | Tổng quan, timeline và thống kê theo model |
+| `GET /api/stats/calls` | Lịch sử call, lọc và phân trang |
 
 Ví dụ `.env`:
 
@@ -195,14 +198,33 @@ Với session, gửi **message mới** thay vì toàn bộ history. Body nhận 
 }
 ```
 
-Khi cần tools, gửi definitions và `tool_choice` trong **mỗi request**. Session cố định model; reasoning cố định sau lượt đầu tiên. Gateway lưu session metadata/history trong `.local/sessions.json` và resume Codex thread sau restart. Session hết hạn sau 24 giờ không hoạt động. Giới hạn context 512 messages / 1 MiB. Chạy một server process cho mỗi `DATA_DIR`; V1 chưa có khóa giữa các process.
+Khi cần tools, gửi definitions và `tool_choice` trong **mỗi request**. Session cố định model và reasoning lúc tạo. Gateway lưu session metadata/history trong `.local/sessions.json` và resume Codex thread sau restart. Session hết hạn sau 24 giờ không hoạt động. Giới hạn context 512 messages / 1 MiB. Chạy một server process cho mỗi `DATA_DIR`; V1 chưa có khóa giữa các process.
 
 Xóa session không xóa lịch sử thread do Codex CLI lưu trong `CODEX_HOME`. Nếu lượt session lỗi/timeout, session bị vô hiệu hóa để tránh tiếp tục một history đã ghi dở; cần tạo session mới.
 
+## Dashboard và SQLite
+
+Mở **http://localhost:4000/dashboard** (hoặc `/` để tự chuyển hướng). Trang cập nhật mỗi 5 giây; có thể tắt tự cập nhật. Bộ lọc gồm 1 giờ / 24 giờ / 7 ngày / 30 ngày, model và trạng thái. Bảng lịch sử phân trang 20 call, mở chi tiết để xem reasoning, session ID, token và mã lỗi. Thời gian hiển thị theo Việt Nam, UTC+7.
+
+Thống kê chỉ tính các POST chat: `/chat`, `/v1/chat/completions`, `/v1/sessions/:id/messages`. Các request đọc dashboard, health và quản lý session không tăng số call. Call được lưu ngay khi server nhận, có trạng thái đang xử lý, thành công, lỗi, từ chối, hủy hoặc gián đoạn. Request bị từ chối trước khi gọi Codex vẫn được ghi riêng.
+
+SQLite lưu tại **`DATA_DIR/stats.sqlite`** (mặc định `.local/stats.sqlite`); có thể đổi bằng `STATS_DB_PATH` trong `.env`. Lịch sử giữ sau restart và không tự xóa. Server bị crash để lại lượt đang chạy thì lần mở sau đánh dấu `interrupted`; không tự suy đoán duration. Chạy một server process cho mỗi file dữ liệu. Dùng [SQLite tích hợp của Node.js](https://nodejs.org/api/sqlite.html), không cần cài database server.
+
+Input/output/cache/reasoning lấy từ usage của Codex. Tổng token = input + output; cache là phần nằm trong input, reasoning nằm trong output. Call không có usage hiển thị `—`, dashboard báo số lượt thiếu usage và không ước lượng token. Thời gian trung bình/p95 chỉ tính các lượt đã gọi Codex và có duration; tỷ lệ thành công tính trên toàn bộ call đã hoàn tất, gồm cả lượt từ chối. Function calls là số hàm được đề xuất, không phải số lần app đã thực thi thành công.
+
+Lịch sử bắt đầu từ khi thêm thống kê; không truy hồi các call cũ. SQLite chỉ lưu metadata, token và timing, không lưu nội dung prompt/câu trả lời. Nếu bật `LOCAL_API_KEY`, trang sẽ yêu cầu nhập token để lấy số liệu; token chỉ giữ trong bộ nhớ trang. Dashboard shell được tải không cần key, API thống kê vẫn yêu cầu Bearer token.
+
+```bash
+curl 'http://localhost:4000/api/stats/overview?range=24h'
+curl 'http://localhost:4000/api/stats/calls?range=7d&status=error&page=1'
+```
+
+Query `model` là tùy chọn; thêm header `Authorization: Bearer ...` nếu bật token gateway.
+
 ## Quyền và phạm vi V1
 
-- Bind cứng `127.0.0.1`; từ chối browser Origin và Host không phải localhost; không bật CORS.
-- Tùy chọn `LOCAL_API_KEY`: mọi endpoint yêu cầu `Authorization: Bearer <token>`. Token này bảo vệ gateway local, không phải API key OpenAI.
+- Bind cứng `127.0.0.1`; từ chối Host không phải localhost; browser chỉ được đọc dashboard và thống kê từ cùng origin, không bật CORS.
+- Tùy chọn `LOCAL_API_KEY`: API chat, session, health, models và thống kê yêu cầu `Authorization: Bearer <token>`. Dashboard shell có thể tải để nhập token. Token này bảo vệ gateway local, không phải API key OpenAI.
 - SDK chạy trong thư mục tạm riêng, bỏ user config và exec rules, thay agent instructions, không nạp AGENTS.md, tắt shell/unified exec, apps/plugins, multi-agent, computer use và web search.
 - Sandbox `read-only`, approvals `never`, command networking tắt. HTTP request không được chọn working directory, Codex home, executable hoặc nâng quyền.
 - Gateway không thực thi tool do caller cung cấp. Không kế thừa biến môi trường bí mật của app; dùng auth store Codex hiện có để tiếp tục refresh login như CLI.
