@@ -1,3 +1,4 @@
+import { catalog } from './catalog.js';
 import Fastify, { type FastifyRequest, type FastifyReply } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
@@ -24,17 +25,20 @@ export async function buildServer(config: Config, provider: Provider) {
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0]!;
     const match = /^\/v1\/sessions\/([^/]{1,128})\/messages$/.exec(path);
-    if (req.method === 'POST' && (path === '/chat' || path === '/v1/chat/completions' || match)) {
+    if (req.method === 'POST' && (path === '/api/playground/chat' || path === '/chat' || path === '/v1/chat/completions' || match)) {
       const session = match ? sessions.records.get(match[1]!) : undefined;
       const id = metrics.begin(match ? '/v1/sessions/:id/messages' : path, session?.model ?? config.model, session?.effort ?? config.reasoningEffort, match?.[1] ?? null);
       tracked.set(req, { id, start: performance.now() });
+      reply.header('X-Codex-Call-Id', id);
       req.raw.once('aborted', () => finishCall(req, 499, true));
       reply.raw.once('close', () => { if (!reply.raw.writableEnded) finishCall(req, 499, true); });
     }
     // Prevent browser requests and DNS rebinding to an unauthenticated loopback gateway.
     const host = req.headers.host ?? '';
     if (!/^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(host)) throw new ApiError(403, 'invalid_host', 'Only localhost Host headers are accepted.');
-    if (req.headers.origin && !(req.method === 'GET' && dashboardRead(path) && req.headers.origin === `http://${host}`)) {
+    const playground = req.method === 'POST' && path === '/api/playground/chat';
+    if (playground && (req.headers.origin !== `http://${host}` || req.headers['x-codex-playground'] !== '1' || !req.headers['content-type']?.startsWith('application/json'))) throw new ApiError(403, 'browser_origin_denied', 'Playground requires same-origin JSON requests.');
+    if (req.headers.origin && !((req.method === 'GET' && dashboardRead(path) || playground) && req.headers.origin === `http://${host}`)) {
       throw new ApiError(403, 'browser_origin_denied', 'Only same-origin dashboard reads are allowed.');
     }
     // The dashboard shell is public; its data endpoints still require the gateway key.
@@ -86,7 +90,7 @@ export async function buildServer(config: Config, provider: Provider) {
     try {
       const call = tracked.get(req);
       if (call) { metrics.context(call.id, model, effort); metrics.running(call.id); }
-      const thread = session?.threadId ? provider.resume(session.threadId, model, effort) : provider.start(model, effort);
+      const thread = session?.threadId ? provider.resume(session.threadId, model, effort) : provider.start(model, effort, req.url.split('?')[0] === '/api/playground/chat');
       const turn = await thread.run(promptFor(session?.threadId ? request.messages : history, request), { outputSchema, signal: controller.signal });
       if (call) metrics.usage(call.id, turn.usage);
       assertNoAgentTools(turn.items);
@@ -111,8 +115,9 @@ export async function buildServer(config: Config, provider: Provider) {
     }
   };
   app.get('/health', async () => ({ ok: true, provider: 'codex', active_requests: running.size }));
-  app.get('/v1/models', async () => ({ object: 'list', data: [{ id: config.model, object: 'model', created: 0, owned_by: 'local-codex' }] }));
+  app.get('/v1/models', async () => ({ object: 'list', data: [...new Set([config.model, ...catalog.models.filter(m => m.chat_supported).map(m => m.id)])].map(id => ({ id, object: 'model', created: 0, owned_by: 'local-codex' })) }));
   app.post('/v1/chat/completions', async (req, reply) => execute(chatRequest.parse(req.body), req, reply));
+  app.post('/api/playground/chat', async (req, reply) => execute(chatRequest.parse(req.body), req, reply));
   app.post('/chat', async (req, reply) => {
     const input = simpleRequest.parse(req.body);
     const { prompt, ...options } = input;

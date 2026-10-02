@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { estimateCost, periodKey } from './catalog.js';
 import type { Usage } from '@openai/codex-sdk';
 
 export const ranges = { '1h': 3_600_000, '24h': 86_400_000, '7d': 604_800_000, '30d': 2_592_000_000 };
@@ -25,8 +26,16 @@ export class Metrics {
       ) STRICT;
       CREATE INDEX IF NOT EXISTS calls_time ON calls(started_at DESC);
       CREATE INDEX IF NOT EXISTS calls_model_time ON calls(model, started_at DESC);
-      PRAGMA user_version=1;
+
     `);
+    const columns = new Set(this.db.prepare('PRAGMA table_info(calls)').all().map(r => r.name));
+    for (const [name, type] of Object.entries({ cost_usd: 'REAL', input_cost_usd: 'REAL', output_cost_usd: 'REAL', cached_cost_usd: 'REAL', input_rate: 'REAL', output_rate: 'REAL', cached_rate: 'REAL', price_checked_on: 'TEXT', price_source: 'TEXT' })) {
+      if (!columns.has(name)) this.db.exec(`ALTER TABLE calls ADD COLUMN ${name} ${type}`);
+    }
+    this.db.exec('PRAGMA user_version=2');
+    for (const row of this.db.prepare('SELECT id,model,input_tokens,output_tokens,cached_tokens FROM calls WHERE input_tokens IS NOT NULL AND price_checked_on IS NULL').all()) {
+      this.price(String(row.id), String(row.model), Number(row.input_tokens), Number(row.output_tokens), Number(row.cached_tokens ?? 0));
+    }
     // A crashed server cannot know when these turns actually finished.
     this.db.prepare(`UPDATE calls SET status='interrupted', error_code='server_restarted', finished_at=?, duration_ms=NULL WHERE status IN ('pending','running')`).run(Date.now());
   }
@@ -44,6 +53,31 @@ export class Metrics {
   usage(id: string, usage: Usage | null) {
     if (!usage) return;
     this.db.prepare('UPDATE calls SET input_tokens=?, output_tokens=?, cached_tokens=?, reasoning_tokens=? WHERE id=?').run(usage.input_tokens, usage.output_tokens, usage.cached_input_tokens, usage.reasoning_output_tokens ?? null, id);
+    const model = String(this.detail(id)!.model);
+    this.price(id, model, usage.input_tokens, usage.output_tokens, usage.cached_input_tokens);
+  }
+  private price(id: string, model: string, input: number, output: number, cached: number) {
+    const cost = estimateCost(model, input, output, cached);
+    if (!cost) return;
+    this.db.prepare('UPDATE calls SET cost_usd=?,input_cost_usd=?,output_cost_usd=?,cached_cost_usd=?,input_rate=?,output_rate=?,cached_rate=?,price_checked_on=?,price_source=? WHERE id=?').run(cost.cost_usd,cost.input_cost_usd,cost.output_cost_usd,cost.cached_cost_usd,cost.input_rate,cost.output_rate,cost.cached_rate,cost.price_checked_on,cost.price_source,id);
+  }
+  detail(id: string) { return this.db.prepare('SELECT * FROM calls WHERE id=?').get(id); }
+  costs(group: 'day' | 'week' | 'month', model?: string, now = Date.now()) {
+    const rows = this.db.prepare('SELECT started_at,cost_usd,codex_started,status FROM calls WHERE started_at <= ?' + (model ? ' AND model=?' : '')).all(...(model ? [now,model] : [now]));
+    const current = { day: 0, week: 0, month: 0, total: 0 };
+    const periods = new Map<string, { period: string; cost_usd: number; priced_calls: number; unpriced_calls: number }>();
+    let unpriced = 0;
+    for (const row of rows) {
+      const key = periodKey(Number(row.started_at), group);
+      const b = periods.get(key) ?? { period: key, cost_usd: 0, priced_calls: 0, unpriced_calls: 0 };
+      if (row.cost_usd !== null) {
+        const value = Number(row.cost_usd); b.cost_usd += value; b.priced_calls++; current.total += value;
+        for (const g of ['day','week','month'] as const) if (periodKey(Number(row.started_at),g) === periodKey(now,g)) current[g] += value;
+      } else if (row.codex_started && !['pending','running'].includes(String(row.status))) { b.unpriced_calls++; unpriced++; }
+      periods.set(key,b);
+    }
+    return { group, timezone: 'Asia/Ho_Chi_Minh', currency: 'USD', current, unpriced_calls: unpriced,
+      periods: [...periods.values()].sort((a,b) => b.period.localeCompare(a.period)), estimated: true };
   }
   result(id: string, toolCalls: number, finishReason: string) {
     this.db.prepare('UPDATE calls SET tool_calls=?, finish_reason=? WHERE id=?').run(toolCalls, finishReason, id);
@@ -61,7 +95,7 @@ export class Metrics {
     const since = now - ranges[range];
     const where = 'started_at >= ? AND started_at <= ?' + (model ? ' AND model=?' : '');
     const params = model ? [since, now, model] : [since, now];
-    const summary = this.db.prepare(`SELECT COUNT(*) AS total_calls,
+    const summary = this.db.prepare(`SELECT COUNT(*) AS total_calls, COALESCE(SUM(cost_usd),0) AS cost_usd, COALESCE(SUM(cost_usd IS NOT NULL),0) AS priced_calls,
       COALESCE(SUM(status='success'),0) AS successful_calls,
       COALESCE(SUM(status IN ('error','cancelled','interrupted')),0) AS failed_calls,
       COALESCE(SUM(status='rejected'),0) AS rejected_calls,
@@ -87,7 +121,7 @@ export class Metrics {
     const byTime = new Map(buckets.map(row => [Number(row.time), row]));
     const timeline = [];
     for (let time = start; time <= now; time += bucket) timeline.push(byTime.get(time) ?? { time, calls: 0, success: 0, errors: 0, rejected: 0, active: 0, tokens: 0, avg_duration_ms: null });
-    const models = this.db.prepare(`SELECT model, COUNT(*) AS calls,
+    const models = this.db.prepare(`SELECT model, COUNT(*) AS calls, SUM(cost_usd) AS cost_usd,
       SUM(status='success') AS success, COALESCE(SUM(input_tokens),0) AS input_tokens,
       COALESCE(SUM(output_tokens),0) AS output_tokens,
       AVG(CASE WHEN codex_started=1 THEN duration_ms END) AS avg_duration_ms

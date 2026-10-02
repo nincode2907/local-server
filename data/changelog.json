@@ -1,0 +1,359 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-10-02",
+  "events": [
+    {
+      "id": "aa-api-import-2026-10-02",
+      "date": "2026-10-02",
+      "type": "data-source",
+      "title": "Artificial Analysis API: exact metrics & effort mapping",
+      "body": "Quét 689 variant, ghép exact 66 variant của 15 model. Có Coding cho 33 và Agentic cho 31 variant; token/task vẫn N/A. API version 4.3 chỉ major.minor; không xem khác số làm tròn của trang public là model tốt lên. Cache 24h và compact report cho các lần review sau.",
+      "source_ids": [
+        "aa-data-api"
+      ]
+    },
+    {
+      "type": "coverage",
+      "title": "GPT-6.1 Sol · thêm benchmark effort",
+      "body": "low. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-0",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "data-source",
+      "title": "GPT-6.1 Sol · đổi nguồn đo",
+      "body": "Dùng số API có cấu trúc cho medium, high, xhigh, max. Version API chỉ major.minor; không coi số làm tròn hoặc thay đổi preset là tiến bộ model.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-1",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "GPT-6 Luna · thêm benchmark effort",
+      "body": "xhigh, medium, none, max. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-2",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "data-source",
+      "title": "GPT-6 Luna · đổi nguồn đo",
+      "body": "Dùng số API có cấu trúc cho low, high. Version API chỉ major.minor; không coi số làm tròn hoặc thay đổi preset là tiến bộ model.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-3",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "GPT-6 Astra · thêm benchmark effort",
+      "body": "low, medium. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-4",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "data-source",
+      "title": "GPT-6 Astra · đổi nguồn đo",
+      "body": "Dùng số API có cấu trúc cho high, xhigh, max. Version API chỉ major.minor; không coi số làm tròn hoặc thay đổi preset là tiến bộ model.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-5",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "GPT-6 Astra · thêm metric",
+      "body": "Đã có số xác minh cho: agentic_index, coding_index. Trước đó N/A.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-6",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "GPT-6 Sol · thêm benchmark effort",
+      "body": "low, high, medium, max, none, xhigh. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-7",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "GPT-5.6 Sol · thêm benchmark effort",
+      "body": "low, medium, none, high, max, xhigh. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-8",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "GPT-5.6 Terra · thêm benchmark effort",
+      "body": "medium, high, none, xhigh, max, low. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-9",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "GPT-5.6 Luna · thêm benchmark effort",
+      "body": "low, max, medium, xhigh, high, none. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-10",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "GPT-5.5 · thêm benchmark effort",
+      "body": "xhigh, medium, none, high, low. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-11",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "Claude Opus 5.5 · thêm benchmark effort",
+      "body": "low, xhigh, medium. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-12",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "data-source",
+      "title": "Claude Opus 5.5 · đổi nguồn đo",
+      "body": "Dùng số API có cấu trúc cho high, max. Version API chỉ major.minor; không coi số làm tròn hoặc thay đổi preset là tiến bộ model.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-13",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "Claude Sonnet 5.5 · thêm benchmark effort",
+      "body": "high, xhigh, max, low. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-14",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "data-source",
+      "title": "Claude Sonnet 5.5 · đổi nguồn đo",
+      "body": "Dùng số API có cấu trúc cho medium. Version API chỉ major.minor; không coi số làm tròn hoặc thay đổi preset là tiến bộ model.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-15",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "Gemini 3.8 Flash · thêm benchmark effort",
+      "body": "medium, low. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-16",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "data-source",
+      "title": "Gemini 3.8 Flash · đổi nguồn đo",
+      "body": "Dùng số API có cấu trúc cho high. Version API chỉ major.minor; không coi số làm tròn hoặc thay đổi preset là tiến bộ model.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-17",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "Gemini 3.8 Flash · thêm metric",
+      "body": "Đã có số xác minh cho: agentic_index, coding_index. Trước đó N/A.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-18",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "data-source",
+      "title": "Gemini 4 Argon · đổi nguồn đo",
+      "body": "Dùng số API có cấu trúc cho high. Version API chỉ major.minor; không coi số làm tròn hoặc thay đổi preset là tiến bộ model.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-19",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "DeepSeek V4.1 Flash · thêm benchmark effort",
+      "body": "none. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-20",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "data-source",
+      "title": "DeepSeek V4.1 Flash · đổi nguồn đo",
+      "body": "Dùng số API có cấu trúc cho max. Version API chỉ major.minor; không coi số làm tròn hoặc thay đổi preset là tiến bộ model.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-21",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "Grok 4.7 · thêm benchmark effort",
+      "body": "low, high. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-22",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "data-source",
+      "title": "Grok 4.7 · đổi nguồn đo",
+      "body": "Dùng số API có cấu trúc cho xhigh. Version API chỉ major.minor; không coi số làm tròn hoặc thay đổi preset là tiến bộ model.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-23",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "Muse Spark 1.3 · thêm benchmark effort",
+      "body": "xhigh. Snapshot đầu tiên cho các effort này; chưa có delta.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-24",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "data-source",
+      "title": "Muse Spark 1.3 · đổi nguồn đo",
+      "body": "Dùng số API có cấu trúc cho max. Version API chỉ major.minor; không coi số làm tròn hoặc thay đổi preset là tiến bộ model.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-25",
+      "date": "2026-10-02"
+    },
+    {
+      "type": "coverage",
+      "title": "Muse Spark 1.3 · thêm metric",
+      "body": "Đã có số xác minh cho: agentic_index, coding_index. Trước đó N/A.",
+      "source_ids": [
+        "aa-data-api"
+      ],
+      "id": "231bba433beffbba-26",
+      "date": "2026-10-02"
+    },
+    {
+      "id": "initial-baseline",
+      "date": "2026-10-02",
+      "type": "baseline",
+      "title": "Snapshot đầu tiên",
+      "body": "Lưu baseline có nguồn. Chưa có lịch sử trước đó để kết luận benchmark tăng/giảm.",
+      "source_ids": [
+        "aa-leaderboard"
+      ]
+    },
+    {
+      "id": "sol61-launch",
+      "date": "2026-09-29",
+      "type": "new-model",
+      "title": "GPT-6.1 Sol bắt đầu rollout",
+      "body": "Đổi lựa chọn daily coding sang Sol6.1 Medium; giữ Sol6 fallback cho tài khoản chưa có.",
+      "source_ids": [
+        "openai-changelog",
+        "openai-models"
+      ]
+    },
+    {
+      "id": "argon-announced",
+      "date": "2026-09-30",
+      "type": "watch",
+      "title": "Gemini 4 Argon: theo dõi quyền truy cập",
+      "body": "Đã công bố, tiếp cận giới hạn; không xem là model có thể dùng ngay.",
+      "source_ids": [
+        "gemini-argon"
+      ]
+    },
+    {
+      "id": "sonnet55-launch",
+      "date": "2026-09-28",
+      "type": "new-model",
+      "title": "Claude Sonnet 5.5",
+      "body": "Bổ sung alternative. Medium là điểm bắt đầu cho agentic task rõ theo guidance Anthropic.",
+      "source_ids": [
+        "claude-sonnet",
+        "claude-effort"
+      ]
+    },
+    {
+      "id": "opus55-launch",
+      "date": "2026-09-22",
+      "type": "new-model",
+      "title": "Claude Opus 5.5",
+      "body": "Bổ sung challenger cho reasoning sâu: benchmark advantage được so theo cùng AA index và effort ghi rõ.",
+      "source_ids": [
+        "claude-opus",
+        "aa-claude-opus-5-5"
+      ]
+    },
+    {
+      "id": "gpt55-retirement",
+      "date": "2026-10-14",
+      "type": "scheduled",
+      "title": "GPT-5.5 sắp rời ChatGPT / Codex",
+      "body": "Lịch retire14/10 đã công bố; API không bị ảnh hưởng. Đây là lịch tương lai, chưa phải đã retire.",
+      "source_ids": [
+        "openai-models"
+      ]
+    },
+    {
+      "id": "gpt54-retired",
+      "date": "2026-08-31",
+      "type": "retired",
+      "title": "GPT-5.4 / Mini đã rời Codex sign-in",
+      "body": "Official thay GPT-5.4 bằng6Sol, Mini bằng6Luna khi có quyền truy cập.",
+      "source_ids": [
+        "openai-models"
+      ]
+    }
+  ]
+}

@@ -8,7 +8,7 @@ import type { Config } from './config.js';
 import type { ChatRequest } from './schema.js';
 
 export interface Provider {
-  start(model: string, effort?: ChatRequest['reasoning_effort']): Thread;
+  start(model: string, effort?: ChatRequest['reasoning_effort'], ephemeral?: boolean): Thread;
   resume(id: string, model: string, effort?: ChatRequest['reasoning_effort']): Thread;
   close(): Promise<void>;
 }
@@ -27,20 +27,23 @@ export async function createProvider(config: Config): Promise<Provider> {
   const env: Record<string, string> = { PATH: process.env.PATH ?? '', HOME: homedir() };
   for (const key of ['CODEX_HOME', 'TMPDIR', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) if (process.env[key]) env[key] = process.env[key]!;
   // API keys, caller env, provider overrides and custom proxy endpoints are deliberately not inherited.
-  const codex = new Codex({ codexPathOverride: wrapper, env, config: {
+  const ephemeralWrapper = join(runtime, 'codex-ephemeral');
+  await writeFile(ephemeralWrapper, `#!/bin/sh\nif [ "$1" != exec ]; then exit 64; fi\nshift\nexec ${command} exec --ephemeral --ignore-user-config --ignore-rules "$@"\n`, { mode: 0o700 });
+  const makeCodex = (path: string) => new Codex({ codexPathOverride: path, env, config: {
     forced_login_method: 'chatgpt', model_instructions_file: instructions,
     project_doc_max_bytes: 0, web_search: 'disabled',
     features: { shell_tool: false, unified_exec: false, apps: false, plugins: false,
       multi_agent: false, multi_agent_v2: false, computer_use: false, shell_snapshot: false },
     apps: { _default: { enabled: false } },
   } });
+  const codex = makeCodex(wrapper), ephemeralCodex = makeCodex(ephemeralWrapper);
   const options = (model: string, effort?: ChatRequest['reasoning_effort']): ThreadOptions => ({
     model, ...(effort && { modelReasoningEffort: effort }), workingDirectory: runtime,
     skipGitRepoCheck: true, sandboxMode: 'read-only', approvalPolicy: 'never',
     networkAccessEnabled: false, webSearchMode: 'disabled',
   });
   return {
-    start: (model, effort) => codex.startThread(options(model, effort)),
+    start: (model, effort, ephemeral) => (ephemeral ? ephemeralCodex : codex).startThread(options(model, effort)),
     resume: (id, model, effort) => codex.resumeThread(id, options(model, effort)),
     close: () => rm(runtime, { recursive: true, force: true }),
   };

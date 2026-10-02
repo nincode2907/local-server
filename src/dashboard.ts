@@ -1,3 +1,5 @@
+import { catalog } from './catalog.js';
+import { ApiError } from './errors.js';
 import { readFile } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -8,7 +10,7 @@ export function dashboardAsset(path: string) {
   return ['/', '/dashboard', '/dashboard/assets/style.css', '/dashboard/assets/app.js'].includes(path);
 }
 export function dashboardRead(path: string) {
-  return dashboardAsset(path) || ['/api/stats/overview', '/api/stats/calls'].includes(path);
+  return dashboardAsset(path) || ['/api/models', '/api/stats/costs', '/api/stats/overview', '/api/stats/calls'].includes(path) || /^\/api\/stats\/calls\/[a-f0-9-]{36}$/.test(path);
 }
 export async function registerDashboard(app: FastifyInstance, metrics: Metrics, config: Config, active: () => number) {
   const html = await readFile(new URL('../public/dashboard.html', import.meta.url), 'utf8');
@@ -24,6 +26,16 @@ export async function registerDashboard(app: FastifyInstance, metrics: Metrics, 
   app.get('/dashboard', async (_req, reply) => reply.headers(security).type('text/html; charset=utf-8').send(html));
   app.get('/dashboard/assets/style.css', async (_req, reply) => reply.headers(security).type('text/css; charset=utf-8').send(css));
   app.get('/dashboard/assets/app.js', async (_req, reply) => reply.headers(security).type('text/javascript; charset=utf-8').send(js));
+  app.get('/api/models', async (_req, reply) => reply.headers(security).send(catalog));
+  app.get<{ Params: { id: string } }>('/api/stats/calls/:id', async (req, reply) => {
+    const row = metrics.detail(z.uuid().parse(req.params.id));
+    if (!row) throw new ApiError(404, 'call_not_found', 'Call not found.');
+    return reply.headers(security).send(row);
+  });
+  app.get('/api/stats/costs', async (req, reply) => {
+    const input = z.object({ group: z.enum(['day','week','month']).default('day'), model: z.string().min(1).max(128).optional() }).strict().parse(req.query);
+    return reply.headers(security).send(metrics.costs(input.group, input.model));
+  });
   const query = z.object({ range: z.enum(['1h', '24h', '7d', '30d']).default('24h'), model: z.string().min(1).max(128).optional() }).strict();
   app.get('/api/stats/overview', async (req, reply) => {
     const input = query.parse(req.query);

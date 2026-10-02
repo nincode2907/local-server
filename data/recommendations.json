@@ -1,0 +1,330 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-10-02",
+  "profile": "ChatGPT Plus + Codex/OpenAI",
+  "default_case": "daily-coding",
+  "method": "Chọn candidate nhẹ nhất đã được review đủ năng lực cho phạm vi task. Benchmark dùng kiểm tra trade-off, không tự suy ra năng lực coding từ Intelligence. Candidates và adequacy là inference có nguồn; không phải kết quả eval cá nhân.",
+  "cases": [
+    {
+      "id": "chat",
+      "label": "Chat thường",
+      "short_label": "Chat",
+      "description": "Hỏi nhanh, viết lại, dịch và trao đổi thường ngày.",
+      "reason": "Chọn Instant trong Chat Plus; chỉ tăng Thinking khi cần.",
+      "confidence": "official-guidance",
+      "escalate_when": "Cần phân tích có nhiều điều kiện hoặc câu trả lời Instant bỏ sót ý.",
+      "primary": {
+        "model_id": "gpt-5.6-sol",
+        "effort": "instant",
+        "surface": "chat",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-chat"
+        ]
+      },
+      "fallbacks": [],
+      "escalate": {
+        "model_id": "gpt-5.6-sol",
+        "effort": "medium",
+        "surface": "chat",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-chat"
+        ]
+      },
+      "challenger": null
+    },
+    {
+      "id": "small-coding",
+      "label": "Coding task nhỏ",
+      "short_label": "Patch nhỏ",
+      "description": "Sửa một hàm, vài dòng CSS, đổi field, viết script có đầu ra rõ.",
+      "reason": "Luna Low cho phạm vi hẹp theo official guidance; API AA đo $0.0045/task và first answer 2.45s. Coding Index của variant này còn N/A, không coi Intelligence là coding score.",
+      "confidence": "official-guidance-and-aa-api",
+      "escalate_when": "Low bỏ sót edge case, hoặc patch chạm nhiều hơn dự kiến.",
+      "primary": {
+        "model_id": "gpt-6-luna",
+        "effort": "low",
+        "surface": "codex",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-selection",
+          "openai-models",
+          "aa-data-api"
+        ]
+      },
+      "fallbacks": [
+        {
+          "model_id": "gpt-5.6-luna",
+          "effort": "low",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        }
+      ],
+      "escalate": {
+        "model_id": "gpt-6-luna",
+        "effort": "high",
+        "surface": "codex",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-selection",
+          "openai-models",
+          "aa-data-api"
+        ]
+      },
+      "challenger": null
+    },
+    {
+      "id": "daily-coding",
+      "label": "Daily coding",
+      "short_label": "Daily coding",
+      "description": "Implement feature thường ngày với vài file, kiểm tra flow và sửa theo review.",
+      "reason": "Sol 6.1 Medium là điểm bắt đầu theo official guidance. AA API: Intelligence 47.8, $0.2137/task, first answer 5.75s; Coding/Agentic của variant này còn N/A.",
+      "confidence": "official-guidance-and-aa-api",
+      "escalate_when": "Bug qua nhiều lớp, yêu cầu mơ hồ hoặc cần kiểm tra sâu hơn.",
+      "primary": {
+        "model_id": "gpt-6.1-sol",
+        "effort": "medium",
+        "surface": "codex",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-selection",
+          "openai-models",
+          "aa-data-api"
+        ]
+      },
+      "fallbacks": [
+        {
+          "model_id": "gpt-6-sol",
+          "effort": "medium",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        },
+        {
+          "model_id": "gpt-5.6-sol",
+          "effort": "medium",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        }
+      ],
+      "escalate": {
+        "model_id": "gpt-6.1-sol",
+        "effort": "high",
+        "surface": "codex",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-selection",
+          "openai-models",
+          "aa-data-api"
+        ]
+      },
+      "challenger": null
+    },
+    {
+      "id": "hard-debug",
+      "label": "Debug khó",
+      "short_label": "Debug khó",
+      "description": "Root cause chưa rõ: concurrency, nhiều service, trạng thái sai hoặc lỗi khó tái hiện.",
+      "reason": "Sol 6.1 High để nối evidence và điều tra nhiều bước. Cost/task $0.3191 và first answer 57.97s trên AA API; chỉ tăng effort khi phạm vi cần độ sâu này.",
+      "confidence": "official-guidance-and-aa-api",
+      "escalate_when": "Sol vẫn không nối được evidence thành root cause sau một vòng điều tra.",
+      "primary": {
+        "model_id": "gpt-6.1-sol",
+        "effort": "high",
+        "surface": "codex",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-selection",
+          "openai-models",
+          "aa-data-api"
+        ]
+      },
+      "fallbacks": [
+        {
+          "model_id": "gpt-6-sol",
+          "effort": "high",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        },
+        {
+          "model_id": "gpt-5.6-sol",
+          "effort": "high",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        }
+      ],
+      "escalate": {
+        "model_id": "gpt-6-astra",
+        "effort": "high",
+        "surface": "codex",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-selection",
+          "openai-models",
+          "aa-data-api"
+        ]
+      },
+      "challenger": null
+    },
+    {
+      "id": "architecture",
+      "label": "Architecture / refactor lớn",
+      "short_label": "Architecture",
+      "description": "Trade-offs, boundaries và migration ảnh hưởng nhiều module; cần kế hoạch kiểm chứng.",
+      "reason": "Sol 6.1 Extra High theo guidance cho nhiều ràng buộc xung đột. AA API: Intelligence 51, $0.3929/task, first answer 111.22s. Chưa có coding score riêng của variant.",
+      "confidence": "official-guidance-and-aa-api",
+      "escalate_when": "Phạm vi mở, nhiều ràng buộc xung đột hoặc quyết định có chi phí sửa cao.",
+      "primary": {
+        "model_id": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "surface": "codex",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-selection",
+          "openai-models",
+          "aa-data-api"
+        ]
+      },
+      "fallbacks": [
+        {
+          "model_id": "gpt-6-sol",
+          "effort": "xhigh",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        },
+        {
+          "model_id": "gpt-5.6-sol",
+          "effort": "xhigh",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        }
+      ],
+      "escalate": {
+        "model_id": "gpt-6-astra",
+        "effort": "xhigh",
+        "surface": "codex",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-selection",
+          "openai-models",
+          "aa-data-api"
+        ]
+      },
+      "challenger": null
+    },
+    {
+      "id": "very-hard",
+      "label": "Reasoning rất khó",
+      "short_label": "Reasoning sâu",
+      "description": "Bài toán mơ hồ, ràng buộc dày, cần giữ consistency qua nhiều bước suy luận.",
+      "reason": "Astra Extra High trước: AA API 52.4 Intelligence, 75.9 Coding và 50.2 Agentic. Max đạt 52.7 Intelligence nhưng API cost/task cao hơn khoảng 41%; chưa cần mặc định Max.",
+      "confidence": "official-guidance-and-aa-api",
+      "escalate_when": "Extra High chưa giải được và độ sâu quan trọng hơn thời gian/quota.",
+      "primary": {
+        "model_id": "gpt-6-astra",
+        "effort": "xhigh",
+        "surface": "codex",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-selection",
+          "openai-models",
+          "aa-data-api"
+        ]
+      },
+      "fallbacks": [],
+      "escalate": {
+        "model_id": "gpt-6-astra",
+        "effort": "max",
+        "surface": "codex",
+        "adequate": true,
+        "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+        "source_ids": [
+          "openai-selection",
+          "openai-models",
+          "aa-data-api"
+        ]
+      },
+      "challenger": {
+        "model_id": "claude-opus-5-5",
+        "effort": "max",
+        "surface": "external",
+        "compare_to": {
+          "model_id": "gpt-6-astra",
+          "effort": "max"
+        },
+        "metric": "intelligence",
+        "minimum_advantage": 3,
+        "title": "Ưu tiên quality tuyệt đối? Thử Opus 5.5 Max",
+        "interpretation": "Opus dẫn trên AA Intelligence cùng phiên bản index. Đây là bằng chứng benchmark rộng để thử reasoning sâu, chưa chứng minh thắng coding task của bạn.",
+        "source_ids": [
+          "claude-opus",
+          "aa-claude-opus-5-5",
+          "aa-gpt-6-astra",
+          "aa-data-api"
+        ],
+        "evidence": {
+          "delta": 4.899999999999999,
+          "challenger_value": 57.6,
+          "openai_value": 52.7,
+          "index_version": "4.3",
+          "cost_ratio": 1.8363775901765158,
+          "latency_ratio": 2.2005745870155824
+        }
+      }
+    }
+  ],
+  "snapshot_id": "231bba433beffbba"
+}

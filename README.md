@@ -246,3 +246,11 @@ npm run test:live   # gọi Codex thật; tiêu thụ hạn mức tài khoản �
 Test tự động kiểm tra API, schema tool, history/tool IDs, resume sau restart, xóa session, Host/Origin/auth, concurrency và cancellation. Live smoke kiểm tra chat thật, function-call round trip và memory/resume sau restart bằng Codex đang đăng nhập.
 
 Tài liệu chính thức: [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk), [Authentication](https://learn.chatgpt.com/docs/auth), [Configuration Reference](https://learn.chatgpt.com/docs/config-file/config-reference).
+
+## Chi phí và test chat
+
+Mở `http://localhost:4000/dashboard`: tab **Thống kê** có tổng chi phí ước tính và bảng theo ngày/tuần/tháng (UTC+7, tuần bắt đầu thứ Hai). Bảng chi phí dùng toàn bộ lịch sử và bộ lọc model; khoảng thời gian chỉ áp dụng thống kê call/token. Giá snapshot clone trong `data/`, được đóng băng theo từng call trong SQLite. Cache được tách khỏi input để tránh tính hai lần. Chi phí theo giá API tham khảo, không phải hóa đơn Plus; lượt thiếu giá/usage được đánh dấu chưa tính được.
+
+Tab **Test chat** có nhiều tab tạm, chọn model/reasoning, system context, copy model, dừng request, trạng thái đang suy nghĩ và chi tiết request/response/usage/chi phí. Context chỉ ở bộ nhớ trang và gửi lại mỗi lượt, không dùng session; Codex chạy `--ephemeral`. Reload xóa chat. SQLite chỉ lưu metadata, không lưu prompt/response. Tab **Model & giá** cho tìm kiếm/copy tất cả model trong snapshot; chỉ model tương thích Codex có nút test. Quyền thực tế còn tùy tài khoản.
+
+Endpoint dashboard: `GET /api/models`, `GET /api/stats/costs?group=day|week|month&model=...`, `GET /api/stats/calls/:id`. Mỗi chat response có header `X-Codex-Call-Id`. Playground dùng `POST /api/playground/chat` cùng origin, JSON và header `X-Codex-Playground: 1`; vẫn yêu cầu Bearer khi bật `LOCAL_API_KEY`.

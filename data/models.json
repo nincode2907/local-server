@@ -1,0 +1,3989 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-10-02",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "scope": "Catalog text/reasoning phù hợp chọn model cá nhân; không phải toàn bộ model audio/image/API.",
+  "sources": [
+    {
+      "id": "openai-models",
+      "name": "Models & Codex rollout",
+      "url": "https://learn.chatgpt.com/docs/models",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "openai-chat",
+      "name": "ChatGPT models & Plus thinking levels",
+      "url": "https://help.openai.com/en/articles/20001354-gpt-56-and-gpt-6-pro-in-chatgpt",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "openai-selection",
+      "name": "Model selection",
+      "url": "https://developers.openai.com/api/docs/guides/model-selection",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "openai-pricing",
+      "name": "Plus / Codex usage",
+      "url": "https://learn.chatgpt.com/docs/pricing",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "openai-changelog",
+      "name": "ChatGPT release notes",
+      "url": "https://help.openai.com/en/articles/6825453-chatgpt-release-notes",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-leaderboard",
+      "name": "Model leaderboard",
+      "url": "https://artificialanalysis.ai/leaderboards/models",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-methodology",
+      "name": "Intelligence Index methodology",
+      "url": "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
+      "publisher": "Artificial Analysis",
+      "kind": "methodology",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "claude-opus",
+      "name": "Opus 5.5 specifications",
+      "url": "https://platform.claude.com/docs/en/models/opus-5-5/overview",
+      "publisher": "Anthropic",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "claude-sonnet",
+      "name": "Sonnet 5.5 announcement",
+      "url": "https://www.anthropic.com/claude-sonnet-5-5",
+      "publisher": "Anthropic",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "claude-effort",
+      "name": "Claude effort levels",
+      "url": "https://platform.claude.com/docs/en/build-with-claude/effort",
+      "publisher": "Anthropic",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "gemini-flash",
+      "name": "Gemini 3.8 Flash specifications",
+      "url": "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
+      "publisher": "Google",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "gemini-pricing",
+      "name": "Gemini API pricing",
+      "url": "https://ai.google.dev/gemini-api/docs/pricing",
+      "publisher": "Google",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "gemini-argon",
+      "name": "Gemini 4 Argon announcement",
+      "url": "https://blog.google/intl/es-419/noticias-de-la-empresa/tecnologia/gemini-4-argon/",
+      "publisher": "Google",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "spec-gpt-6.1-sol",
+      "name": "GPT-6.1 Sol API specifications",
+      "url": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gpt-6-1-sol-medium",
+      "name": "gpt 6 1 sol medium",
+      "url": "https://artificialanalysis.ai/models/gpt-6-1-sol-medium",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gpt-6-1-sol-high",
+      "name": "gpt 6 1 sol high",
+      "url": "https://artificialanalysis.ai/models/gpt-6-1-sol-high",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gpt-6-1-sol-xhigh",
+      "name": "gpt 6 1 sol xhigh",
+      "url": "https://artificialanalysis.ai/models/gpt-6-1-sol-xhigh",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gpt-6-1-sol",
+      "name": "gpt 6 1 sol",
+      "url": "https://artificialanalysis.ai/models/gpt-6-1-sol",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "spec-gpt-6-luna",
+      "name": "GPT-6 Luna API specifications",
+      "url": "https://developers.openai.com/api/docs/models/gpt-6-luna",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gpt-6-luna-low",
+      "name": "gpt 6 luna low",
+      "url": "https://artificialanalysis.ai/models/gpt-6-luna-low",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gpt-6-luna-high",
+      "name": "gpt 6 luna high",
+      "url": "https://artificialanalysis.ai/models/gpt-6-luna-high",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "spec-gpt-6-astra",
+      "name": "GPT-6 Astra API specifications",
+      "url": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gpt-6-astra-high",
+      "name": "gpt 6 astra high",
+      "url": "https://artificialanalysis.ai/models/gpt-6-astra-high",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gpt-6-astra-xhigh",
+      "name": "gpt 6 astra xhigh",
+      "url": "https://artificialanalysis.ai/models/gpt-6-astra-xhigh",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gpt-6-astra",
+      "name": "gpt 6 astra",
+      "url": "https://artificialanalysis.ai/models/gpt-6-astra",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "spec-gpt-6-sol",
+      "name": "GPT-6 Sol API specifications",
+      "url": "https://developers.openai.com/api/docs/models/gpt-6-sol",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "spec-gpt-5.6-sol",
+      "name": "GPT-5.6 Sol API specifications",
+      "url": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "spec-gpt-5.6-terra",
+      "name": "GPT-5.6 Terra API specifications",
+      "url": "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "spec-gpt-5.6-luna",
+      "name": "GPT-5.6 Luna API specifications",
+      "url": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "spec-gpt-5.5",
+      "name": "GPT-5.5 API specifications",
+      "url": "https://developers.openai.com/api/docs/models/gpt-5.5",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-claude-opus-5-5-high",
+      "name": "claude opus 5 5 high",
+      "url": "https://artificialanalysis.ai/models/claude-opus-5-5-high",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-claude-opus-5-5",
+      "name": "claude opus 5 5",
+      "url": "https://artificialanalysis.ai/models/claude-opus-5-5",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-claude-sonnet-5-5-medium",
+      "name": "claude sonnet 5 5 medium",
+      "url": "https://artificialanalysis.ai/models/claude-sonnet-5-5-medium",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gemini-3-8-flash",
+      "name": "gemini 3 8 flash",
+      "url": "https://artificialanalysis.ai/models/gemini-3-8-flash",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-gemini-4-argon",
+      "name": "gemini 4 argon",
+      "url": "https://artificialanalysis.ai/models/gemini-4-argon",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-deepseek-v4-1-flash",
+      "name": "deepseek v4 1 flash",
+      "url": "https://artificialanalysis.ai/models/deepseek-v4-1-flash",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-grok-4-7",
+      "name": "grok 4 7",
+      "url": "https://artificialanalysis.ai/models/grok-4-7",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-muse-spark-1-3",
+      "name": "muse spark 1 3",
+      "url": "https://artificialanalysis.ai/models/muse-spark-1-3",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-02"
+    },
+    {
+      "id": "aa-data-api",
+      "name": "Artificial Analysis Data API",
+      "url": "https://artificialanalysis.ai/data-api/docs",
+      "publisher": "Artificial Analysis",
+      "kind": "api",
+      "checked_on": "2026-10-02"
+    }
+  ],
+  "models": [
+    {
+      "id": "gpt-6.1-sol",
+      "name": "GPT-6.1 Sol",
+      "provider": "OpenAI",
+      "status": "rollout",
+      "tagline": "Daily coding & công việc kỹ thuật nhiều bước",
+      "checked_on": "2026-10-02",
+      "default_effort": "medium",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "rollout",
+        "api": "available",
+        "source_ids": [
+          "openai-models",
+          "openai-chat"
+        ],
+        "note": "Đang rollout vào Plus. Nếu picker chưa có, dùng GPT-6 Sol cùng effort."
+      },
+      "reasoning": {
+        "api": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "codex": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max",
+          "ultra"
+        ],
+        "chat_plus": [],
+        "source_ids": [
+          "spec-gpt-6.1-sol",
+          "openai-models",
+          "openai-chat"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1050000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "spec-gpt-6.1-sol",
+        "api_price": {
+          "input_per_million": 2,
+          "output_per_million": 10,
+          "cached_input_per_million": 0.1,
+          "source_id": "spec-gpt-6.1-sol",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 47.8,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.2137,
+            "speed_tps": 51.71,
+            "ttft_seconds": 5.75,
+            "first_token_seconds": 5.75,
+            "end_to_end_500_answer_tokens_seconds": 15.41,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "a2e51d62-ea4e-4f15-8be0-be9dc1fb489d",
+              "slug": "gpt-6-1-sol-medium",
+              "name": "GPT-6.1 Sol (Medium)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.1
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 50.2,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.3191,
+            "speed_tps": 59.37,
+            "ttft_seconds": 57.97,
+            "first_token_seconds": 57.97,
+            "end_to_end_500_answer_tokens_seconds": 66.4,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "3b84fee3-b70a-41bc-819e-5fbdef9a0042",
+              "slug": "gpt-6-1-sol-high",
+              "name": "GPT-6.1 Sol (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.1
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 51,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.3929,
+            "speed_tps": 53.91,
+            "ttft_seconds": 111.22,
+            "first_token_seconds": 111.22,
+            "end_to_end_500_answer_tokens_seconds": 120.5,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "092a3b0e-c5c8-45dc-bf1b-53673c8ff352",
+              "slug": "gpt-6-1-sol-xhigh",
+              "name": "GPT-6.1 Sol (Xhigh)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.1
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 51.8,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.7242,
+            "speed_tps": 63.95,
+            "ttft_seconds": 291.08,
+            "first_token_seconds": 291.08,
+            "end_to_end_500_answer_tokens_seconds": 298.9,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "b25ac058-1e33-4c31-bbc9-a20c3ad0717a",
+              "slug": "gpt-6-1-sol",
+              "name": "GPT-6.1 Sol (Max)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.1
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 42.1,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.1308,
+            "speed_tps": 54.68,
+            "ttft_seconds": 3.25,
+            "first_token_seconds": 3.25,
+            "end_to_end_500_answer_tokens_seconds": 12.4,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "e76e0fe5-93ca-4272-9359-2eb1740467d1",
+              "slug": "gpt-6-1-sol-low",
+              "name": "GPT-6.1 Sol (Low)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.1
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Đang rollout vào Plus. Nếu picker chưa có, dùng GPT-6 Sol cùng effort."
+    },
+    {
+      "id": "gpt-6-luna",
+      "name": "GPT-6 Luna",
+      "provider": "OpenAI",
+      "status": "active",
+      "tagline": "Patch nhỏ, task có phạm vi rõ",
+      "checked_on": "2026-10-02",
+      "default_effort": "low",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "included",
+        "api": "available",
+        "source_ids": [
+          "openai-models",
+          "openai-chat"
+        ],
+        "note": "Work/Codex; High là một bước nâng khi Low chưa đủ."
+      },
+      "reasoning": {
+        "api": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "codex": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "chat_plus": [],
+        "source_ids": [
+          "spec-gpt-6-luna",
+          "openai-models",
+          "openai-chat"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1050000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "spec-gpt-6-luna",
+        "api_price": {
+          "input_per_million": 0.1,
+          "output_per_million": 0.5,
+          "cached_input_per_million": 0.01,
+          "source_id": "spec-gpt-6-luna",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 21.5,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.0045,
+            "speed_tps": 129.43,
+            "ttft_seconds": 2.45,
+            "first_token_seconds": 2.45,
+            "end_to_end_500_answer_tokens_seconds": 6.31,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "bf9708d8-933d-44f6-affa-b696a7a650c9",
+              "slug": "gpt-6-luna-low",
+              "name": "GPT-6 Luna (Low)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.1,
+              "output_per_million": 0.5,
+              "cached_input_per_million": 0.01
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 32.9,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.029,
+            "speed_tps": 124.21,
+            "ttft_seconds": 15.48,
+            "first_token_seconds": 15.48,
+            "end_to_end_500_answer_tokens_seconds": 19.5,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "7d1229bc-deea-4717-ba5b-f59a35d991e3",
+              "slug": "gpt-6-luna-high",
+              "name": "GPT-6 Luna (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.1,
+              "output_per_million": 0.5,
+              "cached_input_per_million": 0.01
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 34.6,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.0422,
+            "speed_tps": 133.91,
+            "ttft_seconds": 23.49,
+            "first_token_seconds": 23.49,
+            "end_to_end_500_answer_tokens_seconds": 27.22,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "19813eb2-460a-475c-af65-810bb8660fec",
+              "slug": "gpt-6-luna-xhigh",
+              "name": "GPT-6 Luna (Xhigh)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.1,
+              "output_per_million": 0.5,
+              "cached_input_per_million": 0.01
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 29.9,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.0175,
+            "speed_tps": null,
+            "ttft_seconds": null,
+            "first_token_seconds": null,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "36667da0-9222-4967-adbb-f7efa15ad213",
+              "slug": "gpt-6-luna-medium",
+              "name": "GPT-6 Luna (Medium)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.1,
+              "output_per_million": 0.5,
+              "cached_input_per_million": 0.01
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "none",
+          "aa": {
+            "intelligence": 18.5,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.0113,
+            "speed_tps": 130.97,
+            "ttft_seconds": 0.69,
+            "first_token_seconds": 0.69,
+            "end_to_end_500_answer_tokens_seconds": 4.51,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "63cb48ea-0b0c-4e07-8ded-6d28dec4fa28",
+              "slug": "gpt-6-luna-non-reasoning",
+              "name": "GPT-6 Luna (Non-reasoning)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.1,
+              "output_per_million": 0.5,
+              "cached_input_per_million": 0.01
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 38.1,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.0677,
+            "speed_tps": 128.3,
+            "ttft_seconds": 126.56,
+            "first_token_seconds": 126.56,
+            "end_to_end_500_answer_tokens_seconds": 130.46,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "6fb13851-40ce-4bda-ad3f-6b38e0c5daa7",
+              "slug": "gpt-6-luna",
+              "name": "GPT-6 Luna (Max)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.1,
+              "output_per_million": 0.5,
+              "cached_input_per_million": 0.01
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Work/Codex; High là một bước nâng khi Low chưa đủ."
+    },
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT-6 Astra",
+      "provider": "OpenAI",
+      "status": "active",
+      "tagline": "Reasoning khó, ràng buộc và judgment cao",
+      "checked_on": "2026-10-02",
+      "default_effort": "xhigh",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "included",
+        "api": "available",
+        "source_ids": [
+          "openai-models",
+          "openai-chat"
+        ],
+        "note": "Plus dùng Astra trong Work/Codex; GPT-6 Pro trong Chat không thuộc Plus. Ultra là orchestration bằng subagents, không có AA tương đương."
+      },
+      "reasoning": {
+        "api": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "codex": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max",
+          "ultra"
+        ],
+        "chat_plus": [],
+        "source_ids": [
+          "spec-gpt-6-astra",
+          "openai-models",
+          "openai-chat"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1050000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "spec-gpt-6-astra",
+        "api_price": {
+          "input_per_million": 10,
+          "output_per_million": 50,
+          "cached_input_per_million": 1,
+          "source_id": "spec-gpt-6-astra",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 50.9,
+            "coding_index": 77.1,
+            "agentic_index": 48.2,
+            "cost_per_task_usd": 1.7253,
+            "speed_tps": 45.44,
+            "ttft_seconds": 65.56,
+            "first_token_seconds": 65.56,
+            "end_to_end_500_answer_tokens_seconds": 76.57,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "e05a4828-0536-4876-870d-a235023f992b",
+              "slug": "gpt-6-astra-high",
+              "name": "GPT-6 Astra (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 10,
+              "output_per_million": 50,
+              "cached_input_per_million": 1
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 52.4,
+            "coding_index": 75.9,
+            "agentic_index": 50.2,
+            "cost_per_task_usd": 2.3088,
+            "speed_tps": 49.15,
+            "ttft_seconds": 191.01,
+            "first_token_seconds": 191.01,
+            "end_to_end_500_answer_tokens_seconds": 201.19,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "1f541ef3-913f-4eb2-9d07-0e93c7a9a5e3",
+              "slug": "gpt-6-astra-xhigh",
+              "name": "GPT-6 Astra (Xhigh)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 10,
+              "output_per_million": 50,
+              "cached_input_per_million": 1
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 52.7,
+            "coding_index": 76.9,
+            "agentic_index": 51,
+            "cost_per_task_usd": 3.2575,
+            "speed_tps": 51.33,
+            "ttft_seconds": 320.23,
+            "first_token_seconds": 320.23,
+            "end_to_end_500_answer_tokens_seconds": 329.98,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "2f339a97-9a0d-499a-9cb5-e0db665bfa25",
+              "slug": "gpt-6-astra",
+              "name": "GPT-6 Astra (Max)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 10,
+              "output_per_million": 50,
+              "cached_input_per_million": 1
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 45.8,
+            "coding_index": 75.7,
+            "agentic_index": 38.8,
+            "cost_per_task_usd": 0.8175,
+            "speed_tps": 43.19,
+            "ttft_seconds": 2.96,
+            "first_token_seconds": 2.96,
+            "end_to_end_500_answer_tokens_seconds": 14.54,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "a3f8100d-e38f-408b-b0fa-0085dae18dc1",
+              "slug": "gpt-6-astra-low",
+              "name": "GPT-6 Astra (Low)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 10,
+              "output_per_million": 50,
+              "cached_input_per_million": 1
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 49.6,
+            "coding_index": 76.7,
+            "agentic_index": 46,
+            "cost_per_task_usd": 1.5406,
+            "speed_tps": 44.92,
+            "ttft_seconds": 6.21,
+            "first_token_seconds": 6.21,
+            "end_to_end_500_answer_tokens_seconds": 17.34,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "e97a4ef5-e817-480e-9595-12f81dc4974f",
+              "slug": "gpt-6-astra-medium",
+              "name": "GPT-6 Astra (Medium)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 10,
+              "output_per_million": 50,
+              "cached_input_per_million": 1
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Plus dùng Astra trong Work/Codex; GPT-6 Pro trong Chat không thuộc Plus. Ultra là orchestration bằng subagents, không có AA tương đương."
+    },
+    {
+      "id": "gpt-6-sol",
+      "name": "GPT-6 Sol",
+      "provider": "OpenAI",
+      "status": "active",
+      "tagline": "Fallback khi chưa thấy 6.1 Sol",
+      "checked_on": "2026-10-02",
+      "default_effort": "medium",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "included",
+        "api": "available",
+        "source_ids": [
+          "openai-models",
+          "openai-chat"
+        ],
+        "note": "Giữ làm fallback cùng effort; không tự coi benchmark 6.1 là benchmark 6 Sol."
+      },
+      "reasoning": {
+        "api": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "codex": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max",
+          "ultra"
+        ],
+        "chat_plus": [],
+        "source_ids": [
+          "spec-gpt-6-sol",
+          "openai-models",
+          "openai-chat"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1050000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "spec-gpt-6-sol",
+        "api_price": {
+          "input_per_million": 2,
+          "output_per_million": 10,
+          "cached_input_per_million": 0.2,
+          "source_id": "spec-gpt-6-sol",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 34.2,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.1328,
+            "speed_tps": 70.29,
+            "ttft_seconds": 2.06,
+            "first_token_seconds": 2.06,
+            "end_to_end_500_answer_tokens_seconds": 9.17,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "01459872-433a-4ab2-8e99-7083162172eb",
+              "slug": "gpt-6-sol-low",
+              "name": "GPT-6 Sol (Low)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 42.4,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.3728,
+            "speed_tps": 75.8,
+            "ttft_seconds": 19.59,
+            "first_token_seconds": 19.59,
+            "end_to_end_500_answer_tokens_seconds": 26.19,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "52eebe3e-6ede-4e46-92db-c5dea49fc410",
+              "slug": "gpt-6-sol-high",
+              "name": "GPT-6 Sol (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 39.8,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.2473,
+            "speed_tps": null,
+            "ttft_seconds": null,
+            "first_token_seconds": null,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "780a4a85-17ff-4175-a8dd-ebca4823e61b",
+              "slug": "gpt-6-sol-medium",
+              "name": "GPT-6 Sol (Medium)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 47.6,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 1.0447,
+            "speed_tps": 85.59,
+            "ttft_seconds": 169.31,
+            "first_token_seconds": 169.31,
+            "end_to_end_500_answer_tokens_seconds": 175.15,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "c50ea08c-88c0-4eb7-85b8-27f2bbf6d527",
+              "slug": "gpt-6-sol",
+              "name": "GPT-6 Sol (Max)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "none",
+          "aa": {
+            "intelligence": 28.5,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.3337,
+            "speed_tps": 74.29,
+            "ttft_seconds": 1.01,
+            "first_token_seconds": 1.01,
+            "end_to_end_500_answer_tokens_seconds": 7.74,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "d3e20e76-9e1a-45b6-b809-ad6aa37430cf",
+              "slug": "gpt-6-sol-non-reasoning",
+              "name": "GPT-6 Sol (Non-reasoning)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 44.2,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.5208,
+            "speed_tps": 77.65,
+            "ttft_seconds": 54.19,
+            "first_token_seconds": 54.19,
+            "end_to_end_500_answer_tokens_seconds": 60.63,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "da2642fe-9f73-4788-b5af-24edcd55b37e",
+              "slug": "gpt-6-sol-xhigh",
+              "name": "GPT-6 Sol (Xhigh)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Giữ làm fallback cùng effort; không tự coi benchmark 6.1 là benchmark 6 Sol."
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "name": "GPT-5.6 Sol",
+      "provider": "OpenAI",
+      "status": "legacy",
+      "tagline": "ChatGPT Plus: Instant / Medium / High",
+      "checked_on": "2026-10-02",
+      "default_effort": "none",
+      "availability": {
+        "chat_plus": "included",
+        "codex_plus": "included",
+        "api": "available",
+        "source_ids": [
+          "openai-models",
+          "openai-chat"
+        ],
+        "note": "Chat Plus không có Extra High/Pro. Instant của Chat không được coi là cùng cấu hình API none. Giá API promotional ít nhất tới21/11/2026."
+      },
+      "reasoning": {
+        "api": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "codex": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max",
+          "ultra"
+        ],
+        "chat_plus": [
+          "instant",
+          "medium",
+          "high"
+        ],
+        "source_ids": [
+          "spec-gpt-5.6-sol",
+          "openai-models",
+          "openai-chat"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1050000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "spec-gpt-5.6-sol",
+        "api_price": {
+          "input_per_million": 4,
+          "output_per_million": 20,
+          "cached_input_per_million": 0.4,
+          "source_id": "spec-gpt-5.6-sol",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 33.5,
+            "coding_index": 69.7,
+            "agentic_index": 31.6,
+            "cost_per_task_usd": 0.2606,
+            "speed_tps": 66.75,
+            "ttft_seconds": 2.39,
+            "first_token_seconds": 2.39,
+            "end_to_end_500_answer_tokens_seconds": 9.88,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "0904b596-8932-43bd-9b21-324f128e1723",
+              "slug": "gpt-5-6-sol-low",
+              "name": "GPT-5.6 Sol (Low)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.4
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 39.2,
+            "coding_index": 76.3,
+            "agentic_index": 39.7,
+            "cost_per_task_usd": 0.505,
+            "speed_tps": 70.34,
+            "ttft_seconds": 7.15,
+            "first_token_seconds": 7.15,
+            "end_to_end_500_answer_tokens_seconds": 14.26,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "6f174934-5b7d-4333-86cb-f5ebf4a862e3",
+              "slug": "gpt-5-6-sol-medium",
+              "name": "GPT-5.6 Sol (Medium)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.4
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "none",
+          "aa": {
+            "intelligence": 28.3,
+            "coding_index": 65.1,
+            "agentic_index": 28.1,
+            "cost_per_task_usd": null,
+            "speed_tps": 66.3,
+            "ttft_seconds": 1.12,
+            "first_token_seconds": 1.12,
+            "end_to_end_500_answer_tokens_seconds": 8.66,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "7c4d1e30-6ecb-46cf-880c-41446d7b51f1",
+              "slug": "gpt-5-6-sol-non-reasoning",
+              "name": "GPT-5.6 Sol (Non-reasoning)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.4
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 42.3,
+            "coding_index": 77.2,
+            "agentic_index": 44.2,
+            "cost_per_task_usd": 0.808,
+            "speed_tps": 73.76,
+            "ttft_seconds": 16.36,
+            "first_token_seconds": 16.36,
+            "end_to_end_500_answer_tokens_seconds": 23.14,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "8afc250d-b538-45a2-812a-4605f4ffd87e",
+              "slug": "gpt-5-6-sol-high",
+              "name": "GPT-5.6 Sol (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.4
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 47,
+            "coding_index": 77.4,
+            "agentic_index": 50.2,
+            "cost_per_task_usd": 1.9885,
+            "speed_tps": 79.7,
+            "ttft_seconds": 125.04,
+            "first_token_seconds": 125.04,
+            "end_to_end_500_answer_tokens_seconds": 131.31,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "d93edfe8-bf35-49ad-b56e-b18116142a1c",
+              "slug": "gpt-5-6-sol",
+              "name": "GPT-5.6 Sol (Max)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.4
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 44,
+            "coding_index": 78.3,
+            "agentic_index": 47.4,
+            "cost_per_task_usd": 1.1844,
+            "speed_tps": 76.09,
+            "ttft_seconds": 55.73,
+            "first_token_seconds": 55.73,
+            "end_to_end_500_answer_tokens_seconds": 62.3,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "d998db47-9b67-4727-a2bb-2e1261020ac0",
+              "slug": "gpt-5-6-sol-xhigh",
+              "name": "GPT-5.6 Sol (Xhigh)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.4
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Chat Plus không có Extra High/Pro. Instant của Chat không được coi là cùng cấu hình API none. Giá API promotional ít nhất tới21/11/2026."
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "name": "GPT-5.6 Terra",
+      "provider": "OpenAI",
+      "status": "legacy",
+      "tagline": "Thế hệ trước, vẫn có trong rollout",
+      "checked_on": "2026-10-02",
+      "default_effort": "medium",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "included",
+        "api": "available",
+        "source_ids": [
+          "openai-models",
+          "openai-chat"
+        ],
+        "note": "Dùng khi cần tương thích workflow cũ; không phải lựa chọn mới mặc định."
+      },
+      "reasoning": {
+        "api": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "codex": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "chat_plus": [],
+        "source_ids": [
+          "spec-gpt-5.6-terra",
+          "openai-models",
+          "openai-chat"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1050000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "spec-gpt-5.6-terra",
+        "api_price": {
+          "input_per_million": 2,
+          "output_per_million": 12,
+          "cached_input_per_million": 0.2,
+          "source_id": "spec-gpt-5.6-terra",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 30.1,
+            "coding_index": 64.7,
+            "agentic_index": 30.4,
+            "cost_per_task_usd": 0.1834,
+            "speed_tps": 74.53,
+            "ttft_seconds": 2.32,
+            "first_token_seconds": 2.32,
+            "end_to_end_500_answer_tokens_seconds": 9.03,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "26e0f83a-ca98-4f34-94ac-7c5e251ee410",
+              "slug": "gpt-5-6-terra-medium",
+              "name": "GPT-5.6 Terra (Medium)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 12,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 34.2,
+            "coding_index": 67.1,
+            "agentic_index": 36.7,
+            "cost_per_task_usd": 0.3379,
+            "speed_tps": 76.82,
+            "ttft_seconds": 3.21,
+            "first_token_seconds": 3.21,
+            "end_to_end_500_answer_tokens_seconds": 9.72,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "81972fba-1219-477e-bbfb-18c656a63ff7",
+              "slug": "gpt-5-6-terra-high",
+              "name": "GPT-5.6 Terra (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 12,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "none",
+          "aa": {
+            "intelligence": 20.8,
+            "coding_index": 52.3,
+            "agentic_index": 23.5,
+            "cost_per_task_usd": 0.1397,
+            "speed_tps": 77.22,
+            "ttft_seconds": 0.77,
+            "first_token_seconds": 0.77,
+            "end_to_end_500_answer_tokens_seconds": 7.24,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "9b97a35e-6ac7-44d9-91c6-422fa678963e",
+              "slug": "gpt-5-6-terra-non-reasoning",
+              "name": "GPT-5.6 Terra (Non-reasoning)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 12,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 38,
+            "coding_index": 70.6,
+            "agentic_index": 41.4,
+            "cost_per_task_usd": 0.6318,
+            "speed_tps": 81.75,
+            "ttft_seconds": 49.03,
+            "first_token_seconds": 49.03,
+            "end_to_end_500_answer_tokens_seconds": 55.14,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "9e30696f-16fa-4b4f-ba53-161895a85fed",
+              "slug": "gpt-5-6-terra-xhigh",
+              "name": "GPT-5.6 Terra (Xhigh)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 12,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 42.1,
+            "coding_index": 76.7,
+            "agentic_index": 43.2,
+            "cost_per_task_usd": 1.3987,
+            "speed_tps": 95.14,
+            "ttft_seconds": 202.87,
+            "first_token_seconds": 202.87,
+            "end_to_end_500_answer_tokens_seconds": 208.12,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "bcf8db0a-3bb6-4d82-9516-0f57370c85a6",
+              "slug": "gpt-5-6-terra",
+              "name": "GPT-5.6 Terra (Max)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 12,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 27.5,
+            "coding_index": 58.1,
+            "agentic_index": 25.9,
+            "cost_per_task_usd": 0.1445,
+            "speed_tps": 74.06,
+            "ttft_seconds": 1.89,
+            "first_token_seconds": 1.89,
+            "end_to_end_500_answer_tokens_seconds": 8.64,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "cc4a20cd-09fe-4962-a430-119c815e85fa",
+              "slug": "gpt-5-6-terra-low",
+              "name": "GPT-5.6 Terra (Low)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 12,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Dùng khi cần tương thích workflow cũ; không phải lựa chọn mới mặc định."
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "name": "GPT-5.6 Luna",
+      "provider": "OpenAI",
+      "status": "legacy",
+      "tagline": "Luna thế hệ trước",
+      "checked_on": "2026-10-02",
+      "default_effort": "low",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "included",
+        "api": "available",
+        "source_ids": [
+          "openai-models",
+          "openai-chat"
+        ],
+        "note": "Chat Plus không có Luna riêng trong model picker; Luna là default Chat cho Free/Go."
+      },
+      "reasoning": {
+        "api": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "codex": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "chat_plus": [],
+        "source_ids": [
+          "spec-gpt-5.6-luna",
+          "openai-models",
+          "openai-chat"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1050000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "spec-gpt-5.6-luna",
+        "api_price": {
+          "input_per_million": 0.2,
+          "output_per_million": 1.2,
+          "cached_input_per_million": 0.02,
+          "source_id": "spec-gpt-5.6-luna",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 21,
+            "coding_index": 44.2,
+            "agentic_index": 16.1,
+            "cost_per_task_usd": 0.0098,
+            "speed_tps": 110.66,
+            "ttft_seconds": 1.63,
+            "first_token_seconds": 1.63,
+            "end_to_end_500_answer_tokens_seconds": 6.15,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "050c61cd-cddc-463a-a30a-a82aaa37be59",
+              "slug": "gpt-5-6-luna-low",
+              "name": "GPT-5.6 Luna (Low)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.2,
+              "output_per_million": 1.2,
+              "cached_input_per_million": 0.02
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 37.3,
+            "coding_index": 71.4,
+            "agentic_index": 42.1,
+            "cost_per_task_usd": 0.1783,
+            "speed_tps": 121.3,
+            "ttft_seconds": 112.12,
+            "first_token_seconds": 112.12,
+            "end_to_end_500_answer_tokens_seconds": 116.24,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "426d24c8-49ae-482a-b4a8-20f1c53f21c1",
+              "slug": "gpt-5-6-luna",
+              "name": "GPT-5.6 Luna (Max)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.2,
+              "output_per_million": 1.2,
+              "cached_input_per_million": 0.02
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 25,
+            "coding_index": 50.7,
+            "agentic_index": 23.9,
+            "cost_per_task_usd": 0.0156,
+            "speed_tps": 110.59,
+            "ttft_seconds": 2.99,
+            "first_token_seconds": 2.99,
+            "end_to_end_500_answer_tokens_seconds": 7.51,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "58b812bf-8498-46db-b834-f43ccc614b61",
+              "slug": "gpt-5-6-luna-medium",
+              "name": "GPT-5.6 Luna (Medium)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.2,
+              "output_per_million": 1.2,
+              "cached_input_per_million": 0.02
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 34.6,
+            "coding_index": 68.6,
+            "agentic_index": 38.7,
+            "cost_per_task_usd": 0.0853,
+            "speed_tps": 111.31,
+            "ttft_seconds": 58.75,
+            "first_token_seconds": 58.75,
+            "end_to_end_500_answer_tokens_seconds": 63.24,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "87110ff0-1f79-41b4-9976-eda250597317",
+              "slug": "gpt-5-6-luna-xhigh",
+              "name": "GPT-5.6 Luna (Xhigh)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.2,
+              "output_per_million": 1.2,
+              "cached_input_per_million": 0.02
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 32.1,
+            "coding_index": 63.3,
+            "agentic_index": 34.6,
+            "cost_per_task_usd": 0.044,
+            "speed_tps": 108,
+            "ttft_seconds": 18.4,
+            "first_token_seconds": 18.4,
+            "end_to_end_500_answer_tokens_seconds": 23.03,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "aa55297e-8fbf-4372-b4ab-9b068dc6396c",
+              "slug": "gpt-5-6-luna-high",
+              "name": "GPT-5.6 Luna (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.2,
+              "output_per_million": 1.2,
+              "cached_input_per_million": 0.02
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "none",
+          "aa": {
+            "intelligence": 15.5,
+            "coding_index": 39.3,
+            "agentic_index": 13.4,
+            "cost_per_task_usd": 0.0101,
+            "speed_tps": 105.98,
+            "ttft_seconds": 0.79,
+            "first_token_seconds": 0.79,
+            "end_to_end_500_answer_tokens_seconds": 5.51,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "dc64f856-3ded-497d-9527-d41d31267ed5",
+              "slug": "gpt-5-6-luna-non-reasoning",
+              "name": "GPT-5.6 Luna (Non-reasoning)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.2,
+              "output_per_million": 1.2,
+              "cached_input_per_million": 0.02
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Chat Plus không có Luna riêng trong model picker; Luna là default Chat cho Free/Go."
+    },
+    {
+      "id": "gpt-5.5",
+      "name": "GPT-5.5",
+      "provider": "OpenAI",
+      "status": "legacy",
+      "tagline": "Sắp rời ChatGPT / Codex",
+      "checked_on": "2026-10-02",
+      "default_effort": "medium",
+      "availability": {
+        "chat_plus": "legacy",
+        "codex_plus": "legacy",
+        "api": "available",
+        "source_ids": [
+          "openai-models",
+          "openai-chat"
+        ],
+        "note": "Retire ChatGPT/Work/Codex ngày14/10/2026; API vẫn còn. Không đề xuất cho workflow mới."
+      },
+      "reasoning": {
+        "api": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "codex": [],
+        "chat_plus": [],
+        "source_ids": [
+          "spec-gpt-5.5",
+          "openai-models",
+          "openai-chat"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1050000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "spec-gpt-5.5",
+        "api_price": {
+          "input_per_million": 5,
+          "output_per_million": 30,
+          "cached_input_per_million": 0.5,
+          "source_id": "spec-gpt-5.5",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 38.4,
+            "coding_index": 74.9,
+            "agentic_index": 36.4,
+            "cost_per_task_usd": 2.634,
+            "speed_tps": 85.53,
+            "ttft_seconds": 52.42,
+            "first_token_seconds": 52.42,
+            "end_to_end_500_answer_tokens_seconds": 58.27,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "1f054429-397e-4fdb-9e71-67bc92c1735e",
+              "slug": "gpt-5-5",
+              "name": "GPT-5.5 (Xhigh)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 5,
+              "output_per_million": 30,
+              "cached_input_per_million": 0.5
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 33.8,
+            "coding_index": 71.5,
+            "agentic_index": 29.5,
+            "cost_per_task_usd": 0.9017,
+            "speed_tps": 83.25,
+            "ttft_seconds": 7.5,
+            "first_token_seconds": 7.5,
+            "end_to_end_500_answer_tokens_seconds": 13.5,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "6b79f899-e3c0-45f6-923c-243faccdb2fc",
+              "slug": "gpt-5-5-medium",
+              "name": "GPT-5.5 (Medium)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 5,
+              "output_per_million": 30,
+              "cached_input_per_million": 0.5
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "none",
+          "aa": {
+            "intelligence": 23.2,
+            "coding_index": 56.5,
+            "agentic_index": null,
+            "cost_per_task_usd": null,
+            "speed_tps": 79.99,
+            "ttft_seconds": 0.89,
+            "first_token_seconds": 0.89,
+            "end_to_end_500_answer_tokens_seconds": 7.14,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "6f1a7562-6e96-46ac-af4f-6ba5a7a3da96",
+              "slug": "gpt-5-5-non-reasoning",
+              "name": "GPT-5.5 (Non-reasoning)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 5,
+              "output_per_million": 30,
+              "cached_input_per_million": 0.5
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 37,
+            "coding_index": 71.6,
+            "agentic_index": 34.3,
+            "cost_per_task_usd": 1.5413,
+            "speed_tps": 85.97,
+            "ttft_seconds": 26.58,
+            "first_token_seconds": 26.58,
+            "end_to_end_500_answer_tokens_seconds": 32.39,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "b13c1257-d746-4027-8fc8-4892dc14701c",
+              "slug": "gpt-5-5-high",
+              "name": "GPT-5.5 (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 5,
+              "output_per_million": 30,
+              "cached_input_per_million": 0.5
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 30.7,
+            "coding_index": 60.9,
+            "agentic_index": null,
+            "cost_per_task_usd": null,
+            "speed_tps": 82.11,
+            "ttft_seconds": 1.68,
+            "first_token_seconds": 1.68,
+            "end_to_end_500_answer_tokens_seconds": 7.77,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "c77cfe51-f4a0-4692-9dee-5061ef667f23",
+              "slug": "gpt-5-5-low",
+              "name": "GPT-5.5 (Low)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 5,
+              "output_per_million": 30,
+              "cached_input_per_million": 0.5
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Retire ChatGPT/Work/Codex ngày14/10/2026; API vẫn còn. Không đề xuất cho workflow mới.",
+      "retire_on": "2026-10-14"
+    },
+    {
+      "id": "claude-opus-5-5",
+      "name": "Claude Opus 5.5",
+      "provider": "Anthropic",
+      "status": "active",
+      "tagline": "Challenger cho reasoning cần chất lượng tối đa",
+      "checked_on": "2026-10-02",
+      "default_effort": "high",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "not_available",
+        "api": "available",
+        "source_ids": [
+          "claude-opus"
+        ],
+        "note": "Ngoài gói OpenAI; cần Claude/API riêng. AA chạy adaptive reasoning + default fallback; không tương đương trực tiếp Codex harness."
+      },
+      "reasoning": {
+        "api": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "codex": [],
+        "chat_plus": [],
+        "source_ids": [
+          "claude-opus",
+          "claude-effort"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1000000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "claude-opus",
+        "api_price": {
+          "input_per_million": 4,
+          "output_per_million": 20,
+          "cached_input_per_million": 0.2,
+          "source_id": "claude-opus",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 53.6,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 1.8225,
+            "speed_tps": 73.39,
+            "ttft_seconds": 38.91,
+            "first_token_seconds": 38.91,
+            "end_to_end_500_answer_tokens_seconds": 45.72,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "f314eade-2232-44bf-a3ab-9b326bc67de6",
+              "slug": "claude-opus-5-5-high",
+              "name": "Claude Opus 5.5 (Adaptive Reasoning, High Effort, Default Fallback)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 57.6,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 5.982,
+            "speed_tps": 92.16,
+            "ttft_seconds": 704.69,
+            "first_token_seconds": 704.69,
+            "end_to_end_500_answer_tokens_seconds": 710.12,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "2f3c4dc9-a450-4303-8697-0237257cf08f",
+              "slug": "claude-opus-5-5",
+              "name": "Claude Opus 5.5 (Adaptive Reasoning, Max Effort, Default Fallback)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 42.3,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.5512,
+            "speed_tps": 72.19,
+            "ttft_seconds": 12.49,
+            "first_token_seconds": 12.49,
+            "end_to_end_500_answer_tokens_seconds": 19.42,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "4416ca93-fde6-4b7b-abbc-3a6be109cc3d",
+              "slug": "claude-opus-5-5-low",
+              "name": "Claude Opus 5.5 (Adaptive Reasoning, Low Effort, Default Fallback)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 56,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 3.4591,
+            "speed_tps": 79.6,
+            "ttft_seconds": 141.03,
+            "first_token_seconds": 141.03,
+            "end_to_end_500_answer_tokens_seconds": 147.31,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "df5bf99d-d228-4715-b41b-19ca86118777",
+              "slug": "claude-opus-5-5-xhigh",
+              "name": "Claude Opus 5.5 (Adaptive Reasoning, Xhigh Effort, Default Fallback)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 51.2,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 1.336,
+            "speed_tps": 72.8,
+            "ttft_seconds": 25.75,
+            "first_token_seconds": 25.75,
+            "end_to_end_500_answer_tokens_seconds": 32.62,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "ea9e0da6-169f-43c6-92f5-730a10d6ff8d",
+              "slug": "claude-opus-5-5-medium",
+              "name": "Claude Opus 5.5 (Adaptive Reasoning, Medium Effort, Default Fallback)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 4,
+              "output_per_million": 20,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Ngoài gói OpenAI; cần Claude/API riêng. AA chạy adaptive reasoning + default fallback; không tương đương trực tiếp Codex harness."
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5",
+      "provider": "Anthropic",
+      "status": "active",
+      "tagline": "Tốc độ tương tác tốt; thử cho task agentic rõ",
+      "checked_on": "2026-10-02",
+      "default_effort": "medium",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "not_available",
+        "api": "available",
+        "source_ids": [
+          "claude-opus"
+        ],
+        "note": "Official khuyên Medium cho agentic task rõ, High khi khó. AA coding/agentic chưa xác minh; chưa kết luận thắng Sol trong repo của bạn."
+      },
+      "reasoning": {
+        "api": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "codex": [],
+        "chat_plus": [],
+        "source_ids": [
+          "claude-opus",
+          "claude-effort",
+          "claude-sonnet"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1000000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "claude-opus",
+        "api_price": {
+          "input_per_million": 2,
+          "output_per_million": 10,
+          "cached_input_per_million": null,
+          "source_id": "claude-opus",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 40.7,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.5862,
+            "speed_tps": 91.69,
+            "ttft_seconds": 1.34,
+            "first_token_seconds": 1.34,
+            "end_to_end_500_answer_tokens_seconds": 6.8,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "042e8a37-fcd0-40f4-8f41-99215fb68eda",
+              "slug": "claude-sonnet-5-5-medium",
+              "name": "Claude Sonnet 5.5 (Adaptive Reasoning, Medium Effort, Default Fallback)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 46.7,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 1.0798,
+            "speed_tps": 97.59,
+            "ttft_seconds": 12.88,
+            "first_token_seconds": 12.88,
+            "end_to_end_500_answer_tokens_seconds": 18.01,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "268525e2-f873-4178-bc07-e6a0ee1f002d",
+              "slug": "claude-sonnet-5-5-high",
+              "name": "Claude Sonnet 5.5 (Adaptive Reasoning, High Effort, Default Fallback)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 51.9,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 2.7426,
+            "speed_tps": 101.3,
+            "ttft_seconds": 32.46,
+            "first_token_seconds": 32.46,
+            "end_to_end_500_answer_tokens_seconds": 37.39,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "975aeaef-50bd-4a65-9c73-f1015adcd4d4",
+              "slug": "claude-sonnet-5-5-xhigh",
+              "name": "Claude Sonnet 5.5 (Adaptive Reasoning, Xhigh Effort, Default Fallback)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 56,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 7.6206,
+            "speed_tps": 138.4,
+            "ttft_seconds": 455.69,
+            "first_token_seconds": 455.69,
+            "end_to_end_500_answer_tokens_seconds": 459.3,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "b171d979-5ec1-45de-b8b9-db1ee65e77ec",
+              "slug": "claude-sonnet-5-5",
+              "name": "Claude Sonnet 5.5 (Adaptive Reasoning, Max Effort, Default Fallback)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": null,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": null,
+            "speed_tps": 88.26,
+            "ttft_seconds": 1.35,
+            "first_token_seconds": 1.35,
+            "end_to_end_500_answer_tokens_seconds": 7.01,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "bbc2ffea-cf6b-43be-8c41-1769347e234d",
+              "slug": "claude-sonnet-5-5-low",
+              "name": "Claude Sonnet 5.5 (Adaptive Reasoning, Low Effort, Default Fallback)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.2
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Official khuyên Medium cho agentic task rõ, High khi khó. AA coding/agentic chưa xác minh; chưa kết luận thắng Sol trong repo của bạn."
+    },
+    {
+      "id": "gemini-3.8-flash",
+      "name": "Gemini 3.8 Flash",
+      "provider": "Google",
+      "status": "active",
+      "tagline": "Output throughput cao trên API",
+      "checked_on": "2026-10-02",
+      "default_effort": "high",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "not_available",
+        "api": "available",
+        "source_ids": [
+          "gemini-flash"
+        ],
+        "note": "Giá Standard từ Gemini pricing tới31/12/2026; giá tăng từ01/01/2027. Tốc độ output không đồng nghĩa time-to-answer thấp."
+      },
+      "reasoning": {
+        "api": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "codex": [],
+        "chat_plus": [],
+        "source_ids": [
+          "gemini-flash"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1048576,
+        "context_scope": "API input limit",
+        "max_output_tokens": 65536,
+        "chat_context_tokens": null,
+        "source_id": "gemini-flash",
+        "api_price": {
+          "input_per_million": 0.75,
+          "output_per_million": 3.75,
+          "cached_input_per_million": 0.075,
+          "source_id": "gemini-pricing",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 40.9,
+            "coding_index": 76.3,
+            "agentic_index": 40.2,
+            "cost_per_task_usd": 1.2428,
+            "speed_tps": 244.69,
+            "ttft_seconds": 17.48,
+            "first_token_seconds": 17.48,
+            "end_to_end_500_answer_tokens_seconds": 19.53,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "8a999846-4c1d-4ce7-a8b7-1310a7166fd7",
+              "slug": "gemini-3-8-flash",
+              "name": "Gemini 3.8 Flash (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.75,
+              "output_per_million": 3.75,
+              "cached_input_per_million": 0.07
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 39.8,
+            "coding_index": 74.1,
+            "agentic_index": 39.7,
+            "cost_per_task_usd": 0.931,
+            "speed_tps": null,
+            "ttft_seconds": null,
+            "first_token_seconds": null,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "744fa3c1-42a7-4995-b138-fb6be11f463c",
+              "slug": "gemini-3-8-flash-medium",
+              "name": "Gemini 3.8 Flash (Medium)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.75,
+              "output_per_million": 3.75,
+              "cached_input_per_million": 0.07
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 33.5,
+            "coding_index": 73.5,
+            "agentic_index": 32.6,
+            "cost_per_task_usd": null,
+            "speed_tps": null,
+            "ttft_seconds": null,
+            "first_token_seconds": null,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "f6db039b-0f3b-485c-9d7f-982988e44f26",
+              "slug": "gemini-3-8-flash-low",
+              "name": "Gemini 3.8 Flash (Low)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.75,
+              "output_per_million": 3.75,
+              "cached_input_per_million": 0.07
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Giá Standard từ Gemini pricing tới31/12/2026; giá tăng từ01/01/2027. Tốc độ output không đồng nghĩa time-to-answer thấp."
+    },
+    {
+      "id": "gemini-4-argon",
+      "name": "Gemini 4 Argon",
+      "provider": "Google",
+      "status": "restricted",
+      "tagline": "Đã công bố, chưa phải lựa chọn dùng ngay",
+      "checked_on": "2026-10-02",
+      "default_effort": "high",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "not_available",
+        "api": "restricted",
+        "source_ids": [
+          "gemini-argon"
+        ],
+        "note": "Google30/09: tiếp cận giới hạn qua Fairwind, broad availability chưa mở. Giá là giá giới thiệu đã công bố; context chính thức chưa xác minh."
+      },
+      "reasoning": {
+        "api": [],
+        "codex": [],
+        "chat_plus": [],
+        "source_ids": [
+          "gemini-argon"
+        ]
+      },
+      "specs": {
+        "context_tokens": null,
+        "context_scope": "API input limit",
+        "max_output_tokens": 1000000,
+        "chat_context_tokens": null,
+        "source_id": "gemini-argon",
+        "api_price": {
+          "input_per_million": 2,
+          "output_per_million": 10,
+          "cached_input_per_million": 0.1,
+          "source_id": "gemini-argon",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 52.6,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 1.9903,
+            "speed_tps": null,
+            "ttft_seconds": null,
+            "first_token_seconds": null,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "d366dfa1-d940-4788-aa73-d298c45699b3",
+              "slug": "gemini-4-argon",
+              "name": "Gemini 4 Argon (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 10,
+              "cached_input_per_million": 0.1
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "Google30/09: tiếp cận giới hạn qua Fairwind, broad availability chưa mở. Giá là giá giới thiệu đã công bố; context chính thức chưa xác minh."
+    },
+    {
+      "id": "deepseek-v4.1-flash",
+      "name": "DeepSeek V4.1 Flash",
+      "provider": "DeepSeek",
+      "status": "watchlist",
+      "tagline": "Theo dõi throughput và hiệu quả API",
+      "checked_on": "2026-10-02",
+      "default_effort": "max",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "not_available",
+        "api": "unverified",
+        "source_ids": [
+          "aa-deepseek-v4-1-flash"
+        ],
+        "note": "AA có dữ liệu; catalog/availability/giá chính thức chưa xác minh trong lần kiểm tra này. Không tự đề xuất chuyển sang model này."
+      },
+      "reasoning": {
+        "api": [],
+        "codex": [],
+        "chat_plus": [],
+        "source_ids": [
+          "aa-deepseek-v4-1-flash"
+        ]
+      },
+      "specs": {
+        "context_tokens": null,
+        "context_scope": "API combined context",
+        "max_output_tokens": null,
+        "chat_context_tokens": null,
+        "source_id": "aa-deepseek-v4-1-flash",
+        "api_price": {
+          "input_per_million": null,
+          "output_per_million": null,
+          "cached_input_per_million": null,
+          "source_id": "aa-deepseek-v4-1-flash",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 39.5,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.2652,
+            "speed_tps": 208.93,
+            "ttft_seconds": 10.56,
+            "first_token_seconds": 0.99,
+            "end_to_end_500_answer_tokens_seconds": 12.96,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "dbe7c625-3100-4463-b479-a228c41f75dd",
+              "slug": "deepseek-v4-1-flash",
+              "name": "DeepSeek V4.1 Flash (Max)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.3,
+              "output_per_million": 1.2,
+              "cached_input_per_million": 0.01
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "none",
+          "aa": {
+            "intelligence": 24.7,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.1467,
+            "speed_tps": 199.38,
+            "ttft_seconds": 0.99,
+            "first_token_seconds": 0.99,
+            "end_to_end_500_answer_tokens_seconds": 3.5,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "73c96f99-0de3-4668-a4bd-b106a0fe18f2",
+              "slug": "deepseek-v4-1-flash-non-reasoning",
+              "name": "DeepSeek V4.1 Flash (Non-reasoning)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 0.3,
+              "output_per_million": 1.2,
+              "cached_input_per_million": 0.01
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "AA có dữ liệu; catalog/availability/giá chính thức chưa xác minh trong lần kiểm tra này. Không tự đề xuất chuyển sang model này."
+    },
+    {
+      "id": "grok-4.7",
+      "name": "Grok 4.7",
+      "provider": "xAI",
+      "status": "watchlist",
+      "tagline": "Theo dõi model frontier của xAI",
+      "checked_on": "2026-10-02",
+      "default_effort": "xhigh",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "not_available",
+        "api": "unverified",
+        "source_ids": [
+          "aa-grok-4-7"
+        ],
+        "note": "AA theo dõi; thông số và quyền truy cập chính thức N/A, chưa đưa vào recommendation."
+      },
+      "reasoning": {
+        "api": [],
+        "codex": [],
+        "chat_plus": [],
+        "source_ids": [
+          "aa-grok-4-7"
+        ]
+      },
+      "specs": {
+        "context_tokens": null,
+        "context_scope": "API combined context",
+        "max_output_tokens": null,
+        "chat_context_tokens": null,
+        "source_id": "aa-grok-4-7",
+        "api_price": {
+          "input_per_million": null,
+          "output_per_million": null,
+          "cached_input_per_million": null,
+          "source_id": "aa-grok-4-7",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 46.4,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 3.7383,
+            "speed_tps": 76.77,
+            "ttft_seconds": 49.32,
+            "first_token_seconds": 49.32,
+            "end_to_end_500_answer_tokens_seconds": 55.83,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "59627802-1546-422c-9a65-65b61c022d36",
+              "slug": "grok-4-7",
+              "name": "Grok 4.7 (Xhigh)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 6,
+              "cached_input_per_million": 0.5
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 42.2,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 1.248,
+            "speed_tps": 72.3,
+            "ttft_seconds": 8.62,
+            "first_token_seconds": 8.62,
+            "end_to_end_500_answer_tokens_seconds": 15.54,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "208c16f0-8c5b-4524-ac8a-ac74c02e80a9",
+              "slug": "grok-4-7-low",
+              "name": "Grok 4.7 (Low)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 6,
+              "cached_input_per_million": 0.5
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 46.3,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 2.7261,
+            "speed_tps": 77.78,
+            "ttft_seconds": 40.21,
+            "first_token_seconds": 40.21,
+            "end_to_end_500_answer_tokens_seconds": 46.64,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "272f5f03-aea9-4675-a244-2b753b618cdf",
+              "slug": "grok-4-7-high",
+              "name": "Grok 4.7 (High)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 2,
+              "output_per_million": 6,
+              "cached_input_per_million": 0.5
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "AA theo dõi; thông số và quyền truy cập chính thức N/A, chưa đưa vào recommendation."
+    },
+    {
+      "id": "muse-spark-1.3",
+      "name": "Muse Spark 1.3",
+      "provider": "Meta",
+      "status": "watchlist",
+      "tagline": "Theo dõi frontier của Meta",
+      "checked_on": "2026-10-02",
+      "default_effort": "max",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "not_available",
+        "api": "unverified",
+        "source_ids": [
+          "aa-muse-spark-1-3"
+        ],
+        "note": "AA theo dõi; thông số và quyền truy cập chính thức N/A, chưa đưa vào recommendation."
+      },
+      "reasoning": {
+        "api": [],
+        "codex": [],
+        "chat_plus": [],
+        "source_ids": [
+          "aa-muse-spark-1-3"
+        ]
+      },
+      "specs": {
+        "context_tokens": null,
+        "context_scope": "API combined context",
+        "max_output_tokens": null,
+        "chat_context_tokens": null,
+        "source_id": "aa-muse-spark-1-3",
+        "api_price": {
+          "input_per_million": null,
+          "output_per_million": null,
+          "cached_input_per_million": null,
+          "source_id": "aa-muse-spark-1-3",
+          "scope": "USD / 1M tokens, Standard; tool fees, cache writes và long-context premium có thể thêm."
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 48.1,
+            "coding_index": 75.8,
+            "agentic_index": 55.5,
+            "cost_per_task_usd": 1.6049,
+            "speed_tps": 155.98,
+            "ttft_seconds": 59.29,
+            "first_token_seconds": 46.46,
+            "end_to_end_500_answer_tokens_seconds": 62.49,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "9999672c-b687-4026-9c15-5cef02ff53bb",
+              "slug": "muse-spark-1-3",
+              "name": "Muse Spark 1.3 (Max)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 1.25,
+              "output_per_million": 4.25,
+              "cached_input_per_million": 0.15
+            },
+            "context_window_tokens": null
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 45.1,
+            "coding_index": 76.5,
+            "agentic_index": 51.5,
+            "cost_per_task_usd": 1.3678,
+            "speed_tps": 138.91,
+            "ttft_seconds": 54.6,
+            "first_token_seconds": 40.2,
+            "end_to_end_500_answer_tokens_seconds": 58.2,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "4.3",
+            "index_precision": "major.minor",
+            "source_id": "aa-data-api",
+            "checked_on": "2026-10-02",
+            "data_source": "aa-api-v2",
+            "scope": "AA Intelligence Index weighted average cost/task. API medians across providers; TTFT ở đây là first ANSWER token, gồm reasoning. Không đại diện task repo hoặc quota Plus.",
+            "missing_reason": "API null = chưa đo/không áp dụng/chưa công bố. Free không có token counts; Pro trả tổng suite, không phải per-task. Không nội suy số thiếu.",
+            "api": {
+              "model_id": "d5170215-69be-4129-849b-26d8d8825bfc",
+              "slug": "muse-spark-1-3-xhigh",
+              "name": "Muse Spark 1.3 (Xhigh)",
+              "tier": "free",
+              "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+              "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+              "prompt_type": "free-default (preset not exposed)"
+            },
+            "api_pricing": {
+              "input_per_million": 1.25,
+              "output_per_million": 4.25,
+              "cached_input_per_million": 0.15
+            },
+            "context_window_tokens": null
+          }
+        }
+      ],
+      "notes": "AA theo dõi; thông số và quyền truy cập chính thức N/A, chưa đưa vào recommendation."
+    }
+  ],
+  "policy": {
+    "profile": "ChatGPT Plus + Codex/OpenAI",
+    "preferred_provider": "OpenAI",
+    "stale_after_days": 7,
+    "method": "Chọn candidate nhẹ nhất đã được review đủ năng lực cho phạm vi task. Benchmark dùng kiểm tra trade-off, không tự suy ra năng lực coding từ Intelligence. Candidates và adequacy là inference có nguồn; không phải kết quả eval cá nhân.",
+    "cases": [
+      {
+        "id": "chat",
+        "label": "Chat thường",
+        "short_label": "Chat",
+        "description": "Hỏi nhanh, viết lại, dịch và trao đổi thường ngày.",
+        "candidates": [
+          {
+            "model_id": "gpt-5.6-sol",
+            "effort": "instant",
+            "surface": "chat",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-chat"
+            ]
+          }
+        ],
+        "escalate": {
+          "model_id": "gpt-5.6-sol",
+          "effort": "medium",
+          "surface": "chat",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-chat"
+          ]
+        },
+        "escalate_when": "Cần phân tích có nhiều điều kiện hoặc câu trả lời Instant bỏ sót ý.",
+        "reason": "Chọn Instant trong Chat Plus; chỉ tăng Thinking khi cần.",
+        "confidence": "official-guidance"
+      },
+      {
+        "id": "small-coding",
+        "label": "Coding task nhỏ",
+        "short_label": "Patch nhỏ",
+        "description": "Sửa một hàm, vài dòng CSS, đổi field, viết script có đầu ra rõ.",
+        "candidates": [
+          {
+            "model_id": "gpt-6-luna",
+            "effort": "low",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          },
+          {
+            "model_id": "gpt-5.6-luna",
+            "effort": "low",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          }
+        ],
+        "escalate": {
+          "model_id": "gpt-6-luna",
+          "effort": "high",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        },
+        "escalate_when": "Low bỏ sót edge case, hoặc patch chạm nhiều hơn dự kiến.",
+        "reason": "Luna Low cho phạm vi hẹp theo official guidance; API AA đo $0.0045/task và first answer 2.45s. Coding Index của variant này còn N/A, không coi Intelligence là coding score.",
+        "confidence": "official-guidance-and-aa-api"
+      },
+      {
+        "id": "daily-coding",
+        "label": "Daily coding",
+        "short_label": "Daily coding",
+        "description": "Implement feature thường ngày với vài file, kiểm tra flow và sửa theo review.",
+        "candidates": [
+          {
+            "model_id": "gpt-6.1-sol",
+            "effort": "medium",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          },
+          {
+            "model_id": "gpt-6-sol",
+            "effort": "medium",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          },
+          {
+            "model_id": "gpt-5.6-sol",
+            "effort": "medium",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          }
+        ],
+        "escalate": {
+          "model_id": "gpt-6.1-sol",
+          "effort": "high",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        },
+        "escalate_when": "Bug qua nhiều lớp, yêu cầu mơ hồ hoặc cần kiểm tra sâu hơn.",
+        "reason": "Sol 6.1 Medium là điểm bắt đầu theo official guidance. AA API: Intelligence 47.8, $0.2137/task, first answer 5.75s; Coding/Agentic của variant này còn N/A.",
+        "confidence": "official-guidance-and-aa-api"
+      },
+      {
+        "id": "hard-debug",
+        "label": "Debug khó",
+        "short_label": "Debug khó",
+        "description": "Root cause chưa rõ: concurrency, nhiều service, trạng thái sai hoặc lỗi khó tái hiện.",
+        "candidates": [
+          {
+            "model_id": "gpt-6.1-sol",
+            "effort": "high",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          },
+          {
+            "model_id": "gpt-6-sol",
+            "effort": "high",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          },
+          {
+            "model_id": "gpt-5.6-sol",
+            "effort": "high",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          }
+        ],
+        "escalate": {
+          "model_id": "gpt-6-astra",
+          "effort": "high",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        },
+        "escalate_when": "Sol vẫn không nối được evidence thành root cause sau một vòng điều tra.",
+        "reason": "Sol 6.1 High để nối evidence và điều tra nhiều bước. Cost/task $0.3191 và first answer 57.97s trên AA API; chỉ tăng effort khi phạm vi cần độ sâu này.",
+        "confidence": "official-guidance-and-aa-api"
+      },
+      {
+        "id": "architecture",
+        "label": "Architecture / refactor lớn",
+        "short_label": "Architecture",
+        "description": "Trade-offs, boundaries và migration ảnh hưởng nhiều module; cần kế hoạch kiểm chứng.",
+        "candidates": [
+          {
+            "model_id": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          },
+          {
+            "model_id": "gpt-6-sol",
+            "effort": "xhigh",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          },
+          {
+            "model_id": "gpt-5.6-sol",
+            "effort": "xhigh",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          }
+        ],
+        "escalate": {
+          "model_id": "gpt-6-astra",
+          "effort": "xhigh",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        },
+        "escalate_when": "Phạm vi mở, nhiều ràng buộc xung đột hoặc quyết định có chi phí sửa cao.",
+        "reason": "Sol 6.1 Extra High theo guidance cho nhiều ràng buộc xung đột. AA API: Intelligence 51, $0.3929/task, first answer 111.22s. Chưa có coding score riêng của variant.",
+        "confidence": "official-guidance-and-aa-api"
+      },
+      {
+        "id": "very-hard",
+        "label": "Reasoning rất khó",
+        "short_label": "Reasoning sâu",
+        "description": "Bài toán mơ hồ, ràng buộc dày, cần giữ consistency qua nhiều bước suy luận.",
+        "candidates": [
+          {
+            "model_id": "gpt-6-astra",
+            "effort": "xhigh",
+            "surface": "codex",
+            "adequate": true,
+            "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+            "source_ids": [
+              "openai-selection",
+              "openai-models",
+              "aa-data-api"
+            ]
+          }
+        ],
+        "escalate": {
+          "model_id": "gpt-6-astra",
+          "effort": "max",
+          "surface": "codex",
+          "adequate": true,
+          "reason": "Phù hợp phạm vi theo guidance chính thức; adequacy là nhận định cần kiểm tra bằng kết quả task.",
+          "source_ids": [
+            "openai-selection",
+            "openai-models",
+            "aa-data-api"
+          ]
+        },
+        "escalate_when": "Extra High chưa giải được và độ sâu quan trọng hơn thời gian/quota.",
+        "reason": "Astra Extra High trước: AA API 52.4 Intelligence, 75.9 Coding và 50.2 Agentic. Max đạt 52.7 Intelligence nhưng API cost/task cao hơn khoảng 41%; chưa cần mặc định Max.",
+        "confidence": "official-guidance-and-aa-api",
+        "challenger": {
+          "model_id": "claude-opus-5-5",
+          "effort": "max",
+          "surface": "external",
+          "compare_to": {
+            "model_id": "gpt-6-astra",
+            "effort": "max"
+          },
+          "metric": "intelligence",
+          "minimum_advantage": 3,
+          "title": "Ưu tiên quality tuyệt đối? Thử Opus 5.5 Max",
+          "interpretation": "Opus dẫn trên AA Intelligence cùng phiên bản index. Đây là bằng chứng benchmark rộng để thử reasoning sâu, chưa chứng minh thắng coding task của bạn.",
+          "source_ids": [
+            "claude-opus",
+            "aa-claude-opus-5-5",
+            "aa-gpt-6-astra",
+            "aa-data-api"
+          ]
+        }
+      }
+    ]
+  },
+  "subscription": {
+    "source_id": "openai-pricing",
+    "checked_on": "2026-10-02",
+    "note": "Work/Codex dùng chung allowance. API USD/task không quy đổi thành quota Plus. Messages/5h là ước tính official, không phải hard limit hoặc số còn lại của tài khoản.",
+    "local_messages_per_5h": {
+      "gpt-6-astra": [
+        5,
+        45
+      ],
+      "gpt-6.1-sol": [
+        15,
+        160
+      ],
+      "gpt-6-sol": [
+        15,
+        150
+      ],
+      "gpt-6-luna": [
+        350,
+        3000
+      ]
+    },
+    "remaining_quota": null,
+    "credits_per_task": null
+  },
+  "gaps": [
+    "API có Coding/Agentic cho một số model; model nào API trả null giữ N/A. Token counts per task chưa có trong endpoint hiện dùng.",
+    "API context không xác nhận context trong Chat Plus.",
+    "Chưa có eval trên repo Laravel/NestJS của bạn; recommendation là điểm bắt đầu.",
+    "Benchmark coding do vendor công bố có harness khác; không nhập chung vào AA Coding/Agentic."
+  ],
+  "aa_api": {
+    "tier": "free",
+    "fetched_at": "2026-10-02T03:00:45.442435+00:00",
+    "checked_on": "2026-10-02",
+    "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free",
+    "prompt_type": "free-default (preset not exposed)",
+    "source_id": "aa-data-api",
+    "index_version": "4.3",
+    "index_precision": "major.minor",
+    "total_variants": 689,
+    "mapped_variants": 66,
+    "note": "API version chỉ major.minor; không đoán patch. Model/effort mapping exact, không fuzzy. Official availability/specs giữ nguyên."
+  },
+  "snapshot_id": "231bba433beffbba"
+}

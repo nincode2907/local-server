@@ -1,0 +1,469 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-10-02",
+  "note": "Exact AA name, creator and slug bindings. Non-reasoning means API none, never Chat Instant. New variants require mapping review.",
+  "variants": [
+    {
+      "model_id": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "slug": "gpt-6-1-sol-xhigh",
+      "expected_name": "GPT-6.1 Sol (Xhigh)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6.1-sol",
+      "effort": "high",
+      "slug": "gpt-6-1-sol-high",
+      "expected_name": "GPT-6.1 Sol (High)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6.1-sol",
+      "effort": "medium",
+      "slug": "gpt-6-1-sol-medium",
+      "expected_name": "GPT-6.1 Sol (Medium)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6.1-sol",
+      "effort": "max",
+      "slug": "gpt-6-1-sol",
+      "expected_name": "GPT-6.1 Sol (Max)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6.1-sol",
+      "effort": "low",
+      "slug": "gpt-6-1-sol-low",
+      "expected_name": "GPT-6.1 Sol (Low)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-luna",
+      "effort": "xhigh",
+      "slug": "gpt-6-luna-xhigh",
+      "expected_name": "GPT-6 Luna (Xhigh)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-luna",
+      "effort": "medium",
+      "slug": "gpt-6-luna-medium",
+      "expected_name": "GPT-6 Luna (Medium)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-luna",
+      "effort": "none",
+      "slug": "gpt-6-luna-non-reasoning",
+      "expected_name": "GPT-6 Luna (Non-reasoning)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-luna",
+      "effort": "max",
+      "slug": "gpt-6-luna",
+      "expected_name": "GPT-6 Luna (Max)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-luna",
+      "effort": "high",
+      "slug": "gpt-6-luna-high",
+      "expected_name": "GPT-6 Luna (High)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-luna",
+      "effort": "low",
+      "slug": "gpt-6-luna-low",
+      "expected_name": "GPT-6 Luna (Low)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-astra",
+      "effort": "xhigh",
+      "slug": "gpt-6-astra-xhigh",
+      "expected_name": "GPT-6 Astra (Xhigh)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-astra",
+      "effort": "max",
+      "slug": "gpt-6-astra",
+      "expected_name": "GPT-6 Astra (Max)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-astra",
+      "effort": "low",
+      "slug": "gpt-6-astra-low",
+      "expected_name": "GPT-6 Astra (Low)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-astra",
+      "effort": "high",
+      "slug": "gpt-6-astra-high",
+      "expected_name": "GPT-6 Astra (High)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-astra",
+      "effort": "medium",
+      "slug": "gpt-6-astra-medium",
+      "expected_name": "GPT-6 Astra (Medium)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-sol",
+      "effort": "low",
+      "slug": "gpt-6-sol-low",
+      "expected_name": "GPT-6 Sol (Low)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-sol",
+      "effort": "high",
+      "slug": "gpt-6-sol-high",
+      "expected_name": "GPT-6 Sol (High)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-sol",
+      "effort": "medium",
+      "slug": "gpt-6-sol-medium",
+      "expected_name": "GPT-6 Sol (Medium)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-sol",
+      "effort": "max",
+      "slug": "gpt-6-sol",
+      "expected_name": "GPT-6 Sol (Max)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-sol",
+      "effort": "none",
+      "slug": "gpt-6-sol-non-reasoning",
+      "expected_name": "GPT-6 Sol (Non-reasoning)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-6-sol",
+      "effort": "xhigh",
+      "slug": "gpt-6-sol-xhigh",
+      "expected_name": "GPT-6 Sol (Xhigh)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-sol",
+      "effort": "low",
+      "slug": "gpt-5-6-sol-low",
+      "expected_name": "GPT-5.6 Sol (Low)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-sol",
+      "effort": "medium",
+      "slug": "gpt-5-6-sol-medium",
+      "expected_name": "GPT-5.6 Sol (Medium)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-sol",
+      "effort": "none",
+      "slug": "gpt-5-6-sol-non-reasoning",
+      "expected_name": "GPT-5.6 Sol (Non-reasoning)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-sol",
+      "effort": "high",
+      "slug": "gpt-5-6-sol-high",
+      "expected_name": "GPT-5.6 Sol (High)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-sol",
+      "effort": "max",
+      "slug": "gpt-5-6-sol",
+      "expected_name": "GPT-5.6 Sol (Max)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-sol",
+      "effort": "xhigh",
+      "slug": "gpt-5-6-sol-xhigh",
+      "expected_name": "GPT-5.6 Sol (Xhigh)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-terra",
+      "effort": "medium",
+      "slug": "gpt-5-6-terra-medium",
+      "expected_name": "GPT-5.6 Terra (Medium)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-terra",
+      "effort": "high",
+      "slug": "gpt-5-6-terra-high",
+      "expected_name": "GPT-5.6 Terra (High)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-terra",
+      "effort": "none",
+      "slug": "gpt-5-6-terra-non-reasoning",
+      "expected_name": "GPT-5.6 Terra (Non-reasoning)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-terra",
+      "effort": "xhigh",
+      "slug": "gpt-5-6-terra-xhigh",
+      "expected_name": "GPT-5.6 Terra (Xhigh)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-terra",
+      "effort": "max",
+      "slug": "gpt-5-6-terra",
+      "expected_name": "GPT-5.6 Terra (Max)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-terra",
+      "effort": "low",
+      "slug": "gpt-5-6-terra-low",
+      "expected_name": "GPT-5.6 Terra (Low)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-luna",
+      "effort": "low",
+      "slug": "gpt-5-6-luna-low",
+      "expected_name": "GPT-5.6 Luna (Low)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-luna",
+      "effort": "max",
+      "slug": "gpt-5-6-luna",
+      "expected_name": "GPT-5.6 Luna (Max)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-luna",
+      "effort": "medium",
+      "slug": "gpt-5-6-luna-medium",
+      "expected_name": "GPT-5.6 Luna (Medium)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-luna",
+      "effort": "xhigh",
+      "slug": "gpt-5-6-luna-xhigh",
+      "expected_name": "GPT-5.6 Luna (Xhigh)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-luna",
+      "effort": "high",
+      "slug": "gpt-5-6-luna-high",
+      "expected_name": "GPT-5.6 Luna (High)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.6-luna",
+      "effort": "none",
+      "slug": "gpt-5-6-luna-non-reasoning",
+      "expected_name": "GPT-5.6 Luna (Non-reasoning)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.5",
+      "effort": "xhigh",
+      "slug": "gpt-5-5",
+      "expected_name": "GPT-5.5 (Xhigh)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.5",
+      "effort": "medium",
+      "slug": "gpt-5-5-medium",
+      "expected_name": "GPT-5.5 (Medium)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.5",
+      "effort": "none",
+      "slug": "gpt-5-5-non-reasoning",
+      "expected_name": "GPT-5.5 (Non-reasoning)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.5",
+      "effort": "high",
+      "slug": "gpt-5-5-high",
+      "expected_name": "GPT-5.5 (High)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "gpt-5.5",
+      "effort": "low",
+      "slug": "gpt-5-5-low",
+      "expected_name": "GPT-5.5 (Low)",
+      "expected_creator": "OpenAI"
+    },
+    {
+      "model_id": "claude-opus-5-5",
+      "effort": "max",
+      "slug": "claude-opus-5-5",
+      "expected_name": "Claude Opus 5.5 (Adaptive Reasoning, Max Effort, Default Fallback)",
+      "expected_creator": "Anthropic"
+    },
+    {
+      "model_id": "claude-opus-5-5",
+      "effort": "low",
+      "slug": "claude-opus-5-5-low",
+      "expected_name": "Claude Opus 5.5 (Adaptive Reasoning, Low Effort, Default Fallback)",
+      "expected_creator": "Anthropic"
+    },
+    {
+      "model_id": "claude-opus-5-5",
+      "effort": "xhigh",
+      "slug": "claude-opus-5-5-xhigh",
+      "expected_name": "Claude Opus 5.5 (Adaptive Reasoning, Xhigh Effort, Default Fallback)",
+      "expected_creator": "Anthropic"
+    },
+    {
+      "model_id": "claude-opus-5-5",
+      "effort": "medium",
+      "slug": "claude-opus-5-5-medium",
+      "expected_name": "Claude Opus 5.5 (Adaptive Reasoning, Medium Effort, Default Fallback)",
+      "expected_creator": "Anthropic"
+    },
+    {
+      "model_id": "claude-opus-5-5",
+      "effort": "high",
+      "slug": "claude-opus-5-5-high",
+      "expected_name": "Claude Opus 5.5 (Adaptive Reasoning, High Effort, Default Fallback)",
+      "expected_creator": "Anthropic"
+    },
+    {
+      "model_id": "claude-sonnet-5-5",
+      "effort": "medium",
+      "slug": "claude-sonnet-5-5-medium",
+      "expected_name": "Claude Sonnet 5.5 (Adaptive Reasoning, Medium Effort, Default Fallback)",
+      "expected_creator": "Anthropic"
+    },
+    {
+      "model_id": "claude-sonnet-5-5",
+      "effort": "high",
+      "slug": "claude-sonnet-5-5-high",
+      "expected_name": "Claude Sonnet 5.5 (Adaptive Reasoning, High Effort, Default Fallback)",
+      "expected_creator": "Anthropic"
+    },
+    {
+      "model_id": "claude-sonnet-5-5",
+      "effort": "xhigh",
+      "slug": "claude-sonnet-5-5-xhigh",
+      "expected_name": "Claude Sonnet 5.5 (Adaptive Reasoning, Xhigh Effort, Default Fallback)",
+      "expected_creator": "Anthropic"
+    },
+    {
+      "model_id": "claude-sonnet-5-5",
+      "effort": "max",
+      "slug": "claude-sonnet-5-5",
+      "expected_name": "Claude Sonnet 5.5 (Adaptive Reasoning, Max Effort, Default Fallback)",
+      "expected_creator": "Anthropic"
+    },
+    {
+      "model_id": "claude-sonnet-5-5",
+      "effort": "low",
+      "slug": "claude-sonnet-5-5-low",
+      "expected_name": "Claude Sonnet 5.5 (Adaptive Reasoning, Low Effort, Default Fallback)",
+      "expected_creator": "Anthropic"
+    },
+    {
+      "model_id": "gemini-3.8-flash",
+      "effort": "medium",
+      "slug": "gemini-3-8-flash-medium",
+      "expected_name": "Gemini 3.8 Flash (Medium)",
+      "expected_creator": "Google"
+    },
+    {
+      "model_id": "gemini-3.8-flash",
+      "effort": "high",
+      "slug": "gemini-3-8-flash",
+      "expected_name": "Gemini 3.8 Flash (High)",
+      "expected_creator": "Google"
+    },
+    {
+      "model_id": "gemini-3.8-flash",
+      "effort": "low",
+      "slug": "gemini-3-8-flash-low",
+      "expected_name": "Gemini 3.8 Flash (Low)",
+      "expected_creator": "Google"
+    },
+    {
+      "model_id": "gemini-4-argon",
+      "effort": "high",
+      "slug": "gemini-4-argon",
+      "expected_name": "Gemini 4 Argon (High)",
+      "expected_creator": "Google"
+    },
+    {
+      "model_id": "deepseek-v4.1-flash",
+      "effort": "none",
+      "slug": "deepseek-v4-1-flash-non-reasoning",
+      "expected_name": "DeepSeek V4.1 Flash (Non-reasoning)",
+      "expected_creator": "DeepSeek"
+    },
+    {
+      "model_id": "deepseek-v4.1-flash",
+      "effort": "max",
+      "slug": "deepseek-v4-1-flash",
+      "expected_name": "DeepSeek V4.1 Flash (Max)",
+      "expected_creator": "DeepSeek"
+    },
+    {
+      "model_id": "grok-4.7",
+      "effort": "low",
+      "slug": "grok-4-7-low",
+      "expected_name": "Grok 4.7 (Low)",
+      "expected_creator": "SpaceXAI"
+    },
+    {
+      "model_id": "grok-4.7",
+      "effort": "high",
+      "slug": "grok-4-7-high",
+      "expected_name": "Grok 4.7 (High)",
+      "expected_creator": "SpaceXAI"
+    },
+    {
+      "model_id": "grok-4.7",
+      "effort": "xhigh",
+      "slug": "grok-4-7",
+      "expected_name": "Grok 4.7 (Xhigh)",
+      "expected_creator": "SpaceXAI"
+    },
+    {
+      "model_id": "muse-spark-1.3",
+      "effort": "max",
+      "slug": "muse-spark-1-3",
+      "expected_name": "Muse Spark 1.3 (Max)",
+      "expected_creator": "Meta"
+    },
+    {
+      "model_id": "muse-spark-1.3",
+      "effort": "xhigh",
+      "slug": "muse-spark-1-3-xhigh",
+      "expected_name": "Muse Spark 1.3 (Xhigh)",
+      "expected_creator": "Meta"
+    }
+  ]
+}
