@@ -261,10 +261,10 @@ function nativePeriodNote(data,key,current,kind='number') {
   const read = summary => key === 'total_tokens' ? Number(summary.input_tokens)+Number(summary.output_tokens) : summary[key];
   if (data.comparison) {
     const previous = Number(read(data.comparison.summary) ?? 0), value = Number(current ?? 0);
-    if (!previous) return value ? `Mới so với ${data.comparison.label.toLowerCase()}` : `Không đổi so với ${data.comparison.label.toLowerCase()}`;
+    if (!previous) return `<span class="metric-trend metric-trend-neutral">${value ? 'Mới' : 'Không đổi'} · so với ${data.comparison.label.toLowerCase()}</span>`;
     const delta = (value-previous)/previous*100;
-    if (Math.abs(delta)<0.05) return `Không đổi so với ${data.comparison.label.toLowerCase()}`;
-    return `${delta>0?'↑':'↓'} ${Math.abs(delta).toFixed(1)}% so với ${data.comparison.label.toLowerCase()}`;
+    if (Math.abs(delta)<0.05) return `<span class="metric-trend metric-trend-neutral">— Không đổi · so với ${data.comparison.label.toLowerCase()}</span>`;
+    return `<span class="metric-trend metric-trend-${delta>0?'up':'down'}">${delta>0?'↑':'↓'} ${Math.abs(delta).toFixed(1)}% · so với ${data.comparison.label.toLowerCase()}</span>`;
   }
   if (data.average && key !== 'tokens_per_turn') {
     const average = read(data.average.summary), unit = data.average.unit === 'month' ? 'tháng' : 'ngày';
@@ -299,7 +299,7 @@ async function loadNative({quiet=false}={}) {
     ];
     $('native-cards').innerHTML=cards.map(([label,value,note,key,kind])=>{
       const periodNote=nativePeriodNote(d,key,value,kind);
-      return `<article class="metric"><div class="metric-label">${label}</div><div class="metric-value" title="${escape(number(value))}">${kind==='cost' ? money(value) : compact(value)}</div><p>${escape([periodNote,note].filter(Boolean).join(' · '))}</p></article>`;
+      return `<article class="metric"><div class="metric-label">${label}</div><div class="metric-value" title="${escape(number(value))}">${kind==='cost' ? money(value) : compact(value)}</div><p>${periodNote ? `${periodNote}<span class="metric-period-note">${escape(note)}</span>` : escape(note)}</p></article>`;
     }).join('');
     $('native-note').textContent=`${d.range.label}: ${date(d.range.since)} ${time(d.range.since)} → ${date(d.range.until)} ${time(d.range.until)} (UTC+7). Giá API tham khảo, không phải hóa đơn Plus. Nguồn lấy từ metadata; vscode có thể là App hoặc VS Code. Gateway trong rollout chỉ là dữ liệu quan sát, không cộng vào thống kê server. Log cũ dùng chênh lệch token_count; record response được ưu tiên. Session không còn rollout hoặc thread ephemeral có thể không có usage.`;
     const grouped=(list,project=false)=>list.map(r=>`<tr><td class="${project ? 'native-path' : 'model-name'}">${project ? `<strong>${escape(r.key.split('/').filter(Boolean).pop() ?? r.key)}</strong><small>${escape(r.key)}</small>` : escape(r.key)}<div class="native-meter"><span data-native-width="${total ? (r.input_tokens+r.output_tokens)/total*100 : 0}"></span></div></td>${project ? '' : `<td class="number">${number(r.sessions)}</td>`}<td class="number">${number(r.input_tokens+r.output_tokens)}</td><td class="number">${r.tokens_per_turn === null ? '—' : number(Math.round(r.tokens_per_turn))}<small class="native-stat-note">${number(r.usage_turns)} turn có usage</small></td>${project ? `<td class="number">${money(r.cost_per_session)}<small class="native-stat-note">${number(r.priced_sessions)}/${number(r.sessions)} session đủ giá${r.unpriced_sessions ? ' · tổng có thể thiếu' : ''}</small></td>` : ''}<td class="number">${nativeCost(r)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty-table">Chưa có usage trong bộ lọc</td></tr>';

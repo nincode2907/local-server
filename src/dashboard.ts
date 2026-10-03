@@ -8,7 +8,7 @@ import type { Config } from './config.js';
 import type { Metrics } from './metrics.js';
 
 export function dashboardAsset(path: string) {
-  return ['/', '/dashboard', '/dashboard/assets/style.css', '/dashboard/assets/app.js'].includes(path);
+  return ['/', '/dashboard', '/dashboard/assets/style.css', '/dashboard/assets/app.js', '/dashboard/assets/favicon.svg'].includes(path);
 }
 export function dashboardRead(path: string) {
   return /^\/api\/native\/(overview|sessions\/[^/]{1,128})$/.test(path) || dashboardAsset(path) || ['/api/models', '/api/stats/costs', '/api/stats/overview', '/api/stats/calls'].includes(path) || /^\/api\/stats\/calls\/[a-f0-9-]{36}$/.test(path);
@@ -17,6 +17,7 @@ export async function registerDashboard(app: FastifyInstance, metrics: Metrics, 
   const html = await readFile(new URL('../public/dashboard.html', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/dashboard.css', import.meta.url), 'utf8');
   const js = await readFile(new URL('../public/dashboard.js', import.meta.url), 'utf8');
+  const favicon = await readFile(new URL('../public/favicon.svg', import.meta.url), 'utf8');
   const security = {
     'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
     'X-Content-Type-Options': 'nosniff',
@@ -27,6 +28,7 @@ export async function registerDashboard(app: FastifyInstance, metrics: Metrics, 
   app.get('/dashboard', async (_req, reply) => reply.headers(security).type('text/html; charset=utf-8').send(html));
   app.get('/dashboard/assets/style.css', async (_req, reply) => reply.headers(security).type('text/css; charset=utf-8').send(css));
   app.get('/dashboard/assets/app.js', async (_req, reply) => reply.headers(security).type('text/javascript; charset=utf-8').send(js));
+  app.get('/dashboard/assets/favicon.svg', async (_req, reply) => reply.headers(security).type('image/svg+xml; charset=utf-8').send(favicon));
   app.get('/api/native/overview', async (req, reply) => {
     const input = z.object({range:z.enum(['today','yesterday','7d','30d','all','24h']).default('today'),group:z.enum(['day','week','month']).default('day'),model:z.string().max(128).optional(),source:z.string().max(128).optional(),project:z.string().max(4096).optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict().parse(req.query);
     return reply.headers(security).send(native.overview(input));

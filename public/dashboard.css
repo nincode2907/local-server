@@ -18,3 +18,4 @@
 .spike-panel{margin-bottom:22px}.spike-panel .panel-heading h2{display:flex;gap:10px;align-items:center}.native-stat-note{display:block;font:10px/1.5 var(--body);color:var(--muted);margin-top:5px;white-space:normal}.spike-sequence{font:12px var(--mono);white-space:nowrap}.native-grid{grid-template-columns:1fr}.native-grid th,.native-grid td{padding-left:18px;padding-right:18px}.native-spike ul{margin:10px 0 0;padding-left:18px}
 
 .spike-panel .table-scroll{max-height:380px;overflow:auto}
+.metric-trend{display:inline-flex;align-items:center;gap:3px;border-radius:999px;padding:3px 8px;font-size:10px;font-weight:650;line-height:1.4;white-space:nowrap}.metric-trend-up{color:#126b43;background:#e7f6ed}.metric-trend-down{color:#a33143;background:#fbebee}.metric-trend-neutral{color:#59677b;background:#edf1f6}.metric-period-note{display:block;margin-top:5px;color:var(--muted);font-size:10px;font-weight:400}
