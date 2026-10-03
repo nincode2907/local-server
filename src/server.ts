@@ -1,3 +1,4 @@
+import { NativeUsage } from './native-usage.js';
 import { catalog } from './catalog.js';
 import Fastify, { type FastifyRequest, type FastifyReply } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
@@ -16,6 +17,8 @@ export async function buildServer(config: Config, provider: Provider) {
   const sessions = new Sessions(config.dataDir, config.sessionTtl, config.maxSessions);
   await sessions.init();
   const metrics = new Metrics(config.statsDbPath);
+  const native = new NativeUsage(config.statsDbPath, config.nativeCodexHome, config.nativeUsageInterval);
+  native.start();
   const running = new Set<AbortController>();
   const tracked = new WeakMap<FastifyRequest, { id: string; start: number }>();
   const finishCall = (req: FastifyRequest, status: number, cancelled = false) => {
@@ -145,8 +148,8 @@ export async function buildServer(config: Config, provider: Provider) {
     await sessions.remove(req.params.id); return reply.code(204).send();
   });
   app.addHook('preClose', async () => { for (const controller of running) controller.abort(); });
-  app.addHook('onClose', async () => { try { await provider.close(); } finally { metrics.close(); } });
-  try { await registerDashboard(app, metrics, config, () => running.size); }
-  catch (error) { metrics.close(); throw error; }
+  app.addHook('onClose', async () => { try { await provider.close(); } finally { await native.close(); metrics.close(); } });
+  try { await registerDashboard(app, metrics, config, () => running.size, native); }
+  catch (error) { await native.close(); metrics.close(); throw error; }
   return app;
 }

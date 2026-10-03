@@ -44,7 +44,7 @@ test('SQLite aggregates real usage, latency, tools, unknown usage and restores a
 
 test('dashboard routes preserve auth and record successful, invalid, tool and failed calls only', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'codex-dashboard-'));
-  const config = readConfig({ DATA_DIR: directory, LOCAL_API_KEY: 'test-key' });
+  const config = readConfig({ NATIVE_CODEX_HOME: join(directory, "no-codex"), DATA_DIR: directory, LOCAL_API_KEY: 'test-key' });
   let fail = false;
   const provider = {
     start: () => ({ id: 'thread-id', run: async () => {
@@ -58,6 +58,10 @@ test('dashboard routes preserve auth and record successful, invalid, tool and fa
     assert.equal((await app.inject({ url: '/dashboard' })).statusCode, 200);
     assert.equal((await app.inject({ url: '/dashboard/assets/app.js' })).statusCode, 200);
     assert.equal((await app.inject({ url: '/api/stats/overview' })).statusCode, 401);
+    assert.equal((await app.inject({url:'/api/native/overview'})).statusCode,401);
+    assert.equal((await app.inject({url:'/api/native/overview',headers:{...headers,origin:'https://evil.test'}})).statusCode,403);
+    assert.equal((await app.inject({url:'/api/native/overview',headers:{...headers,origin:'http://localhost:80'}})).statusCode,200);
+    assert.equal((await app.inject({url:'/api/native/overview?range=bad',headers})).statusCode,400);
     assert.equal((await app.inject({ url: '/api/stats/overview', headers: { ...headers, origin: 'https://evil.test' } })).statusCode, 403);
     assert.equal((await app.inject({ url: '/api/stats/overview', headers: { ...headers, origin: 'http://localhost:80' } })).statusCode, 200);
     assert.equal((await app.inject({ method: 'POST', url: '/chat', headers, payload: { prompt: 'hi', model: 'custom-model', reasoning: 'high' } })).statusCode, 200);

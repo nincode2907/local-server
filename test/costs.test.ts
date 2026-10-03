@@ -45,7 +45,7 @@ test('migration backfills old calls, persists price snapshots, and groups all hi
 test('playground requires same origin, uses ephemeral provider and exposes metadata without conversation', async () => {
   const dir = await mkdtemp(join(tmpdir(),'playground-')); let ephemeral = false;
   const provider = { start: (_m: string,_e: string,tmp: boolean) => { ephemeral = tmp; return { id:'tmp', run:async () => ({ items:[], finalResponse:'{"content":"ok","tool_calls":[]}',usage:{input_tokens:100,output_tokens:20,cached_input_tokens:30} }) }; },close:async()=>{} } as unknown as Provider;
-  const app = await buildServer(readConfig({ DATA_DIR:dir,LOCAL_API_KEY:'secret' }),provider);
+  const app = await buildServer(readConfig({ NATIVE_CODEX_HOME:join(dir,"no-codex"), DATA_DIR:dir,LOCAL_API_KEY:'secret' }),provider);
   const payload = { messages:[{role:'user',content:'private prompt'}] };
   const headers = { origin:'http://localhost:80','x-codex-playground':'1',authorization:'Bearer secret' };
   try {

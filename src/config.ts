@@ -1,4 +1,5 @@
 import { resolve, join } from 'node:path';
+import { homedir } from 'node:os';
 import { z } from 'zod';
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
@@ -13,11 +14,14 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     LOCAL_API_KEY: z.string().min(1).optional(),
     DATA_DIR: z.string().default('.local'),
     STATS_DB_PATH: z.string().min(1).optional(),
+    NATIVE_CODEX_HOME: z.string().min(1).optional(),
+    NATIVE_USAGE_INTERVAL_MS: z.coerce.number().int().min(5000).default(30000),
     CODEX_BIN: z.string().optional(),
   }).parse(env);
   return { port: parsed.PORT, model: parsed.DEFAULT_MODEL, reasoningEffort: parsed.DEFAULT_REASONING_EFFORT, timeout: parsed.REQUEST_TIMEOUT_MS,
     concurrency: parsed.MAX_CONCURRENT, maxSessions: parsed.MAX_SESSIONS, sessionTtl: parsed.SESSION_TTL_MS,
     apiKey: parsed.LOCAL_API_KEY, dataDir: resolve(parsed.DATA_DIR), codexBin: parsed.CODEX_BIN,
+    nativeCodexHome: resolve(parsed.NATIVE_CODEX_HOME ?? env.CODEX_HOME ?? join(homedir(), '.codex')), nativeUsageInterval: parsed.NATIVE_USAGE_INTERVAL_MS,
     statsDbPath: resolve(parsed.STATS_DB_PATH ?? join(parsed.DATA_DIR, 'stats.sqlite')) };
 }
 export type Config = ReturnType<typeof readConfig>;

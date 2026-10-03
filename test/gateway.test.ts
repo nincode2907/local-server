@@ -15,7 +15,7 @@ const tools = [{ type: 'function', function: { name: 'weather', parameters: {
 const body = { messages: [{ role: 'user', content: 'Hello' }] };
 async function fixture(overrides = {}, run?: (prompt: string, options: any) => Promise<any>) {
   const data = await mkdtemp(join(tmpdir(), 'gateway-test-'));
-  const config = readConfig({ DATA_DIR: data, ...overrides });
+  const config = readConfig({ NATIVE_CODEX_HOME: join(data, "no-codex"), DATA_DIR: data, ...overrides });
   let starts = 0; const resumes: string[] = [];
   const create = () => ({ id: 'thread-test', run: run ?? (async () => ({
     finalResponse: '{"content":"Hello","tool_calls":[]}', items: [], usage: { input_tokens: 4, output_tokens: 2, cached_input_tokens: 1 },

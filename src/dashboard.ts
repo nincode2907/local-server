@@ -1,3 +1,4 @@
+import type { NativeUsage } from './native-usage.js';
 import { catalog } from './catalog.js';
 import { ApiError } from './errors.js';
 import { readFile } from 'node:fs/promises';
@@ -10,9 +11,9 @@ export function dashboardAsset(path: string) {
   return ['/', '/dashboard', '/dashboard/assets/style.css', '/dashboard/assets/app.js'].includes(path);
 }
 export function dashboardRead(path: string) {
-  return dashboardAsset(path) || ['/api/models', '/api/stats/costs', '/api/stats/overview', '/api/stats/calls'].includes(path) || /^\/api\/stats\/calls\/[a-f0-9-]{36}$/.test(path);
+  return /^\/api\/native\/(overview|sessions\/[^/]{1,128})$/.test(path) || dashboardAsset(path) || ['/api/models', '/api/stats/costs', '/api/stats/overview', '/api/stats/calls'].includes(path) || /^\/api\/stats\/calls\/[a-f0-9-]{36}$/.test(path);
 }
-export async function registerDashboard(app: FastifyInstance, metrics: Metrics, config: Config, active: () => number) {
+export async function registerDashboard(app: FastifyInstance, metrics: Metrics, config: Config, active: () => number, native: NativeUsage) {
   const html = await readFile(new URL('../public/dashboard.html', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/dashboard.css', import.meta.url), 'utf8');
   const js = await readFile(new URL('../public/dashboard.js', import.meta.url), 'utf8');
@@ -26,7 +27,16 @@ export async function registerDashboard(app: FastifyInstance, metrics: Metrics, 
   app.get('/dashboard', async (_req, reply) => reply.headers(security).type('text/html; charset=utf-8').send(html));
   app.get('/dashboard/assets/style.css', async (_req, reply) => reply.headers(security).type('text/css; charset=utf-8').send(css));
   app.get('/dashboard/assets/app.js', async (_req, reply) => reply.headers(security).type('text/javascript; charset=utf-8').send(js));
-  app.get('/api/models', async (_req, reply) => reply.headers(security).send(catalog));
+  app.get('/api/native/overview', async (req, reply) => {
+    const input = z.object({range:z.enum(['24h','7d','30d','all']).default('24h'),group:z.enum(['day','week','month']).default('day'),model:z.string().max(128).optional(),source:z.string().max(128).optional(),project:z.string().max(4096).optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict().parse(req.query);
+    return reply.headers(security).send(native.overview(input));
+  });
+  app.get<{ Params: { id: string } }>('/api/native/sessions/:id', async (req, reply) => {
+    const result = native.detail(z.string().min(1).max(128).parse(req.params.id));
+    if (!result) throw new ApiError(404,'session_not_found','Native session not found.');
+    return reply.headers(security).send(result);
+  });
+  app.get('/api/models' , async (_req, reply) => reply.headers(security).send(catalog));
   app.get<{ Params: { id: string } }>('/api/stats/calls/:id', async (req, reply) => {
     const row = metrics.detail(z.uuid().parse(req.params.id));
     if (!row) throw new ApiError(404, 'call_not_found', 'Call not found.');

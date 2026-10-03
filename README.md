@@ -266,3 +266,20 @@ Mở `http://localhost:4000/dashboard`: tab **Thống kê** có tổng chi phí 
 Tab **Test chat** có nhiều tab tạm, chọn model/reasoning, system context, copy model, dừng request, trạng thái đang suy nghĩ và chi tiết request/response/usage/chi phí. Context chỉ ở bộ nhớ trang và gửi lại mỗi lượt, không dùng session; Codex chạy `--ephemeral`. Reload xóa chat. SQLite chỉ lưu metadata, không lưu prompt/response. Tab **Model & giá** cho tìm kiếm/copy tất cả model trong snapshot; chỉ model tương thích Codex có nút test. Quyền thực tế còn tùy tài khoản.
 
 Endpoint dashboard: `GET /api/models`, `GET /api/stats/costs?group=day|week|month&model=...`, `GET /api/stats/calls/:id`. Mỗi chat response có header `X-Codex-Call-Id`. Playground dùng `POST /api/playground/chat` cùng origin, JSON và header `X-Codex-Playground: 1`; vẫn yêu cầu Bearer khi bật `LOCAL_API_KEY`.
+
+## Codex usage trên laptop
+
+Tab **Codex usage** đọc `state_5.sqlite` (chỉ đọc), `sessions/**/rollout-*.jsonl` và `archived_sessions/**/rollout-*.jsonl` trong `NATIVE_CODEX_HOME` (mặc định `CODEX_HOME` hoặc `~/.codex`). Collector chạy lúc khởi động và mỗi `NATIVE_USAGE_INTERVAL_MS` (mặc định 30000, tối thiểu 5000). Nó stream các file mới/đã thay đổi, replay vào bảng SQLite riêng theo ID để tránh đếm trùng, và giữ thống kê khi file gốc không còn. Nút Làm mới đọc số liệu đã đồng bộ; không quét bằng agent hay proxy network.
+
+Database gateway giữ thêm `native_sessions`, `native_turns`, `native_events`, `native_files`. Chỉ lưu session ID, project/cwd, nguồn, model/reasoning, timestamps, trạng thái, usage và snapshot giá; không lưu title, prompt, response hay nội dung tool. Native events được giữ riêng với call gateway, không cộng hai datasource với nhau. Gateway trong rollout được nhận diện bằng tên thư mục runtime `codex-gateway-*`; đây là phân loại theo cwd. `vscode` có thể là VS Code hoặc App, không tự khẳng định phân biệt khi metadata không đủ. Các thread ephemeral không có rollout nên không thể lấy usage bằng observer này.
+
+Parser ưu tiên `token_usage_record.usage`, deduplicate response ID và bỏ `token_count` của cùng turn để tránh cộng hai lần. Với log cũ, dùng chênh lệch `total_token_usage`; record đầu/reset dùng `last_token_usage`, không gán usage kế thừa cho child/fork. Bản fork bỏ record trước thời điểm tạo và record có thread ID của parent. Usage chưa expose sẽ hiển thị **—**; không dùng `threads.tokens_used` hay suy token từ text. Bộ đếm reset và dòng malformed được ghi chú; dòng JSONL chưa hoàn chỉnh được đọc lại ở lần sync sau. Session không có rollout vẫn được nhập metadata từ state DB.
+
+Bộ lọc thời gian áp dụng theo **timestamp usage event**, gom ngày/tuần/tháng UTC+7. Session/turn được chọn nếu có event trong kỳ hoặc metadata/start trong kỳ; duration là tổng turn có start/end được ghi nhận (không tính thời gian chờ). Usage records là số generation record quan sát được, không phải số HTTP request hoặc retry thực tế. Giá API-equivalent chỉ ước tính theo catalog clone, cache đã nằm trong input, reasoning đã nằm trong output; giá được giữ theo event, thiếu giá không coi là miễn phí. Chi tiết session dùng toàn bộ lịch sử turn và 200 usage event mới nhất. Context spike là chỉ báo input của turn ≥100k và >2 lần turn trước; không kết luận nguyên nhân.
+
+API đọc (cùng chính sách Host/Origin/Bearer):
+
+- `GET /api/native/overview?range=24h|7d|30d|all&group=day|week|month&page=1&source=...&project=...&model=...`
+- `GET /api/native/sessions/:id`
+
+Log/schema Codex là dữ liệu nội bộ có thể thay đổi theo version. Collector báo lỗi riêng và giữ dữ liệu cũ; state DB thiếu/khác schema vẫn thử đọc JSONL. Không chỉnh sửa database hoặc transcript gốc của Codex.
