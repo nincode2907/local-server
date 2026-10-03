@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, appendFile, readFile, rm } from 'node:fs/pro
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { NativeUsage, parseRollout } from '../src/native-usage.js';
+import { NativeUsage, parseRollout, contextSpikes } from '../src/native-usage.js';
 
 const time='2026-10-03T01:00:00Z';
 const event=(type:string,payload:any,timestamp=time)=>JSON.stringify({type,payload,timestamp});
@@ -75,4 +75,46 @@ test('collector sync is idempotent, persists after restart, imports metadata-onl
     assert.equal(collector.overview(filter).summary.calls,2);
     assert.equal(collector.overview(filter).summary.input_tokens,1000010);
   }finally{await collector.close();await rm(dir,{recursive:true,force:true});}
+});
+
+
+test('context spikes compare generation input within session/model, include 20k → 80k → 300k, and ignore tiny jumps',()=>{
+  const sample=(id:string,input:number,model='gpt-6.1-sol',session='s')=>({id,session_id:session,turn_id:'same-turn',model,timestamp:Number(id),input_tokens:input});
+  const spikes=contextSpikes([sample('1',20000),sample('2',80000),sample('3',300000),sample('4',300000),sample('5',900000,'other'),sample('6',1000000,'gpt-6.1-sol','new-session')]);
+  assert.equal(spikes.length,2);assert.equal(spikes[0]!.growth_ratio,4);
+  assert.deepEqual(spikes[1]!.sequence,[20000,80000,300000]);
+  assert.equal(contextSpikes([sample('1',100),sample('2',400)]).length,0);
+  assert.equal(contextSpikes([sample('1',25000),sample('2',50000)]).length,0); // strict >2×
+});
+
+test('project/model efficiency counts distinct used turns and sessions, excludes missing usage/prices, and keeps spike baselines outside the window',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'native-efficiency-')),dbpath=join(dir,'stats.sqlite');
+  const collector=new NativeUsage(dbpath,join(dir,'no-codex'));const db=new DatabaseSync(dbpath),now=Date.now();
+  const addSession=(id:string,cwd:string,model:string)=>db.prepare('INSERT INTO native_sessions(id,cwd,source,model,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id,cwd,'vscode',model,now-200000000,now);
+  const addTurn=(session:string,id:string,model:string)=>db.prepare('INSERT INTO native_turns VALUES(?,?,?,?,?,?,?)').run(`${session}:${id}`,session,model,'high',now-200000000,now,'completed');
+  const addEvent=(id:string,session:string,turn:string,model:string,input:number,output:number,cached:number,cost:number|null,time=now-10000)=>db.prepare('INSERT INTO native_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(id,session,`${session}:${turn}`,model,time,input,cached,output,0,'response_record',cost,null);
+  try {
+    addSession('s1','/project-a','sol');addSession('s2','/project-a','astra');addSession('no-usage','/project-a','sol');addSession('s3','/project-b','sol');
+    addTurn('s1','t1','sol');addTurn('s1','t2','astra');addTurn('s1','missing','sol');addTurn('s2','t1','astra');addTurn('s3','t1','sol');
+    addEvent('a','s1','t1','sol',20000,1000,10000,1,now-100000000); // prior window baseline
+    addEvent('b','s1','t1','sol',80000,2000,60000,2);
+    addEvent('c','s1','t2','astra',100000,3000,50000,3);
+    addEvent('d','s2','t1','astra',300000,4000,150000,null);
+    addEvent('e','s3','t1','sol',50000,500,0,4);
+    const all=collector.overview({range:'all',group:'day',page:1});
+    const project=all.projects.find(p=>p.key==='/project-a')!;
+    assert.equal(project.sessions,2);assert.equal(project.usage_turns,3);
+    assert.equal(project.tokens_per_turn,510000/3);assert.equal(project.cost_per_session,6);assert.equal(project.unpriced_sessions,1);
+    const sol=all.models.find(m=>m.key==='sol')!;assert.equal(sol.sessions,2);assert.equal(sol.usage_turns,2);assert.equal(sol.tokens_per_turn,153500/2);
+    assert.equal(all.summary.cache_hit_rate,270000/550000);
+    const filtered=collector.overview({range:'24h',group:'day',page:1,project:'/project-a',model:'sol'});
+    assert.equal(filtered.summary.tokens_per_turn,82000);assert.equal(filtered.summary.usage_turns,1);
+    assert.equal(filtered.spikes.length,1);assert.deepEqual(filtered.spikes[0]!.sequence,[20000,80000]);
+    assert.equal(filtered.summary.context_spikes,1);assert.equal(collector.detail('s1')!.spikes.length,1);
+    addEvent('unattributed','s3','unattributed','sol',900000,0,0,null);
+    const missingTurn=collector.overview({range:'all',group:'day',page:1});
+    assert.equal(missingTurn.summary.unattributed_events,1);assert.equal(missingTurn.summary.tokens_per_turn,560500/4);
+    const empty=collector.overview({range:'all',group:'day',page:1,project:'/none'});
+    assert.equal(empty.summary.cache_hit_rate,null);assert.equal(empty.summary.tokens_per_turn,null);assert.equal(empty.spikes.length,0);
+  }finally{db.close();await collector.close();await rm(dir,{recursive:true,force:true});}
 });

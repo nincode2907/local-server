@@ -275,7 +275,7 @@ Database gateway giữ thêm `native_sessions`, `native_turns`, `native_events`,
 
 Parser ưu tiên `token_usage_record.usage`, deduplicate response ID và bỏ `token_count` của cùng turn để tránh cộng hai lần. Với log cũ, dùng chênh lệch `total_token_usage`; record đầu/reset dùng `last_token_usage`, không gán usage kế thừa cho child/fork. Bản fork bỏ record trước thời điểm tạo và record có thread ID của parent. Usage chưa expose sẽ hiển thị **—**; không dùng `threads.tokens_used` hay suy token từ text. Bộ đếm reset và dòng malformed được ghi chú; dòng JSONL chưa hoàn chỉnh được đọc lại ở lần sync sau. Session không có rollout vẫn được nhập metadata từ state DB.
 
-Bộ lọc thời gian áp dụng theo **timestamp usage event**, gom ngày/tuần/tháng UTC+7. Session/turn được chọn nếu có event trong kỳ hoặc metadata/start trong kỳ; duration là tổng turn có start/end được ghi nhận (không tính thời gian chờ). Usage records là số generation record quan sát được, không phải số HTTP request hoặc retry thực tế. Giá API-equivalent chỉ ước tính theo catalog clone, cache đã nằm trong input, reasoning đã nằm trong output; giá được giữ theo event, thiếu giá không coi là miễn phí. Chi tiết session dùng toàn bộ lịch sử turn và 200 usage event mới nhất. Context spike là chỉ báo input của turn ≥100k và >2 lần turn trước; không kết luận nguyên nhân.
+Bộ lọc thời gian áp dụng theo **timestamp usage event**, gom ngày/tuần/tháng UTC+7. Session/turn được chọn nếu có event trong kỳ hoặc metadata/start trong kỳ; duration là tổng turn có start/end được ghi nhận (không tính thời gian chờ). Usage records là số generation record quan sát được, không phải số HTTP request hoặc retry thực tế. Giá API-equivalent chỉ ước tính theo catalog clone, cache đã nằm trong input, reasoning đã nằm trong output; giá được giữ theo event, thiếu giá không coi là miễn phí. Chi tiết session dùng toàn bộ lịch sử turn và 200 usage event mới nhất. Context spike so input từng usage record trong cùng session/model: ≥50k và >2 lần record trước. Dashboard hiển thị tối đa 20 cảnh báo gần nhất cùng chuỗi input và link session; chi tiết session cũng dùng cùng detector. Record trước có thể nằm ngoài khoảng thời gian đã lọc. Đây là chỉ báo để kiểm tra, không kết luận lãng phí hay nguyên nhân.
 
 API đọc (cùng chính sách Host/Origin/Bearer):
 
@@ -283,3 +283,12 @@ API đọc (cùng chính sách Host/Origin/Bearer):
 - `GET /api/native/sessions/:id`
 
 Log/schema Codex là dữ liệu nội bộ có thể thay đổi theo version. Collector báo lỗi riêng và giữ dữ liệu cũ; state DB thiếu/khác schema vẫn thử đọc JSONL. Không chỉnh sửa database hoặc transcript gốc của Codex.
+
+### Chỉ số hiệu quả context
+
+- **Cache hit rate** = tổng cached input / tổng input trong bộ lọc; input bằng 0 hiển thị `—`. Có trên card token native và phần phân bổ token gateway.
+- **Tokens / turn** = tổng input + output của các record gắn turn / số turn khác nhau có usage. Turn thiếu usage và record chưa gắn turn không tham gia bình quân; tổng token vẫn giữ mọi usage đã ghi nhận.
+- **Theo project** thêm tokens/turn và USD/session. Cost/session chỉ tính các session có đủ giá cho mọi record trong bộ lọc; hiển thị số session đủ giá / tổng session có usage, tránh xem dữ liệu thiếu là miễn phí.
+- **Theo model** thêm số session có usage và average tokens/turn. Session/turn dùng nhiều model có thể thuộc nhiều hàng; không cộng số session giữa các model để lấy tổng.
+
+Các số bình quân phản ánh usage trong bộ lọc thời gian/model/nguồn/project, không phải toàn bộ lifetime của session nếu đã chọn một khoảng thời gian ngắn.

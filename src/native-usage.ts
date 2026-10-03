@@ -77,6 +77,23 @@ export async function parseRollout(lines: AsyncIterable<string>, fallback?: Meta
   return { meta, turns:[...turns.values()], events:events.filter(e => e.basis === 'response_record' || !canonical.has(e.turn_id)), malformed,resets };
 }
 
+export interface SpikeSample { id: string; session_id: string; turn_id: string; model: string; timestamp: number; input_tokens: number }
+export function contextSpikes(samples: SpikeSample[]) {
+  const histories = new Map<string, SpikeSample[]>();
+  const spikes: (SpikeSample & { previous_input: number; growth_ratio: number; sequence: number[] })[] = [];
+  for (const sample of samples) {
+    const key = JSON.stringify([sample.session_id, sample.model]);
+    const history = histories.get(key) ?? [];
+    const previous = history.at(-1);
+    if (previous && previous.input_tokens > 0 && sample.input_tokens >= 50_000 && sample.input_tokens > previous.input_tokens * 2) {
+      spikes.push({ ...sample, previous_input: previous.input_tokens, growth_ratio: sample.input_tokens / previous.input_tokens,
+        sequence: [...history.slice(-2).map(e => e.input_tokens), sample.input_tokens] });
+    }
+    history.push(sample); if (history.length > 2) history.shift(); histories.set(key, history);
+  }
+  return spikes;
+}
+
 export type NativeFilter = { range: '24h' | '7d' | '30d' | 'all'; group: 'day' | 'week' | 'month'; model?: string; source?: string; project?: string; page: number };
 export class NativeUsage {
   private db: DatabaseSync;
@@ -189,7 +206,7 @@ export class NativeUsage {
     const params: (string|number)[] = [since,Date.now()];
     let where = 'e.timestamp >= ? AND e.timestamp <= ?';
     for (const [field,value] of [['e.model',filter.model],['s.source',filter.source],['s.cwd',filter.project]]) if (value) { where += ` AND ${field}=?`; params.push(value); }
-    const events = this.db.prepare(`SELECT e.*,s.cwd,s.source FROM native_events e JOIN native_sessions s ON s.id=e.session_id WHERE ${where} ORDER BY e.timestamp`).all(...params);
+    const events = this.db.prepare(`SELECT e.*,s.cwd,s.source FROM native_events e JOIN native_sessions s ON s.id=e.session_id WHERE ${where} ORDER BY e.timestamp,e.rowid`).all(...params);
     const sessions = this.db.prepare('SELECT * FROM native_sessions ORDER BY updated_at DESC').all().filter(s => (!filter.source || s.source === filter.source) && (!filter.project || s.cwd === filter.project));
     const relevant = new Set(events.map(e => String(e.session_id)));
     const selected = sessions.filter(s => relevant.has(String(s.id)) || Number(s.updated_at) >= since && (!filter.model || s.model === filter.model));
@@ -198,20 +215,44 @@ export class NativeUsage {
     const eventTurns = new Set(events.map(e => e.turn_id));
     const turns = allTurns.filter(t => selectedIds.has(t.session_id) && (eventTurns.has(t.id) || Number(t.started_at)>=since && (!filter.model || t.model===filter.model)));
     const sum = (rows: typeof events) => ({ input_tokens:rows.reduce((n,e)=>n+Number(e.input_tokens),0),cached_tokens:rows.reduce((n,e)=>n+Number(e.cached_tokens),0),output_tokens:rows.reduce((n,e)=>n+Number(e.output_tokens),0),reasoning_tokens:rows.reduce((n,e)=>n+Number(e.reasoning_tokens),0),cost_usd:rows.reduce((n,e)=>n+Number(e.cost_usd ?? 0),0),unpriced_events:rows.filter(e=>e.cost_usd===null).length,calls:rows.length });
-    const aggregate = (field:string) => [...new Set(events.map(e=>String(e[field])))].map(key => ({key,...sum(events.filter(e=>String(e[field])===key))})).sort((a,b)=>b.input_tokens+b.output_tokens-a.input_tokens-a.output_tokens);
+    const efficiency = (rows: typeof events) => {
+      const sessionIds = [...new Set(rows.map(e => String(e.session_id)))];
+      const attributed = rows.filter(e => !String(e.turn_id).endsWith(':unattributed'));
+      const knownTurns = new Set(attributed.map(e => e.turn_id)).size;
+      const pricedSessions = sessionIds.map(id => rows.filter(e => e.session_id === id)).filter(es => es.every(e => e.cost_usd !== null));
+      return { sessions: sessionIds.length, usage_turns: knownTurns,
+        tokens_per_turn: knownTurns ? attributed.reduce((n,e) => n+Number(e.input_tokens)+Number(e.output_tokens),0)/knownTurns : null,
+        cost_per_session: pricedSessions.length ? pricedSessions.reduce((n,es) => n+sum(es).cost_usd,0)/pricedSessions.length : null,
+        priced_sessions: pricedSessions.length, unpriced_sessions: sessionIds.length-pricedSessions.length,
+        unattributed_events: rows.length-attributed.length };
+    };
+    const aggregate = (field:string) => [...new Set(events.map(e=>String(e[field])))].map(key => {
+      const rows = events.filter(e=>String(e[field])===key);
+      return {key,...sum(rows),...efficiency(rows)};
+    }).sort((a,b)=>b.input_tokens+b.output_tokens-a.input_tokens-a.output_tokens);
+    // Compare against the prior record even when it falls outside the selected time window.
+    const history = this.db.prepare(`SELECT e.id,e.session_id,e.turn_id,e.model,e.timestamp,e.input_tokens,s.cwd,s.source
+      FROM native_events e JOIN native_sessions s ON s.id=e.session_id ORDER BY e.timestamp,e.rowid`).all();
+    const spikes = contextSpikes(history.map(e => ({id:String(e.id),session_id:String(e.session_id),turn_id:String(e.turn_id),model:String(e.model),timestamp:Number(e.timestamp),input_tokens:Number(e.input_tokens)})))
+      .filter(e => e.timestamp>=since && e.timestamp<=Number(params[1]) && (!filter.model || e.model===filter.model))
+      .filter(e => { const s = sessions.find(s => s.id===e.session_id); return Boolean(s); })
+      .map(e => ({...e,cwd:String(sessions.find(s => s.id===e.session_id)!.cwd)})).reverse();
+
     const periods = [...new Set(events.map(e=>periodKey(Number(e.timestamp),filter.group)))].sort().map(period=>({period,...sum(events.filter(e=>periodKey(Number(e.timestamp),filter.group)===period))}));
     const data = selected.map(s => {
       const rows = events.filter(e=>e.session_id===s.id), ts = turns.filter(t=>t.session_id===s.id), u = sum(rows);
       const duration = ts.reduce((n,t)=>n+(t.finished_at===null ? 0 : Math.max(0,Number(t.finished_at)-Number(t.started_at))),0);
-      return {...s,...u,turns:ts.length,usage_available:rows.length>0,duration_ms:ts.some(t=>t.finished_at!==null)?duration:null,tokens_per_turn:ts.length&&rows.length?(u.input_tokens+u.output_tokens)/ts.length:null,cache_ratio:u.input_tokens?u.cached_tokens/u.input_tokens:null};
+      return {...s,...u,turns:ts.length,usage_available:rows.length>0,duration_ms:ts.some(t=>t.finished_at!==null)?duration:null,tokens_per_turn:ts.length&&rows.length?(u.input_tokens+u.output_tokens)/ts.length:null,cache_ratio:u.input_tokens?u.cached_tokens/u.input_tokens:null,context_spikes:spikes.filter(e=>e.session_id===s.id).length};
     });
-    return {collector:this.status(),summary:{...sum(events),sessions:selected.length,turns:turns.length,usage_unavailable_sessions:data.filter(s=>!s.usage_available).length},projects:aggregate('cwd'),models:aggregate('model'),sources:aggregate('source'),periods,
+    return {collector:this.status(),summary:{...sum(events),...efficiency(events),cache_hit_rate:sum(events).input_tokens ? sum(events).cached_tokens/sum(events).input_tokens : null,context_spikes:spikes.length,sessions:selected.length,turns:turns.length,usage_unavailable_sessions:data.filter(s=>!s.usage_available).length},projects:aggregate('cwd'),models:aggregate('model'),sources:aggregate('source'),periods,spikes:spikes.slice(0,20),
       data:data.slice((filter.page-1)*20,filter.page*20),total:data.length,page:filter.page,page_size:20,
       filters:{models:this.db.prepare('SELECT DISTINCT model FROM native_events ORDER BY model').all().map(r=>r.model),projects:this.db.prepare('SELECT DISTINCT cwd FROM native_sessions ORDER BY cwd').all().map(r=>r.cwd),sources:this.db.prepare('SELECT DISTINCT source FROM native_sessions ORDER BY source').all().map(r=>r.source)} };
   }
   detail(id: string) {
     const session = this.db.prepare('SELECT * FROM native_sessions WHERE id=?').get(id); if (!session) return null;
-    return {session,turns:this.db.prepare(`SELECT t.*,COUNT(e.id) AS calls,SUM(e.input_tokens) AS input_tokens,SUM(e.cached_tokens) AS cached_tokens,SUM(e.output_tokens) AS output_tokens,SUM(e.reasoning_tokens) AS reasoning_tokens,SUM(e.cost_usd) AS cost_usd FROM native_turns t LEFT JOIN native_events e ON e.turn_id=t.id WHERE t.session_id=? GROUP BY t.id ORDER BY t.started_at`).all(id),events:this.db.prepare('SELECT * FROM native_events WHERE session_id=? ORDER BY timestamp DESC LIMIT 200').all(id)};
+    const samples = this.db.prepare('SELECT * FROM native_events WHERE session_id=? ORDER BY timestamp,rowid').all(id);
+    const spikes = contextSpikes(samples.map(e => ({id:String(e.id),session_id:id,turn_id:String(e.turn_id),model:String(e.model),timestamp:Number(e.timestamp),input_tokens:Number(e.input_tokens)})));
+    return {session,spikes,turns:this.db.prepare(`SELECT t.*,COUNT(e.id) AS calls,SUM(e.input_tokens) AS input_tokens,SUM(e.cached_tokens) AS cached_tokens,SUM(e.output_tokens) AS output_tokens,SUM(e.reasoning_tokens) AS reasoning_tokens,SUM(e.cost_usd) AS cost_usd FROM native_turns t LEFT JOIN native_events e ON e.turn_id=t.id WHERE t.session_id=? GROUP BY t.id ORDER BY t.started_at`).all(id),events:this.db.prepare('SELECT * FROM native_events WHERE session_id=? ORDER BY timestamp DESC LIMIT 200').all(id)};
   }
   async close() { this.stopped=true; clearInterval(this.timer); await this.syncing; this.db.close(); }
 }
