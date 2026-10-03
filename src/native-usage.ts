@@ -94,7 +94,22 @@ export function contextSpikes(samples: SpikeSample[]) {
   return spikes;
 }
 
-export type NativeFilter = { range: '24h' | '7d' | '30d' | 'all'; group: 'day' | 'week' | 'month'; model?: string; source?: string; project?: string; page: number };
+export type NativeRange = 'today' | 'yesterday' | '7d' | '30d' | 'all' | '24h';
+export type NativeFilter = { range: NativeRange; group: 'day' | 'week' | 'month'; model?: string; source?: string; project?: string; page: number };
+const DAY = 86_400_000;
+const VIETNAM_OFFSET = 7 * 3_600_000;
+function dayStart(timestamp: number) {
+  return Math.floor((timestamp + VIETNAM_OFFSET) / DAY) * DAY - VIETNAM_OFFSET;
+}
+function nativeWindow(range: NativeRange, now = Date.now()) {
+  const today = dayStart(now);
+  if (range === 'yesterday') return { key: range, label: 'Hôm qua', since: today-DAY, until: today, average_unit: null, average_divisor: null } as const;
+  if (range === '7d') return { key: range, label: '7 ngày gần nhất', since: today-6*DAY, until: now+1, average_unit: 'day', average_divisor: 7 } as const;
+  if (range === '30d') return { key: range, label: '30 ngày qua', since: today-29*DAY, until: now+1, average_unit: 'day', average_divisor: 30 } as const;
+  if (range === 'all') return { key: range, label: 'Toàn bộ lịch sử', since: 0, until: now+1, average_unit: 'month', average_divisor: null } as const;
+  // Keep 24h as a compatibility alias for clients created before calendar ranges.
+  return { key: 'today', label: 'Hôm nay', since: today, until: now+1, average_unit: null, average_divisor: null } as const;
+}
 export class NativeUsage {
   private db: DatabaseSync;
   private timer?: NodeJS.Timeout;
@@ -202,18 +217,19 @@ export class NativeUsage {
   }
   status() { return { syncing:Boolean(this.syncing),last_sync:this.lastSync,interval_ms:this.interval,home:this.home,issues:[...new Set(this.issues)] }; }
   overview(filter: NativeFilter) {
-    const since = filter.range === 'all' ? 0 : Date.now() - ({'24h':86400000,'7d':604800000,'30d':2592000000}[filter.range]);
-    const params: (string|number)[] = [since,Date.now()];
-    let where = 'e.timestamp >= ? AND e.timestamp <= ?';
+    const window = nativeWindow(filter.range);
+    const since = window.since;
+    const params: (string|number)[] = [since,window.until];
+    let where = 'e.timestamp >= ? AND e.timestamp < ?';
     for (const [field,value] of [['e.model',filter.model],['s.source',filter.source],['s.cwd',filter.project]]) if (value) { where += ` AND ${field}=?`; params.push(value); }
     const events = this.db.prepare(`SELECT e.*,s.cwd,s.source FROM native_events e JOIN native_sessions s ON s.id=e.session_id WHERE ${where} ORDER BY e.timestamp,e.rowid`).all(...params);
     const sessions = this.db.prepare('SELECT * FROM native_sessions ORDER BY updated_at DESC').all().filter(s => (!filter.source || s.source === filter.source) && (!filter.project || s.cwd === filter.project));
     const relevant = new Set(events.map(e => String(e.session_id)));
-    const selected = sessions.filter(s => relevant.has(String(s.id)) || Number(s.updated_at) >= since && (!filter.model || s.model === filter.model));
+    const selected = sessions.filter(s => relevant.has(String(s.id)) || Number(s.updated_at) >= since && Number(s.updated_at) < window.until && (!filter.model || s.model === filter.model));
     const selectedIds = new Set(selected.map(s => s.id));
     const allTurns = this.db.prepare('SELECT * FROM native_turns ORDER BY started_at').all();
     const eventTurns = new Set(events.map(e => e.turn_id));
-    const turns = allTurns.filter(t => selectedIds.has(t.session_id) && (eventTurns.has(t.id) || Number(t.started_at)>=since && (!filter.model || t.model===filter.model)));
+    const turns = allTurns.filter(t => selectedIds.has(t.session_id) && (eventTurns.has(t.id) || Number(t.started_at)>=since && Number(t.started_at)<window.until && (!filter.model || t.model===filter.model)));
     const sum = (rows: typeof events) => ({ input_tokens:rows.reduce((n,e)=>n+Number(e.input_tokens),0),cached_tokens:rows.reduce((n,e)=>n+Number(e.cached_tokens),0),output_tokens:rows.reduce((n,e)=>n+Number(e.output_tokens),0),reasoning_tokens:rows.reduce((n,e)=>n+Number(e.reasoning_tokens),0),cost_usd:rows.reduce((n,e)=>n+Number(e.cost_usd ?? 0),0),unpriced_events:rows.filter(e=>e.cost_usd===null).length,calls:rows.length });
     const efficiency = (rows: typeof events) => {
       const sessionIds = [...new Set(rows.map(e => String(e.session_id)))];
@@ -230,11 +246,24 @@ export class NativeUsage {
       const rows = events.filter(e=>String(e[field])===key);
       return {key,...sum(rows),...efficiency(rows)};
     }).sort((a,b)=>b.input_tokens+b.output_tokens-a.input_tokens-a.output_tokens);
+    const scopedSummary = (start:number,end:number) => {
+      const scopedParams: (string|number)[] = [start,end];
+      let scopedWhere = 'e.timestamp >= ? AND e.timestamp < ?';
+      for (const [field,value] of [['e.model',filter.model],['s.source',filter.source],['s.cwd',filter.project]]) if (value) { scopedWhere += ` AND ${field}=?`; scopedParams.push(value); }
+      const scopedEvents = this.db.prepare(`SELECT e.*,s.cwd,s.source FROM native_events e JOIN native_sessions s ON s.id=e.session_id WHERE ${scopedWhere} ORDER BY e.timestamp,e.rowid`).all(...scopedParams);
+      const scopedRelevant = new Set(scopedEvents.map(e=>String(e.session_id)));
+      const scopedSessions = sessions.filter(s => scopedRelevant.has(String(s.id)) || Number(s.updated_at)>=start && Number(s.updated_at)<end && (!filter.model || s.model===filter.model));
+      const scopedIds = new Set(scopedSessions.map(s=>s.id));
+      const scopedEventTurns = new Set(scopedEvents.map(e=>e.turn_id));
+      const scopedTurns = allTurns.filter(t => scopedIds.has(t.session_id) && (scopedEventTurns.has(t.id) || Number(t.started_at)>=start && Number(t.started_at)<end && (!filter.model || t.model===filter.model)));
+      const totals = sum(scopedEvents);
+      return {...totals,...efficiency(scopedEvents),cache_hit_rate:totals.input_tokens ? totals.cached_tokens/totals.input_tokens : null,sessions:scopedSessions.length,turns:scopedTurns.length};
+    };
     // Compare against the prior record even when it falls outside the selected time window.
     const history = this.db.prepare(`SELECT e.id,e.session_id,e.turn_id,e.model,e.timestamp,e.input_tokens,s.cwd,s.source
       FROM native_events e JOIN native_sessions s ON s.id=e.session_id ORDER BY e.timestamp,e.rowid`).all();
     const spikes = contextSpikes(history.map(e => ({id:String(e.id),session_id:String(e.session_id),turn_id:String(e.turn_id),model:String(e.model),timestamp:Number(e.timestamp),input_tokens:Number(e.input_tokens)})))
-      .filter(e => e.timestamp>=since && e.timestamp<=Number(params[1]) && (!filter.model || e.model===filter.model))
+      .filter(e => e.timestamp>=since && e.timestamp<window.until && (!filter.model || e.model===filter.model))
       .filter(e => { const s = sessions.find(s => s.id===e.session_id); return Boolean(s); })
       .map(e => ({...e,cwd:String(sessions.find(s => s.id===e.session_id)!.cwd)})).reverse();
 
@@ -244,7 +273,19 @@ export class NativeUsage {
       const duration = ts.reduce((n,t)=>n+(t.finished_at===null ? 0 : Math.max(0,Number(t.finished_at)-Number(t.started_at))),0);
       return {...s,...u,turns:ts.length,usage_available:rows.length>0,duration_ms:ts.some(t=>t.finished_at!==null)?duration:null,tokens_per_turn:ts.length&&rows.length?(u.input_tokens+u.output_tokens)/ts.length:null,cache_ratio:u.input_tokens?u.cached_tokens/u.input_tokens:null,context_spikes:spikes.filter(e=>e.session_id===s.id).length};
     });
-    return {collector:this.status(),summary:{...sum(events),...efficiency(events),cache_hit_rate:sum(events).input_tokens ? sum(events).cached_tokens/sum(events).input_tokens : null,context_spikes:spikes.length,sessions:selected.length,turns:turns.length,usage_unavailable_sessions:data.filter(s=>!s.usage_available).length},projects:aggregate('cwd'),models:aggregate('model'),sources:aggregate('source'),periods,spikes:spikes.slice(0,20),
+    const totals = sum(events);
+    const summary = {...totals,...efficiency(events),cache_hit_rate:totals.input_tokens ? totals.cached_tokens/totals.input_tokens : null,context_spikes:spikes.length,sessions:selected.length,turns:turns.length,usage_unavailable_sessions:data.filter(s=>!s.usage_available).length};
+    const comparison = window.key === 'today' ? { label:'Hôm qua', summary:scopedSummary(window.since-DAY,window.since) } : null;
+    let averageDivisor: number | null = window.average_divisor;
+    if (window.key === 'all' && events.length) {
+      const first = new Date(Number(events[0]!.timestamp)+VIETNAM_OFFSET), last = new Date((window.until-1)+VIETNAM_OFFSET);
+      averageDivisor = (last.getUTCFullYear()-first.getUTCFullYear())*12+last.getUTCMonth()-first.getUTCMonth()+1;
+    }
+    const average = averageDivisor && window.average_unit ? {
+      unit:window.average_unit, divisor:averageDivisor,
+      summary:Object.fromEntries(['sessions','turns','calls','input_tokens','cached_tokens','output_tokens','reasoning_tokens','cost_usd'].map(key=>[key,Number(summary[key as keyof typeof summary] ?? 0)/averageDivisor]))
+    } : null;
+    return {collector:this.status(),range:{key:window.key,label:window.label,since:window.since,until:window.until-1},summary,comparison,average,projects:aggregate('cwd'),models:aggregate('model'),sources:aggregate('source'),periods,spikes:spikes.slice(0,20),
       data:data.slice((filter.page-1)*20,filter.page*20),total:data.length,page:filter.page,page_size:20,
       filters:{models:this.db.prepare('SELECT DISTINCT model FROM native_events ORDER BY model').all().map(r=>r.model),projects:this.db.prepare('SELECT DISTINCT cwd FROM native_sessions ORDER BY cwd').all().map(r=>r.cwd),sources:this.db.prepare('SELECT DISTINCT source FROM native_sessions ORDER BY source').all().map(r=>r.source)} };
   }

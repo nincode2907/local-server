@@ -256,6 +256,22 @@ let nativePage = 1, nativeController, nativeLoading = false;
 const sourceLabels = { 'gateway-log':'Gateway · từ rollout', exec:'Codex exec', cli:'Codex CLI', vscode:'VS Code / App (vscode)', subagent:'Subagent', unknown:'Chưa xác định' };
 const compact = value => value >= 1000000 ? new Intl.NumberFormat('vi-VN',{notation:'compact',maximumFractionDigits:2}).format(value) : number(value);
 const nativeCost = row => `${row.calls > row.unpriced_events ? money(row.cost_usd) : '—'}${row.unpriced_events ? `<small class="native-cost-unknown">${number(row.unpriced_events)} record chưa có giá</small>` : ''}`;
+const nativeValue = (value,kind) => kind === 'cost' ? money(value) : new Intl.NumberFormat('vi-VN',{maximumFractionDigits:1}).format(value);
+function nativePeriodNote(data,key,current,kind='number') {
+  const read = summary => key === 'total_tokens' ? Number(summary.input_tokens)+Number(summary.output_tokens) : summary[key];
+  if (data.comparison) {
+    const previous = Number(read(data.comparison.summary) ?? 0), value = Number(current ?? 0);
+    if (!previous) return value ? `Mới so với ${data.comparison.label.toLowerCase()}` : `Không đổi so với ${data.comparison.label.toLowerCase()}`;
+    const delta = (value-previous)/previous*100;
+    if (Math.abs(delta)<0.05) return `Không đổi so với ${data.comparison.label.toLowerCase()}`;
+    return `${delta>0?'↑':'↓'} ${Math.abs(delta).toFixed(1)}% so với ${data.comparison.label.toLowerCase()}`;
+  }
+  if (data.average && key !== 'tokens_per_turn') {
+    const average = read(data.average.summary), unit = data.average.unit === 'month' ? 'tháng' : 'ngày';
+    return `TB ${nativeValue(average,kind)}/${unit}`;
+  }
+  return '';
+}
 function nativeOptions(id,values,label) {
   const selected = $(id).value; $(id).innerHTML = `<option value="">${label}</option>` + values.map(v=>`<option value="${escape(v)}">${escape(id==='native-source' ? sourceLabels[v] ?? v : v)}</option>`).join(''); $(id).value = selected;
 }
@@ -271,9 +287,21 @@ async function loadNative({quiet=false}={}) {
     if (nativePage>1 && !d.data.length) {nativePage=Math.max(1,Math.ceil(d.total/d.page_size));return loadNative();}
     const s=d.summary, total=s.input_tokens+s.output_tokens;
     $('native-sync').textContent = `${d.collector.syncing ? 'Đang đồng bộ…' : 'Đồng bộ mỗi '+d.collector.interval_ms/1000+'s'} · ${d.collector.last_sync ? 'Lần cuối '+date(d.collector.last_sync)+' '+time(d.collector.last_sync) : 'Đang nhập lịch sử lần đầu'} · ${d.collector.home}${d.collector.issues.length ? ' · '+d.collector.issues.join(' ') : ''}`;
-    const cards = [['Sessions',s.sessions,`${s.usage_unavailable_sessions} session chưa có usage`],['Turns',s.turns,`${s.calls} usage record · không phải số HTTP call`],['Input tokens',s.input_tokens,`Cache hit rate: ${s.cache_hit_rate === null ? '—' : (s.cache_hit_rate*100).toFixed(1)+'%'} · cached / input`],['Output tokens',s.output_tokens,`${number(s.reasoning_tokens)} reasoning trong output`],['Cached tokens',s.cached_tokens,s.input_tokens ? `${(s.cached_tokens/s.input_tokens*100).toFixed(1)}% input được cache` : '—'],['Tổng token',total,`Cache hit rate: ${s.cache_hit_rate === null ? '—' : (s.cache_hit_rate*100).toFixed(1)+'%'}`],['API-equivalent cost',s.cost_usd,`${s.unpriced_events} record chưa có giá`],['Token / turn',s.tokens_per_turn === null ? null : Math.round(s.tokens_per_turn),`${number(s.usage_turns)} turn có usage · ${number(s.unattributed_events)} record chưa gắn turn`]];
-    $('native-cards').innerHTML=cards.map(([label,value,note])=>`<article class="metric"><div class="metric-label">${label}</div><div class="metric-value" title="${escape(number(value))}">${label==='API-equivalent cost' ? money(value) : compact(value)}</div><p>${escape(note)}</p></article>`).join('');
-    $('native-note').textContent='Giá API tham khảo, không phải hóa đơn Plus. Nguồn lấy từ metadata; vscode có thể là App hoặc VS Code. Gateway trong rollout chỉ là dữ liệu quan sát, không cộng vào thống kê server. Log cũ dùng chênh lệch token_count; record response được ưu tiên. Session không còn rollout hoặc thread ephemeral có thể không có usage.';
+    const cards = [
+      ['Sessions',s.sessions,`${s.usage_unavailable_sessions} session chưa có usage`,'sessions','number'],
+      ['Turns',s.turns,`${s.calls} usage record · không phải số HTTP call`,'turns','number'],
+      ['Input tokens',s.input_tokens,`Cache hit rate: ${s.cache_hit_rate === null ? '—' : (s.cache_hit_rate*100).toFixed(1)+'%'} · cached / input`,'input_tokens','number'],
+      ['Output tokens',s.output_tokens,`${number(s.reasoning_tokens)} reasoning trong output`,'output_tokens','number'],
+      ['Cached tokens',s.cached_tokens,s.input_tokens ? `${(s.cached_tokens/s.input_tokens*100).toFixed(1)}% input được cache` : '—','cached_tokens','number'],
+      ['Tổng token',total,`Cache hit rate: ${s.cache_hit_rate === null ? '—' : (s.cache_hit_rate*100).toFixed(1)+'%'}`,'total_tokens','number'],
+      ['API-equivalent cost',s.cost_usd,`${s.unpriced_events} record chưa có giá`,'cost_usd','cost'],
+      ['Token / turn',s.tokens_per_turn === null ? null : Math.round(s.tokens_per_turn),`${number(s.usage_turns)} turn có usage · ${number(s.unattributed_events)} record chưa gắn turn`,'tokens_per_turn','number']
+    ];
+    $('native-cards').innerHTML=cards.map(([label,value,note,key,kind])=>{
+      const periodNote=nativePeriodNote(d,key,value,kind);
+      return `<article class="metric"><div class="metric-label">${label}</div><div class="metric-value" title="${escape(number(value))}">${kind==='cost' ? money(value) : compact(value)}</div><p>${escape([periodNote,note].filter(Boolean).join(' · '))}</p></article>`;
+    }).join('');
+    $('native-note').textContent=`${d.range.label}: ${date(d.range.since)} ${time(d.range.since)} → ${date(d.range.until)} ${time(d.range.until)} (UTC+7). Giá API tham khảo, không phải hóa đơn Plus. Nguồn lấy từ metadata; vscode có thể là App hoặc VS Code. Gateway trong rollout chỉ là dữ liệu quan sát, không cộng vào thống kê server. Log cũ dùng chênh lệch token_count; record response được ưu tiên. Session không còn rollout hoặc thread ephemeral có thể không có usage.`;
     const grouped=(list,project=false)=>list.map(r=>`<tr><td class="${project ? 'native-path' : 'model-name'}">${project ? `<strong>${escape(r.key.split('/').filter(Boolean).pop() ?? r.key)}</strong><small>${escape(r.key)}</small>` : escape(r.key)}<div class="native-meter"><span data-native-width="${total ? (r.input_tokens+r.output_tokens)/total*100 : 0}"></span></div></td>${project ? '' : `<td class="number">${number(r.sessions)}</td>`}<td class="number">${number(r.input_tokens+r.output_tokens)}</td><td class="number">${r.tokens_per_turn === null ? '—' : number(Math.round(r.tokens_per_turn))}<small class="native-stat-note">${number(r.usage_turns)} turn có usage</small></td>${project ? `<td class="number">${money(r.cost_per_session)}<small class="native-stat-note">${number(r.priced_sessions)}/${number(r.sessions)} session đủ giá${r.unpriced_sessions ? ' · tổng có thể thiếu' : ''}</small></td>` : ''}<td class="number">${nativeCost(r)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty-table">Chưa có usage trong bộ lọc</td></tr>';
     $('native-spike-count').textContent = number(s.context_spikes);
     $('native-spike-note').textContent = `Hiển thị ${number(d.spikes.length)}/${number(s.context_spikes)} cảnh báo gần nhất trong bộ lọc. Input record tăng >2× và ≥50k, cùng session/model; cần kiểm tra, không kết luận lãng phí.`;

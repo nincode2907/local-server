@@ -28,7 +28,7 @@ export async function registerDashboard(app: FastifyInstance, metrics: Metrics, 
   app.get('/dashboard/assets/style.css', async (_req, reply) => reply.headers(security).type('text/css; charset=utf-8').send(css));
   app.get('/dashboard/assets/app.js', async (_req, reply) => reply.headers(security).type('text/javascript; charset=utf-8').send(js));
   app.get('/api/native/overview', async (req, reply) => {
-    const input = z.object({range:z.enum(['24h','7d','30d','all']).default('24h'),group:z.enum(['day','week','month']).default('day'),model:z.string().max(128).optional(),source:z.string().max(128).optional(),project:z.string().max(4096).optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict().parse(req.query);
+    const input = z.object({range:z.enum(['today','yesterday','7d','30d','all','24h']).default('today'),group:z.enum(['day','week','month']).default('day'),model:z.string().max(128).optional(),source:z.string().max(128).optional(),project:z.string().max(4096).optional(),page:z.coerce.number().int().min(1).max(100000).default(1)}).strict().parse(req.query);
     return reply.headers(security).send(native.overview(input));
   });
   app.get<{ Params: { id: string } }>('/api/native/sessions/:id', async (req, reply) => {
