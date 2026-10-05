@@ -6,6 +6,8 @@ Local HTTP gateway bằng Node.js + TypeScript + `@openai/codex-sdk`, dùng Code
 Python / app / agent → HTTP → Fastify → Codex SDK → Codex CLI → ChatGPT account
 ```
 
+Tài liệu kiến trúc: [TECHNICAL.md](docs/TECHNICAL.md) · [Sơ đồ trực quan HTML](docs/architecture.html).
+
 ## Chạy
 
 Node **22.13+** (khuyên dùng Node 24). Máy hiện tại có Node 24 qua nvm; chạy `nvm use` trước vì shell có thể đang dùng Node 16.
