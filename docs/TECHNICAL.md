@@ -127,7 +127,7 @@ Native parser ưu tiên response usage record, khử trùng theo response ID và
 | Biến | Mặc định | Ý nghĩa |
 | --- | --- | --- |
 | `PORT` | `4000` | Cổng HTTP |
-| `DEFAULT_MODEL` | `gpt-6-luna` trong schema runtime | Model mặc định; README có thể nêu giá trị gợi ý khác |
+| `DEFAULT_MODEL` | `gpt-6-luna` | Model mặc định; `.env` và body request có thể ghi đè |
 | `DEFAULT_REASONING_EFFORT` | `low` | Reasoning mặc định |
 | `REQUEST_TIMEOUT_MS` | `180000` | Timeout một lượt |
 | `MAX_CONCURRENT` | `2` | Lượt đồng thời tối đa |
@@ -173,4 +173,6 @@ npm run build
 npm start
 ```
 
-Đăng nhập CLI bằng `\.\node_modules\.bin\codex.cmd login` trên Windows hoặc `./node_modules/.bin/codex login` trên macOS/Linux. Dashboard ở `http://127.0.0.1:4000/dashboard`; `npm run dev` bật TypeScript watcher. `npm run test:live` gọi Codex thật và tiêu thụ hạn mức tài khoản.
+Đăng nhập CLI bằng `.\node_modules\.bin\codex.cmd login` trên Windows hoặc `./node_modules/.bin/codex login` trên macOS/Linux. Dashboard ở `http://127.0.0.1:4000/dashboard`; `npm run dev` bật TypeScript watcher. `npm run test:live` gọi Codex thật và tiêu thụ hạn mức tài khoản.
+
+`npm start` qua `scripts/start.js` chạy foreground; `npm start --silent -- -d` chạy nền và bỏ output. `npm stop` kiểm tra PID bằng `ps` rồi gửi SIGTERM trên macOS/Linux. PID được ghi khi spawn, chưa xác nhận HTTP sẵn sàng. Chi tiết runtime, lệch Node/npm và tình trạng port/proxy ở [DEVELOPMENT.md](DEVELOPMENT.md) và [bản trực quan](DEVELOPMENT.html).

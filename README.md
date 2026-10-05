@@ -8,6 +8,8 @@ Python / app / agent → HTTP → Fastify → Codex SDK → Codex CLI → ChatGP
 
 Tài liệu kiến trúc: [TECHNICAL.md](docs/TECHNICAL.md) · [Sơ đồ trực quan HTML](docs/architecture.html).
 
+Lệnh chạy, process management và tình trạng Dev Hub: [DEVELOPMENT.md](docs/DEVELOPMENT.md) · [Bản trực quan](docs/DEVELOPMENT.html). Hướng dẫn cho agent: [AGENTS.md](AGENTS.md).
+
 ## Chạy
 
 Node **22.13+** (khuyên dùng Node 24). Máy hiện tại có Node 24 qua nvm; chạy `nvm use` trước vì shell có thể đang dùng Node 16.
@@ -45,7 +47,7 @@ npm start
 
 Development: `npm run dev`. `Ctrl+C` dừng server và hủy các lượt đang chạy. Không cần `OPENAI_API_KEY`; gateway buộc auth bằng ChatGPT, không kế thừa API key từ môi trường.
 
-Đặt `DEFAULT_MODEL` và `DEFAULT_REASONING_EFFORT` trong `.env` để chọn mặc định cho chat và session. Mặc định là `gpt-6.1-sol` và `medium`. Body từng request vẫn nhận `model` và `reasoning_effort` (hoặc alias `reasoning`) để override. Model phải được tài khoản Codex của bạn cấp quyền; nếu không hãy chọn model khả dụng. Gateway vẫn dùng hạn mức của tài khoản ChatGPT. Health chỉ cho biết HTTP server hoạt động, không kiểm tra đăng nhập/hạn mức.
+Đặt `DEFAULT_MODEL` và `DEFAULT_REASONING_EFFORT` trong `.env` để chọn mặc định cho chat và session. Defaults trong `src/config.ts` và `.env.example` là `gpt-6-luna` và `low`; cấu hình `.env` của máy có thể ghi đè. Body từng request vẫn nhận `model` và `reasoning_effort` (hoặc alias `reasoning`) để override. Model phải được tài khoản Codex của bạn cấp quyền; nếu không hãy chọn model khả dụng. Gateway vẫn dùng hạn mức của tài khoản ChatGPT. Health chỉ cho biết HTTP server hoạt động, không kiểm tra đăng nhập/hạn mức.
 
 ## API
 
