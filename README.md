@@ -22,6 +22,15 @@ npm run build
 npm start
 ```
 
+Chạy nền không in log ra terminal (npm dùng `-d` làm cờ riêng, nên truyền cờ cho script sau `--`):
+
+```bash
+npm start --silent -- -d
+npm stop
+```
+
+`npm start -- -d` cũng chạy nền; `--silent` ẩn banner của npm. Output của server được bỏ qua. PID được ghi trong `.local/server.pid`.
+
 Windows PowerShell (NVM for Windows requires an explicit version; use any installed Node 22.13+):
 
 ```powershell
