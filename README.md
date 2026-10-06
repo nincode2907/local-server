@@ -265,6 +265,27 @@ Manifest compact **version 1** được lưu với từng experiment và có nú
 
 `duration` là giây; `created_at` và `approved_at` là Unix milliseconds tùy chọn. Duyệt stage không truyền `approved_at` sẽ lấy thời điểm hiện tại. Khi nhập experiment cũ, truyền thời điểm duyệt thật. `approved`/`final` cần một BUILD/REVISE đã duyệt; `final` cần `final_path`. Quality tùy chọn gồm clarity, visual, motion, originality, wow, technical, overall. Import ID trùng báo 409; chỉnh sửa thay thế manifest theo ID, giữ ngày tạo.
 
+### Tương thích với global video-builder
+
+Schema import thực tế là `videoManifest` trong `src/video-builds.ts`, không phải template của skill. Manifest nguồn `video-build.json` dùng `schema_version: 1` của global video-builder hiện **không import trực tiếp** được. Giữ nguyên file nguồn và xuất riêng `video-build.dashboard.json` theo schema `version: 1` ở trên:
+
+| Manifest nguồn | Payload dashboard |
+| --- | --- |
+| `schema_version` | `version` |
+| `build.duration_seconds` | `build.duration` |
+| `build.engine`, ví dụ `Remotion` | Enum chữ thường: `remotion`, `manim`, `ffmpeg`, `hybrid` |
+| `revisions` ở root | `build.revisions` |
+| `quality_scores` | `build.quality` |
+| `artifacts.preview` / `artifacts.final` | `build.preview_path` / `build.final_path` |
+| `build.created_at` ISO 8601 | Unix milliseconds |
+| Stage `model: null` | Stage `model: ""` (chưa biết) |
+
+Importer strict: không gửi root `approval`, `artifacts`, stage `created_at` hoặc field ngoài schema. Giữ brief path, timestamp ISO, unknown fields và lịch sử trong manifest nguồn. Dashboard cần metadata bắt buộc đã biết; không điền engine suy đoán hoặc duration bằng 0 khi chưa biết. Status dashboard chỉ gồm `planned`, `preview`, `approved`, `final`; khi nguồn đang `building`/`revising`, bản export dùng `preview` nếu đã có preview thật, nếu chưa thì `planned`.
+
+Approval dashboard thuộc từng stage: duyệt brief PLAN không có nghĩa duyệt preview BUILD. Chỉ đánh dấu stage được duyệt khi biết rõ đối tượng và thời điểm duyệt; `approved`/`final` cần BUILD/REVISE đã duyệt. DIRECT dùng chung session phải có `turn_ids` thật, không chồng nhau giữa stages. Không tạo session/model/turn giả để vượt validation. Dashboard yêu cầu thứ tự PLAN → BUILD → REVISE → FINISH; lịch sử không phù hợp cần báo giới hạn, không tự sắp xếp lại.
+
+Kiểm tra payload bằng parser và API với database fixture riêng trước khi báo import thành công. Validator của skill chỉ kiểm tra cấu trúc skill. Hướng dẫn export nằm trong global `video-builder/references/build-manifest.md`; contract của repo tại đây là nguồn chuẩn cho dashboard.
+
 API local: `GET /api/videos`, `GET /api/videos/:id` (build + manifest), `GET /api/videos/sessions?search=...`, `POST /api/videos`, `POST /api/videos/import`, `PUT /api/videos/:id`. Ghi dùng JSON và header `X-Codex-Video: 1`; browser cần cùng origin. Cấu hình Bearer hiện có vẫn áp dụng nếu đã bật.
 
 ```bash

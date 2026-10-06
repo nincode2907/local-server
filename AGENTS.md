@@ -43,6 +43,9 @@ built-in SQLite, and vanilla HTML/CSS/JavaScript. No frontend bundler.
 
 - API, sessions, cost formulas, native ranges/spikes: relevant sections of
   `README.md`; catalog provenance and pricing limitations: `data/README.md`.
+- Video builds/import/export: the Video builds section of `README.md`;
+  `src/video-builds.ts` is the dashboard schema authority. Validate external
+  manifests against it; a skill template is not proof of import compatibility.
 - Provider, storage, security and file map: `docs/TECHNICAL.md`.
   Its human-readable visual companion is `docs/architecture.html`.
 - Setup, process management, Node mismatch, ports/proxy and bootstrap findings:

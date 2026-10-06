@@ -71,14 +71,14 @@ cần Bearer token; không đưa token vào tài liệu hay URL.
 
 ## Port và Dev Hub
 
-| Nguồn | Trạng thái kiểm tra ngày 05/10/2026 |
+| Nguồn | Trạng thái kiểm tra ngày 06/10/2026 |
 | --- | --- |
 | Repo | `src/config.ts` / `.env.example`: port 4000; `src/index.ts`: bind 127.0.0.1 |
 | Listener | Node của repo nghe `127.0.0.1:4000`; command dùng Node 24.21.0 |
 | URL hiện tại | `http://127.0.0.1:4000/dashboard` hoặc `http://localhost:4000/dashboard` |
 | Registry | `/Users/buivannin/Desktop/workspace/personal/dev-hub/projects.yml` tồn tại; chưa có entry khớp đường dẫn repo |
 | Block | Chưa được cấp block trung tâm; không xem 4000 là port đã reserve |
-| Proxy | Dev Hub Caddy đang chạy, có route dev/intelligence; chưa có route cho codex-server |
+| Proxy | Dev Hub Caddy đang chạy, có route dev/intelligence/ai-model-dashboard; chưa có route cho codex-server |
 | Bind proxy | Docker publish `0.0.0.0:80→80`; không phải chỉ loopback. `lsof` không root thấy listener wildcard IPv6 |
 | Host policy | `src/server.ts` chỉ nhận localhost/loopback; chưa nhận hostname `.localhost` của project |
 
@@ -106,3 +106,17 @@ TECHNICAL và sơ đồ hiện có; không tạo bản sao quy trình global. Gl
 có thể tái dùng: `feature-builder` khi thêm feature, `task-qa-review` khi review
 task, `security-review` khi audit bảo mật. Không tạo project skill mới nên không
 có skill mới cần validator.
+
+## Rà soát AI bootstrap ngày 06/10/2026
+
+| Phạm vi | Bằng chứng và kết quả |
+| --- | --- |
+| Agent instructions | Chỉ có root `AGENTS.md`: 65 dòng trước, 68 dòng sau. Nội dung là core rules và routing; không cần tách workflow hay tạo project skill mới. Không có nested scope cần di chuyển. |
+| Knowledge routing | Giữ README cho API, usage và video contract; TECHNICAL/architecture cho kiến trúc; DEVELOPMENT.md/HTML cho vận hành. Bổ sung route Video builds trong AGENTS.md. |
+| Sai lệch import | Global video-builder dùng `schema_version`, ISO timestamps và metadata khác schema dashboard. README bổ sung mapping export; `src/video-builds.ts` vẫn là schema authority. Giữ nguyên manifest nguồn. |
+| Global skills | Tái dùng feature-builder cho implementation, task-qa-review cho review, security-review cho audit và project-ai-bootstrap cho setup. Không sao chép phương pháp global vào repo. |
+| Runtime | `nvm use`: Node 24.21.0, npm 11.19.0; cả hai executable thuộc cùng runtime. Listener PID 48395 là Node 24.21.0 tại 127.0.0.1:4000; GET /health trả 200. |
+| Dev Hub | Registry chưa có repo/block; Caddyfile có dev/intelligence/ai-model-dashboard, không có codex-server. Docker inspect xác nhận publish 0.0.0.0:80; chưa có hostname proxy cho repo. |
+| User changes | Giữ nguyên thay đổi `.gitignore` có sẵn. Không đổi code runtime, dữ liệu thật, port, registry hay proxy. |
+
+Không đưa lỗi import này thành quy tắc core dài: chi tiết nằm tại mục Video builds trong README, AGENTS.md chỉ dẫn tới contract và validation. Kiểm tra import ở lượt chẩn đoán đã dùng API inject + database tạm: manifest nguồn trả 400, bản export trả 201; không gọi provider thật. Snapshot vận hành không chứng minh quyền model hoặc hạn mức tài khoản.
