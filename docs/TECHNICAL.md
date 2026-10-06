@@ -112,6 +112,10 @@ Chi phí là ước lượng dựa vào `data/models.json`, không phải hóa �
 
 Native parser ưu tiên response usage record, khử trùng theo response ID và xử lý log cũ bằng delta bộ đếm tích lũy. Context spike là chỉ báo input cùng session/model tăng hơn 2 lần và đạt ít nhất 50k; nó không tự kết luận lãng phí.
 
+`src/video-builds.ts` tạo additive hai bảng STRICT `video_builds` và `video_stages` trong cùng database. Lưu metadata, scores, manifest version 1 và session/turn scopes; không lưu token/cost/time hoặc transcript. Đọc một SQLite snapshot để nối `native_events` / `native_turns`; ghi manifest và các stages trong transaction, kiểm tra scope không chồng nhau toàn cục. Không đặt FK vào native sessions để experiment có thể được nhập trước collector. Approved preview có cutoff `approved_at`; số liệu thiếu giữ null. Định dạng và công thức nằm ở mục Video builds trong README.
+
+Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `POST /api/videos`, `POST /api/videos/import`, `PUT /api/videos/:id` phục vụ tab cùng dashboard. Ghi cần JSON + `X-Codex-Video: 1`, kiểm tra Origin nếu có và giữ các Host/Bearer checks hiện tại. Paths là chuỗi metadata, không đọc/chạy video local. Native session detail thêm `video_tags`.
+
 ## 7. Bảo mật và giới hạn
 
 - Bind `127.0.0.1`; chỉ nhận Host localhost/loopback, không bật CORS.
@@ -153,6 +157,7 @@ Native parser ưu tiên response usage record, khử trùng theo response ID và
 | `src/sessions.ts` | Gateway session lifecycle, atomic JSON write |
 | `src/metrics.ts` | SQLite gateway metrics và cost snapshot |
 | `src/native-usage.ts` | Đọc Codex state/rollout và tổng hợp usage |
+| `src/video-builds.ts` | Metadata/manifest video, nối native usage, approval cutoff và so sánh |
 | `src/catalog.ts` | Catalog và ước lượng chi phí |
 | `src/dashboard.ts` | Phục vụ assets, dashboard APIs |
 | `public/dashboard.html` | Cấu trúc UI |

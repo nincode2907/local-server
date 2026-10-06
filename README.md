@@ -227,6 +227,52 @@ Khi cần tools, gửi definitions và `tool_choice` trong **mỗi request**. Se
 
 Xóa session không xóa lịch sử thread do Codex CLI lưu trong `CODEX_HOME`. Nếu lượt session lỗi/timeout, session bị vô hiệu hóa để tránh tiếp tục một history đã ghi dở; cần tạo session mới.
 
+## Video builds
+
+Tab **Video builds** nằm trong dashboard hiện có. Tạo/sửa metadata, chấm điểm tùy chọn 0–10, nối session với PLAN / BUILD / REVISE / FINISH, xem timeline và so sánh theo model, engine hoặc pipeline. Session detail có tag `Video: … · Stage: …` và form gắn vào build đã tạo.
+
+SQLite hiện tại giữ thêm `video_builds` và `video_stages`. Token, cost và thời gian được nối từ `native_events` / `native_turns` qua session ID, không lưu bản sao. Không nhập prompt/response vào notes. Preview/final path chỉ là metadata, không phục vụ hay chạy file. Các số liệu thiếu hiển thị `—`, không coi là miễn phí.
+
+- First-pass rate: số preview duyệt ở BUILD đầu tiên, chưa qua BUILD khác hoặc REVISE / tổng preview đã duyệt.
+- Cost/time đến approved preview: tổng stage trước và gồm BUILD/REVISE đầu tiên được duyệt, cắt usage tại `approved_at`; không cộng FINISH sau đó. Time là tổng thời gian turn, không phải thời gian chờ review.
+- Quality/USD và quality/phút: tổng overall / tổng cost hoặc phút của các mẫu có cả score và số liệu đầy đủ, mẫu số >0. Theo model dùng phần usage của model đó; score vẫn là score của build.
+- Một session chỉ được dùng toàn bộ ở một stage. Nếu tái dùng session, chọn các `turn_ids` không chồng nhau để tránh cộng trùng. Không cần session đã import sẵn: collector đồng bộ sau sẽ bổ sung số liệu.
+
+Manifest compact **version 1** được lưu với từng experiment và có nút Import/Export. Ví dụ file `video-build.json` cho các lần chạy video-builder sau:
+
+```json
+{
+  "version": 1,
+  "build": {
+    "id": "queue-protects-server",
+    "title": "Queue protects server",
+    "type": "explainer",
+    "engine": "remotion",
+    "duration": 30,
+    "aspect_ratio": "16:9",
+    "status": "preview",
+    "revisions": 0,
+    "preview_path": "out/preview.mp4",
+    "final_path": null,
+    "quality": { "overall": 8, "wow": 7 }
+  },
+  "stages": [
+    { "id": "plan", "stage": "PLAN", "session_id": "codex-session-id-plan", "model": "gpt-6.1-sol", "notes": "Storyboard", "approved": false },
+    { "id": "build", "stage": "BUILD", "session_id": "codex-session-id-build", "model": "gpt-6-luna", "notes": "Preview ready", "approved": false }
+  ]
+}
+```
+
+`duration` là giây; `created_at` và `approved_at` là Unix milliseconds tùy chọn. Duyệt stage không truyền `approved_at` sẽ lấy thời điểm hiện tại. Khi nhập experiment cũ, truyền thời điểm duyệt thật. `approved`/`final` cần một BUILD/REVISE đã duyệt; `final` cần `final_path`. Quality tùy chọn gồm clarity, visual, motion, originality, wow, technical, overall. Import ID trùng báo 409; chỉnh sửa thay thế manifest theo ID, giữ ngày tạo.
+
+API local: `GET /api/videos`, `GET /api/videos/:id` (build + manifest), `GET /api/videos/sessions?search=...`, `POST /api/videos`, `POST /api/videos/import`, `PUT /api/videos/:id`. Ghi dùng JSON và header `X-Codex-Video: 1`; browser cần cùng origin. Cấu hình Bearer hiện có vẫn áp dụng nếu đã bật.
+
+```bash
+curl http://localhost:4000/api/videos/import \
+  -H 'Content-Type: application/json' -H 'X-Codex-Video: 1' \
+  --data-binary @video-build.json
+```
+
 ## Dashboard và SQLite
 
 Mở **http://localhost:4000/dashboard** (hoặc `/` để tự chuyển hướng). Trang cập nhật mỗi 5 giây; có thể tắt tự cập nhật. Bộ lọc gồm 1 giờ / 24 giờ / 7 ngày / 30 ngày, model và trạng thái. Bảng lịch sử phân trang 20 call, mở chi tiết để xem reasoning, session ID, token và mã lỗi. Thời gian hiển thị theo Việt Nam, UTC+7.

@@ -181,9 +181,10 @@ function renderCatalog() {
   $('catalog-rows').innerHTML = modelCatalog.models.filter(m => `${m.id} ${m.provider}`.toLowerCase().includes(search)).map(m => `<tr><td><code>${escape(m.id)}</code><span class="catalog-provider">${escape(m.name)} · ${escape(m.provider)}</span></td><td>${escape(m.availability)}<p class="catalog-note">${escape(m.note)}</p></td><td class="number">${money(m.price?.input_per_million)}</td><td class="number">${money(m.price?.cached_input_per_million)}</td><td class="number">${money(m.price?.output_per_million)}</td><td><div class="catalog-actions"><button class="quiet" data-copy="${escape(m.id)}">Copy</button>${m.chat_supported ? `<button class="quiet" data-try="${escape(m.id)}">Test →</button>` : ''}</div></td></tr>`).join('');
 }
 function view(name) {
-  ['stats','native','chat','catalog'].forEach(id => { $(`view-${id}`).hidden = id !== name; });
+  ['stats','native','videos','chat','catalog'].forEach(id => { $(`view-${id}`).hidden = id !== name; });
   document.querySelectorAll('[data-view]').forEach(b => { b.classList.toggle('selected', b.dataset.view === name); b.setAttribute('aria-pressed', String(b.dataset.view === name)); });
   if (name === 'native') loadNative();
+  if (name === 'videos') loadVideos();
   if (name === 'stats' && lastOverview) chart(lastOverview.timeline,lastOverview.range);
 }
 function currentChat() { return chats.find(c => c.id === activeChat); }
@@ -329,7 +330,21 @@ async function nativeDetail(id) {
       return `<tr><td>${escape(t.id.split(':').pop())}<br>${escape(t.model)} · ${escape(t.reasoning)}<br>${escape(t.status)}${spike ? '<small class="native-cost-unknown">Context spike</small>' : ''}</td><td>${escape(date(t.started_at)+' '+time(t.started_at))}</td><td class="number">${number(t.input_tokens)}</td><td class="number">${number(t.cached_tokens)}</td><td class="number">${number(t.output_tokens)}</td><td class="number">${t.finished_at===null ? '—' : seconds(t.finished_at-t.started_at)}</td><td class="number">${money(t.cost_usd)}</td></tr>`;
     }).join('');
     $('detail-content').innerHTML=`<div class="native-detail-head"><p>${escape(s.id)}<br>${escape(s.cwd)}<br>${escape(sourceLabels[s.source] ?? s.source)} · ${escape(s.model)}</p><p>Thời điểm session: ${escape(date(s.created_at)+' '+time(s.created_at))} → ${escape(date(s.updated_at)+' '+time(s.updated_at))}<br>Rollout: ${escape(s.rollout_path ?? 'Chưa tìm thấy rollout')}</p><p>${number(s.malformed)} dòng không parse được · ${number(s.resets)} lần bộ đếm reset</p>${d.spikes.length ? `<div class="native-spike">${number(d.spikes.length)} context spike · input mỗi usage record tăng >2× và ≥50k, cùng model.<ul>${d.spikes.slice(-20).map(e=>`<li>${escape(e.model)} · ${escape(date(e.timestamp)+' '+time(e.timestamp))}: ${e.sequence.map(n=>number(n)).join(' → ')} (${e.growth_ratio.toFixed(1)}×)</li>`).join('')}</ul></div>` : ''}</div><div class="native-detail-table"><table><thead><tr><th>Turn / model</th><th>Bắt đầu</th><th>Input</th><th>Cache</th><th>Output</th><th>Thời gian</th><th>USD</th></tr></thead><tbody>${turnRows || '<tr><td colspan="7">Chưa có turn được ghi trong rollout.</td></tr>'}</tbody></table></div><details class="system-context"><summary>Usage events & snapshot giá · tối đa 200 record mới nhất</summary><pre class="detail-json">${escape(JSON.stringify(d.events,null,2))}</pre></details>`;
-    $('call-detail').showModal();
+    const tags=document.createElement('div');tags.className='video-session-tags';
+    tags.innerHTML=(d.video_tags??[]).map(t=>`<button class="quiet" data-video-open="${escape(t.video_build_id)}">Video: ${escape(t.video_build_id)} · Stage: ${escape(t.stage)}</button>`).join('')||'<p class="subtitle">Chưa gắn video build.</p>';
+    const options=videoData??await get('/api/videos');
+    tags.innerHTML+=`<form id="video-session-link" class="video-actions"><label>Video<select name="build" required><option value="">Chọn build đã tạo</option>${options.builds.map(b=>`<option value="${escape(b.id)}">${escape(b.title)} · ${escape(b.id)}</option>`).join('')}</select></label><label>Stage<select name="stage">${videoStages.map(t=>`<option>${t}</option>`).join('')}</select></label><button class="quiet" type="submit">Gắn video/stage</button><span id="video-link-error" class="subtitle" role="status"></span></form>`;
+    $('detail-content').prepend(tags);
+    tags.addEventListener('click',e=>{const b=e.target.closest('[data-video-open]');if(b){$('call-detail').close();view('videos');showVideoBuild(b.dataset.videoOpen);}});
+    tags.querySelector('form').addEventListener('submit',async e=>{
+      e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
+      try{const buildId=form.elements.build.value,entry=await get(`/api/videos/${encodeURIComponent(buildId)}`),stage=form.elements.stage.value;
+        const ranks={PLAN:0,BUILD:1,REVISE:2,FINISH:3},newStage={id:crypto.randomUUID(),stage,session_id:s.id,model:s.model,notes:'',approved:false};
+        const at=entry.manifest.stages.findIndex(t=>ranks[t.stage]>ranks[stage]);entry.manifest.stages.splice(at<0?entry.manifest.stages.length:at,0,newStage);
+        await writeVideo(`/api/videos/${encodeURIComponent(buildId)}`,entry.manifest,'PUT');videoData=null;await nativeDetail(id);
+      }catch(error){tags.querySelector('#video-link-error').textContent=error.message;}finally{button.disabled=false;}
+    });
+    if(!$('call-detail').open)$('call-detail').showModal();
   }catch(error){$('native-sync').textContent=error.message;}
 }
 ['range','model','source','project','group'].forEach(key=>$(`native-${key}`).addEventListener('change',()=>{nativePage=1;loadNative();}));
@@ -337,4 +352,82 @@ $('native-refresh').addEventListener('click',()=>loadNative());
 $('native-previous').addEventListener('click',()=>{nativePage--;loadNative();});$('native-next').addEventListener('click',()=>{nativePage++;loadNative();});
 $('view-native').addEventListener('click',event=>{const b=event.target.closest('[data-native-session]');if(b)nativeDetail(b.dataset.nativeSession);});
 setInterval(()=>{if(!$('view-native').hidden&&!document.hidden&&$('auto-refresh').checked)loadNative({quiet:true});},5000);
+let videoData=null,videoEditing=null,videoImportMode=false,videoGeneration=0,videoOpenId=null;
+const videoStages=['PLAN','BUILD','REVISE','FINISH'],videoScores=['clarity','visual','motion','originality','wow','technical','overall'];
+const videoStatus={planned:'Đã lên kế hoạch',preview:'Preview',approved:'Đã duyệt',final:'Hoàn tất'};
+const videoDecimal=v=>v==null?'—':new Intl.NumberFormat('vi-VN',{maximumFractionDigits:2}).format(v);
+async function writeVideo(path,manifest,method='POST') {
+  const response=await fetch(path,{method,headers:{'Content-Type':'application/json','X-Codex-Video':'1',...(apiKey?{Authorization:`Bearer ${apiKey}`}:{})},body:JSON.stringify(manifest)});
+  const data=await response.json();if(!response.ok)throw new Error(data.error?.message??`HTTP ${response.status}`);return data;
+}
+async function loadVideos() {
+  const generation=++videoGeneration;$('video-refresh').disabled=true;
+  try {
+    const data=await get('/api/videos');if(generation!==videoGeneration)return;videoData=data;const s=data.summary;
+    const cards=[['Builds',number(s.builds),'Tất cả thử nghiệm'],['Approved first pass',number(s.approved_first_pass),`${s.first_pass_rate===null?'—':(s.first_pass_rate*100).toFixed(1)+'%'} / ${number(s.approved_previews)} preview đã duyệt`],['Avg revisions',videoDecimal(s.avg_revisions),'Số lần chỉnh sửa / build'],['Avg overall',videoDecimal(s.avg_overall),'Score được nhập · 0–10'],['Avg wow',videoDecimal(s.avg_wow),'Score được nhập · 0–10'],['Avg cost → approved',money(s.avg_cost_to_approved),`${s.cost_samples}/${s.approved_previews} preview đủ dữ liệu giá`],['Avg time → approved',seconds(s.avg_time_to_approved_ms),`${s.time_samples}/${s.approved_previews} preview đủ thời gian turn`]];
+    $('video-cards').innerHTML=cards.map(([label,value,note])=>`<article class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div><p>${escape(note)}</p></article>`).join('');
+    $('video-rows').innerHTML=data.builds.map(b=>`<tr><td><button class="quiet" data-video-open="${escape(b.id)}">${escape(b.title)}</button><small class="native-stat-note">${escape(b.id)} · ${escape(b.type)}</small></td><td>${escape(b.engine)}</td><td class="video-pipeline">${b.stages.map(s=>`${escape(s.stage)} · ${escape(s.usage.models.join('+')||s.model||'—')}`).join('<br>')||'—'}</td><td class="number">${videoDecimal(b.duration)} s<small class="native-stat-note">${escape(b.aspect_ratio)}</small></td><td class="number">${number(b.revisions)}</td><td class="number">${videoDecimal(b.quality.overall)}</td><td class="number">${videoDecimal(b.quality.wow)}</td><td class="number">${number(b.usage.tokens)}</td><td class="number">${money(b.usage.cost_usd)}</td><td class="number">${seconds(b.usage.elapsed_ms)}</td><td><span class="badge ${b.status==='planned'?'pending':'success'}">${escape(videoStatus[b.status])}</span></td></tr>`).join('')||'<tr><td colspan="11" class="empty-table">Chưa có video build. Tạo build hoặc import manifest JSON để bắt đầu.</td></tr>';
+    $('video-list-note').textContent=`${s.builds} build · mở tiêu đề để xem timeline, sửa metadata và export manifest. Giá API tham khảo; — nghĩa là dữ liệu chưa đầy đủ.`;
+    renderVideoComparisons();$('video-error').hidden=true;
+  }catch(error){$('video-error').hidden=false;$('video-error').textContent=error.message;if(error.auth)$('auth-form').hidden=false;}
+  finally{if(generation===videoGeneration)$('video-refresh').disabled=false;}
+}
+function renderVideoComparisons() {
+  if(!videoData)return;
+  $('video-comparisons').innerHTML=videoData.comparisons[$('video-comparison').value].map(r=>`<tr><td class="video-pipeline">${escape(r.key)}</td><td class="number">${number(r.builds)}</td><td class="number">${videoDecimal(r.avg_overall)}</td><td class="number">${videoDecimal(r.avg_wow)}</td><td class="number">${videoDecimal(r.quality_per_dollar)}<small class="native-stat-note">${r.quality_cost_samples} mẫu</small></td><td class="number">${videoDecimal(r.quality_per_minute)}<small class="native-stat-note">${r.quality_time_samples} mẫu</small></td><td class="number">${r.first_pass_rate===null?'—':(r.first_pass_rate*100).toFixed(1)+'%'}<small class="native-stat-note">${r.approved_first_pass}/${r.approved_previews} preview đã duyệt</small></td></tr>`).join('')||'<tr><td colspan="7" class="empty-table">Chưa có dữ liệu so sánh.</td></tr>';
+}
+async function showVideoBuild(id) {
+  videoOpenId=id;$('video-detail').hidden=false;$('video-detail').innerHTML='<p class="usage-note" role="status">Đang đọc video build…</p>';
+  try {
+    const {build:b,manifest}=await get(`/api/videos/${encodeURIComponent(id)}`);if(videoOpenId!==id)return;
+    const stageCards=b.stages.map(s=>`<article class="video-stage-card"><div class="video-stage-title"><strong>${escape(s.stage)}</strong><span class="badge ${s.approved?'success':'pending'}">${s.approved?'Đã duyệt':'Chưa duyệt'}</span></div><p>${escape(s.usage.models.join('+')||s.model||'Chưa chọn model')}${s.model&&s.usage.models.length?`<small class="native-stat-note">Model trong manifest: ${escape(s.model)}</small>`:''}</p><p>${s.session_id?`<button class="quiet" data-native-session="${escape(s.session_id)}">Session: ${escape(s.session_id)}</button>`:'Chưa nối session'}</p><p class="subtitle">${number(s.usage.tokens)} token · ${money(s.usage.cost_usd)} · ${seconds(s.usage.elapsed_ms)}</p><p class="subtitle">${s.usage.session_found?'Đã tìm thấy session':'Chưa có session local'} · ${s.usage.records} usage record · ${s.usage.turns} turn${s.usage.missing_usage_turns?` · ${s.usage.missing_usage_turns} turn thiếu usage`:''}${s.usage.unpriced_records?` · ${s.usage.unpriced_records} record thiếu giá`:''}</p>${s.turn_ids?`<p class="native-stat-note">Turn IDs: ${escape(s.turn_ids.join(', '))}</p>`:''}${s.approved_at?`<p class="native-stat-note">Duyệt: ${escape(date(s.approved_at)+' '+time(s.approved_at))}</p>`:''}<p class="video-notes">${escape(s.notes||'Chưa có notes.')}</p></article>`).join('');
+    $('video-detail').innerHTML=`<div class="panel-heading"><div><h2>${escape(b.title)}</h2><p>${escape(b.id)} · ${escape(b.engine)} · ${videoDecimal(b.duration)} s · ${escape(b.aspect_ratio)} · ${escape(videoStatus[b.status])}</p></div><div class="video-actions"><button class="quiet" id="video-detail-edit">Chỉnh sửa</button><button class="quiet" id="video-detail-export">Export manifest</button><button class="quiet" id="video-detail-close">Đóng</button></div></div><div class="video-detail-body"><h3>Timeline PLAN → BUILD → REVISE → FINISH</h3><div class="video-timeline">${stageCards||'<p class="subtitle">Chưa có stage. Thêm stage khi chỉnh sửa build.</p>'}</div><h3>Quality scores · 0–10</h3><dl class="video-quality-grid">${videoScores.map(k=>`<div><dt>${escape(k)}</dt><dd>${videoDecimal(b.quality[k])}</dd></div>`).join('')}</dl><div class="video-paths"><p>Preview: <code>${escape(b.preview_path||'—')}</code></p><p>Final: <code>${escape(b.final_path||'—')}</code></p><p class="subtitle">Chỉ lưu đường dẫn metadata; dashboard không đọc hoặc thực thi file trên máy.</p></div><p class="subtitle">Đến preview đã duyệt: ${money(b.approved_preview?.cost_usd)} · ${seconds(b.approved_preview?.elapsed_ms)}. Tổng build chỉ có giá/thời gian khi mọi stage đều đủ dữ liệu.</p><details><summary>Manifest version 1</summary><pre class="detail-json">${escape(JSON.stringify(manifest,null,2))}</pre></details></div>`;
+    $('video-detail-edit').onclick=()=>openVideoEditor(manifest);
+    $('video-detail-close').onclick=()=>{$('video-detail').hidden=true;videoOpenId=null;};
+    $('video-detail-export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(manifest,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`${b.id}.video-build.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+    $('video-detail').scrollIntoView({block:'start',behavior:'auto'});
+  }catch(error){$('video-detail').innerHTML=`<p class="notice" role="alert">${escape(error.message)}</p>`;}
+}
+const videoField=(label,key,value,type='text',attrs='')=>`<label>${escape(label)}<input name="${key}" type="${type}" value="${escape(value??'')}" ${attrs}></label>`;
+function videoStageForm(s={stage:'BUILD',model:'',notes:'',session_id:null,approved:false}) {
+  const item=document.createElement('div');item.className='video-stage-form';item.dataset.stageId=s.id||crypto.randomUUID();item.dataset.approvedAt=s.approved_at??'';
+  item.innerHTML=`<label>Stage<select name="stage">${videoStages.map(t=>`<option ${t===s.stage?'selected':''}>${t}</option>`).join('')}</select></label>${videoField('Session ID','session_id',s.session_id,'text','list="video-session-options" maxlength="128"')}${videoField('Model','model',s.model,'text','maxlength="128"')}${videoField('Turn IDs · tùy chọn, ngăn cách bằng dấu phẩy','turn_ids',s.turn_ids?.join(', '))}<label class="toggle"><input name="approved" type="checkbox" ${s.approved?'checked':''}>Đã duyệt</label><button type="button" class="quiet video-stage-remove" aria-label="Bỏ stage khỏi manifest">Bỏ stage</button><label class="video-stage-notes">Notes<textarea name="notes" rows="2" maxlength="4000">${escape(s.notes)}</textarea></label>`;
+  item.querySelector('.video-stage-remove').onclick=()=>{item.remove();updateVideoManifest();};$('video-stage-fields').append(item);
+}
+function readVideoForm() {
+  const f=$('video-form').elements,build={id:f.id.value,title:f.title.value,type:f.type.value,engine:f.engine.value,duration:Number(f.duration.value),aspect_ratio:f.aspect_ratio.value,status:f.status.value,revisions:Number(f.revisions.value),preview_path:f.preview_path.value||null,final_path:f.final_path.value||null,quality:{}};
+  for(const key of videoScores)build.quality[key]=f[`score_${key}`].value===''?null:Number(f[`score_${key}`].value);
+  const stages=[...document.querySelectorAll('.video-stage-form')].map(e=>{const val=k=>e.querySelector(`[name="${k}"]`).value;return {id:e.dataset.stageId,stage:val('stage'),session_id:val('session_id')||null,model:val('model'),notes:val('notes'),approved:e.querySelector('[name="approved"]').checked,approved_at:e.dataset.approvedAt===''?null:Number(e.dataset.approvedAt),...(val('turn_ids').trim()?{turn_ids:val('turn_ids').split(/[\s,]+/).filter(Boolean)}:{})};});
+  return {version:1,build,stages};
+}
+function updateVideoManifest(){if(!videoImportMode)$('video-manifest').value=JSON.stringify(readVideoForm(),null,2);}
+async function openVideoEditor(manifest=null,importMode=false) {
+  videoImportMode=importMode;videoEditing=manifest?.build.id??null;
+  const b=manifest?.build??{id:`video-${Date.now()}`,title:'',type:'explainer',engine:'remotion',duration:30,aspect_ratio:'16:9',status:'planned',revisions:0,quality:{}};
+  const select=(label,key,options)=>`<label>${label}<select name="${key}">${options.map(v=>`<option value="${v}" ${v===b[key]?'selected':''}>${key==='status'?videoStatus[v]:v}</option>`).join('')}</select></label>`;
+  $('video-editor-title').textContent=importMode?'Import video-build manifest':manifest?'Chỉnh sửa build':'Build mới';
+  $('video-form-fields').innerHTML=videoField('ID / slug','id',b.id,'text',`required maxlength="128" ${manifest?'readonly':''}`)+videoField('Tiêu đề','title',b.title,'text','required maxlength="240"')+videoField('Loại video','type',b.type,'text','required maxlength="80"')+select('Engine','engine',['remotion','manim','ffmpeg','hybrid'])+videoField('Thời lượng · giây','duration',b.duration,'number','required min="0" max="86400" step="0.1"')+videoField('Aspect ratio','aspect_ratio',b.aspect_ratio,'text','required placeholder="16:9"')+select('Trạng thái','status',['planned','preview','approved','final'])+videoField('Revisions','revisions',b.revisions,'number','required min="0" max="10000" step="1"')+videoField('Preview path','preview_path',b.preview_path)+videoField('Final path','final_path',b.final_path);
+  $('video-score-fields').innerHTML=videoScores.map(k=>videoField(k,`score_${k}`,b.quality[k],'number','min="0" max="10" step="0.1"')).join('');
+  $('video-stage-fields').innerHTML='';(manifest?.stages??[{stage:'PLAN',model:'gpt-6.1-sol',notes:'',approved:false},{stage:'BUILD',model:'gpt-6-luna',notes:'',approved:false}]).forEach(videoStageForm);
+  $('video-form-fields').hidden=importMode;$('video-quality').hidden=importMode;$('video-stage-add').closest('fieldset').hidden=importMode;
+  for(const field of $('video-form-fields').querySelectorAll('input'))field.required=!importMode&&['id','title','type','duration','aspect_ratio','revisions'].includes(field.name);
+  $('video-manifest-area').open=importMode;$('video-manifest').required=importMode;$('video-manifest').readOnly=!importMode;
+  $('video-form-error').hidden=true;updateVideoManifest();if(importMode)$('video-manifest').value=JSON.stringify({version:1,build:{...b,title:'Video thử nghiệm',preview_path:null,final_path:null},stages:[]},null,2);
+  $('video-editor').showModal();
+  try{const data=await get('/api/videos/sessions');let list=$('video-session-options');if(!list){list=document.createElement('datalist');list.id='video-session-options';$('video-form').append(list);}list.innerHTML=data.sessions.map(s=>`<option value="${escape(s.id)}">${escape(s.cwd)} · ${escape(s.model)}</option>`).join('');}catch{}
+}
+$('video-form').addEventListener('input',updateVideoManifest);$('video-form').addEventListener('change',updateVideoManifest);
+$('video-form').addEventListener('submit',async e=>{
+  e.preventDefault();$('video-save').disabled=true;$('video-form-error').hidden=true;
+  try{const manifest=videoImportMode?JSON.parse($('video-manifest').value):readVideoForm();const path=videoEditing?`/api/videos/${encodeURIComponent(videoEditing)}`:videoImportMode?'/api/videos/import':'/api/videos';const b=await writeVideo(path,manifest,videoEditing?'PUT':'POST');$('video-editor').close();await loadVideos();await showVideoBuild(b.id);}
+  catch(error){$('video-form-error').hidden=false;$('video-form-error').textContent=error.message;}
+  finally{$('video-save').disabled=false;}
+});
+$('video-stage-add').onclick=()=>{videoStageForm();updateVideoManifest();};
+$('video-new').onclick=()=>openVideoEditor();$('video-import').onclick=()=>openVideoEditor(null,true);
+for(const id of ['video-editor-close','video-cancel'])$(id).onclick=()=>$('video-editor').close();
+$('video-refresh').onclick=async()=>{await loadVideos();if(videoOpenId)await showVideoBuild(videoOpenId);};
+$('video-comparison').onchange=renderVideoComparisons;
+$('view-videos').addEventListener('click',e=>{const b=e.target.closest('[data-video-open]');if(b)showVideoBuild(b.dataset.videoOpen);const s=e.target.closest('[data-native-session]');if(s)nativeDetail(s.dataset.nativeSession);});
+setInterval(()=>{if(!$('view-videos').hidden&&!document.hidden&&$('auto-refresh').checked&&!$('video-editor').open)loadVideos();},5000);
 load();

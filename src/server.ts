@@ -40,8 +40,11 @@ export async function buildServer(config: Config, provider: Provider) {
     const host = req.headers.host ?? '';
     if (!/^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(host)) throw new ApiError(403, 'invalid_host', 'Only localhost Host headers are accepted.');
     const playground = req.method === 'POST' && path === '/api/playground/chat';
+    const videoWrite=['POST','PUT'].includes(req.method)&&/^\/api\/videos(?:\/[^/]{1,128})?$/.test(path);
+    if(videoWrite&&(!req.headers['content-type']?.startsWith('application/json')||req.headers['x-codex-video']!=='1'||req.headers.origin&&req.headers.origin!==`http://${host}`))
+      throw new ApiError(403,'video_origin_denied','Video metadata cần JSON, cùng origin và X-Codex-Video: 1.');
     if (playground && (req.headers.origin !== `http://${host}` || req.headers['x-codex-playground'] !== '1' || !req.headers['content-type']?.startsWith('application/json'))) throw new ApiError(403, 'browser_origin_denied', 'Playground requires same-origin JSON requests.');
-    if (req.headers.origin && !((req.method === 'GET' && dashboardRead(path) || playground) && req.headers.origin === `http://${host}`)) {
+    if (req.headers.origin && !((req.method === 'GET' && dashboardRead(path) || playground || videoWrite) && req.headers.origin === `http://${host}`)) {
       throw new ApiError(403, 'browser_origin_denied', 'Only same-origin dashboard reads are allowed.');
     }
     // The dashboard shell is public; its data endpoints still require the gateway key.

@@ -76,6 +76,7 @@
         </ul></article>
       </div>
       <div class="separation"><span>Không tự sync giữa Mac và Windows</span></div>
+      <p class="callout"><strong>Video builds:</strong> <code>video_builds</code> + <code>video_stages</code> giữ metadata, scores và manifest version 1 trong SQLite hiện có. Session/turn scopes nối native events/turns, không sao chép token/cost/time. Transaction ngăn scopes chồng nhau; approved preview cắt usage tại thời điểm duyệt. Native session detail hiển thị tag Video/Stage. Đường dẫn preview/final chỉ là metadata.</p>
       <p class="callout"><strong>Playground:</strong> nội dung chat chỉ giữ trong bộ nhớ tab; gửi lại context mỗi lượt và dùng Codex `--ephemeral`. Vì vậy native rollout collector không thấy usage của các thread này.</p>
     </section>
 
@@ -90,6 +91,8 @@
         <tr><td><span class="method">POST</span></td><td><code>/api/playground/chat</code></td><td>Dashboard chat cùng origin, Codex ephemeral.</td></tr>
         <tr><td><span class="method">GET</span></td><td><code>/api/stats/*</code></td><td>Thống kê riêng cho request đã qua gateway.</td></tr>
         <tr><td><span class="method">GET</span></td><td><code>/api/native/overview</code></td><td>Thống kê Codex App/CLI local trên máy server.</td></tr>
+        <tr><td><span class="method">GET</span></td><td><code>/api/videos[/:id]</code></td><td>Video builds, timeline, manifest và so sánh model/engine/pipeline.</td></tr>
+        <tr><td><span class="method">POST/PUT</span></td><td><code>/api/videos[/import|/:id]</code></td><td>Tạo/import hoặc cập nhật metadata JSON; X-Codex-Video: 1, Origin và Bearer checks hiện có.</td></tr>
       </tbody></table></div>
     </section>
 
@@ -100,6 +103,7 @@
         <div class="file"><code>src/provider.ts</code><span>Spawn Codex CLI và parse JSONL.</span></div><div class="file"><code>src/schema.ts</code><span>Zod request schemas, transcript validation.</span></div><div class="file"><code>src/protocol.ts</code><span>Prompt, structured output và tool call mapping.</span></div>
         <div class="file"><code>src/sessions.ts</code><span>Gateway sessions và atomic JSON writes.</span></div><div class="file"><code>src/metrics.ts</code><span>Gateway usage, costs và SQLite.</span></div><div class="file"><code>src/native-usage.ts</code><span>Native rollout collector và parser.</span></div>
         <div class="file"><code>src/dashboard.ts</code><span>Phục vụ dashboard assets và API.</span></div><div class="file"><code>public/dashboard.*</code><span>HTML, CSS, JS của UI hiện tại.</span></div><div class="file"><code>data/models.json</code><span>Model catalog và snapshot giá tham khảo.</span></div>
+        <div class="file"><code>src/video-builds.ts</code><span>Metadata/manifest video; nối native usage, approval cutoff và so sánh.</span></div>
       </div>
     </section>
     <section><div class="section-head"><div><h2>Chạy và vận hành</h2><p><code>npm start</code> giữ terminal và log. <code>npm start --silent -- -d</code> chạy nền, bỏ output; <code>npm stop</code> dùng PID/ps trên macOS/Linux. PID khi spawn chưa xác nhận HTTP sẵn sàng.</p></div></div><p class="callout">Đọc <a href="DEVELOPMENT.html">hướng dẫn vận hành</a> cho Node/npm, URL hiện tại và tình trạng port/proxy.</p></section>
