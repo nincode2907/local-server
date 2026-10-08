@@ -6,7 +6,7 @@
 
 Codex Local Server là HTTP gateway viết bằng Node.js và TypeScript. Nó nhận chat request theo kiểu OpenAI, kiểm tra đầu vào, chuyển yêu cầu sang Codex CLI đã đăng nhập bằng ChatGPT, rồi đổi kết quả thành JSON tương thích.
 
-Mặc định server chỉ lắng nghe tại `127.0.0.1:4000`. Đây không phải OpenAI API chính thức, không cần `OPENAI_API_KEY`, và không hỗ trợ toàn bộ tính năng của OpenAI API.
+Mặc định server chỉ lắng nghe tại `127.0.0.1:15600`. Đây không phải OpenAI API chính thức, không cần `OPENAI_API_KEY`, và không hỗ trợ toàn bộ tính năng của OpenAI API.
 
 ```text
 Client → Fastify → validation/policy → Provider → Codex CLI → ChatGPT account
@@ -118,7 +118,7 @@ Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `PO
 
 ## 7. Bảo mật và giới hạn
 
-- Bind `127.0.0.1`; chỉ nhận Host localhost/loopback, không bật CORS.
+- Bind `127.0.0.1`; nhận Host localhost/loopback và allowlist chính xác `codex-server.localhost` cho route Dev Hub. Origin phải cùng origin; không bật CORS.
 - `LOCAL_API_KEY` là Bearer token riêng cho gateway, không phải OpenAI API key. Dashboard shell có thể tải để nhập token; API dữ liệu/chat vẫn yêu cầu token.
 - Browser đọc dashboard cùng origin. Playground POST cần origin trùng, JSON và `X-Codex-Playground: 1`.
 - Body tối đa 1 MiB, mặc định tối đa 2 lượt Codex đồng thời, timeout 180 giây.
@@ -130,7 +130,7 @@ Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `PO
 
 | Biến | Mặc định | Ý nghĩa |
 | --- | --- | --- |
-| `PORT` | `4000` | Cổng HTTP |
+| `PORT` | `15600` | Cổng HTTP |
 | `DEFAULT_MODEL` | `gpt-6-luna` | Model mặc định; `.env` và body request có thể ghi đè |
 | `DEFAULT_REASONING_EFFORT` | `low` | Reasoning mặc định |
 | `REQUEST_TIMEOUT_MS` | `180000` | Timeout một lượt |
@@ -178,6 +178,6 @@ npm run build
 npm start
 ```
 
-Đăng nhập CLI bằng `.\node_modules\.bin\codex.cmd login` trên Windows hoặc `./node_modules/.bin/codex login` trên macOS/Linux. Dashboard ở `http://127.0.0.1:4000/dashboard`; `npm run dev` bật TypeScript watcher. `npm run test:live` gọi Codex thật và tiêu thụ hạn mức tài khoản.
+Đăng nhập CLI bằng `.\node_modules\.bin\codex.cmd login` trên Windows hoặc `./node_modules/.bin/codex login` trên macOS/Linux. Dashboard ở `http://127.0.0.1:15600/dashboard`; `npm run dev` bật TypeScript watcher. `npm run test:live` gọi Codex thật và tiêu thụ hạn mức tài khoản.
 
 `npm start` qua `scripts/start.js` chạy foreground; `npm start --silent -- -d` chạy nền và bỏ output. `npm stop` kiểm tra PID bằng `ps` rồi gửi SIGTERM trên macOS/Linux. PID được ghi khi spawn, chưa xác nhận HTTP sẵn sàng. Chi tiết runtime, lệch Node/npm và tình trạng port/proxy ở [DEVELOPMENT.md](DEVELOPMENT.md) và [bản trực quan](DEVELOPMENT.html).

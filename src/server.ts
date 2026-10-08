@@ -38,7 +38,7 @@ export async function buildServer(config: Config, provider: Provider) {
     }
     // Prevent browser requests and DNS rebinding to an unauthenticated loopback gateway.
     const host = req.headers.host ?? '';
-    if (!/^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(host)) throw new ApiError(403, 'invalid_host', 'Only localhost Host headers are accepted.');
+    if (!/^(localhost|127\.0\.0\.1|\[::1\]|codex-server\.localhost)(?::\d+)?$/.test(host)) throw new ApiError(403, 'invalid_host', 'Only localhost Host headers are accepted.');
     const playground = req.method === 'POST' && path === '/api/playground/chat';
     const videoWrite=['POST','PUT'].includes(req.method)&&/^\/api\/videos(?:\/[^/]{1,128})?$/.test(path);
     if(videoWrite&&(!req.headers['content-type']?.startsWith('application/json')||req.headers['x-codex-video']!=='1'||req.headers.origin&&req.headers.origin!==`http://${host}`))

@@ -22,7 +22,7 @@
   <main>
     <header class="hero">
       <div><p class="eyebrow">Architecture guide · V1</p><h1>Luồng đi của một request, và dữ liệu được giữ ở đâu.</h1><p class="dek">Một bản đồ trực quan cho gateway chat Node.js này: từ HTTP vào, qua các lớp kiểm tra, đến Codex CLI và hai nhánh thống kê.</p></div>
-      <div class="hero-side" aria-label="Thông tin runtime"><div class="fact"><small>Runtime</small><strong>Node.js 22.13+</strong></div><div class="fact"><small>Local endpoint</small><strong>127.0.0.1:4000</strong></div></div>
+      <div class="hero-side" aria-label="Thông tin runtime"><div class="fact"><small>Runtime</small><strong>Node.js 22.13+</strong></div><div class="fact"><small>Local endpoint</small><strong>127.0.0.1:15600</strong><small>codex-server.localhost · Dev Hub IPv4</small></div></div>
     </header>
 
     <aside class="notice"><span class="notice-mark" aria-hidden="true">!</span><div><b>Hai loại session không tự đồng bộ.</b> Gateway session nằm trong `DATA_DIR/sessions.json`. Native Codex usage đọc `~/.codex` của máy đang chạy server. Web này không tự lấy conversation/session từ Mac sang Windows.</div></aside>
@@ -51,7 +51,7 @@
       <div class="section-head"><div><p class="eyebrow">02 / Request lifecycle</p><h2 id="request-title">Điều gì xảy ra khi gửi chat?</h2><p>Thứ tự kiểm tra giúp xác định lỗi nhanh hơn: trước khi gọi Codex hay sau khi provider chạy.</p></div><span class="section-index">REQUEST → RESPONSE</span></div>
       <div class="columns">
         <article class="panel flow-panel"><h3>Đường đi của request</h3><p>Chọn một bước để xem ý nghĩa của nó.</p><div class="steps" role="group" aria-label="Các bước xử lý">
-          <button class="step" aria-pressed="true" data-copy="Host phải là localhost/loopback; browser request phải cùng origin; API key được so sánh constant-time. Body tối đa 1 MiB." data-step="Request tới"><span class="step-n">1</span><span><b>Request tới</b><small>Host · origin · auth · body limit</small></span></button>
+          <button class="step" aria-pressed="true" data-copy="Host phải là localhost/loopback hoặc hostname chính xác `codex-server.localhost`; browser request phải cùng origin; API key được so sánh constant-time. Body tối đa 1 MiB." data-step="Request tới"><span class="step-n">1</span><span><b>Request tới</b><small>Host · origin · auth · body limit</small></span></button>
           <button class="step" aria-pressed="false" data-copy="Zod kiểm tra hình dạng message và tham số. Ajv kiểm tra schema function arguments. Transcript phải có đủ tool results từ vòng trước." data-step="Validate"><span class="step-n">2</span><span><b>Validate</b><small>Zod · Ajv · transcript integrity</small></span></button>
           <button class="step" aria-pressed="false" data-copy="Nếu vượt MAX_CONCURRENT server trả 429. Request đang hoạt động có timeout; client disconnect sẽ abort subprocess." data-step="Điều phối"><span class="step-n">3</span><span><b>Điều phối</b><small>Concurrency · timeout · cancellation</small></span></button>
           <button class="step" aria-pressed="false" data-copy="Provider gọi `codex exec --experimental-json`, gửi prompt qua stdin và thu event JSONL từ stdout. Không tạo shell wrapper." data-step="Codex CLI"><span class="step-n">4</span><span><b>Codex CLI</b><small>spawn(args) · stdin/stdout JSONL</small></span></button>

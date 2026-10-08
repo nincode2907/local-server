@@ -254,6 +254,33 @@ $('cost-group').addEventListener('change', () => loadCosts().catch(error => { $(
 document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => view(b.dataset.view)));
 
 let nativePage = 1, nativeController, nativeLoading = false;
+let nativeProjects = [], nativeProjectTotal = 0;
+let nativeProjectSort = { key: 'tokens', direction: 'desc' };
+function sortedNativeProjects(list) {
+  const value = row => nativeProjectSort.key === 'tokens' ? row.input_tokens + row.output_tokens : row.calls > row.unpriced_events ? row.cost_usd : null;
+  return [...list].sort((a,b) => {
+    const av = value(a), bv = value(b);
+    if (av == null || bv == null) return av == null ? (bv == null ? a.key.localeCompare(b.key) : 1) : -1;
+    return (nativeProjectSort.direction === 'asc' ? av - bv : bv - av) || a.key.localeCompare(b.key);
+  });
+}
+function renderNativeProjects() {
+  $('native-projects').innerHTML = nativeGrouped(sortedNativeProjects(nativeProjects), nativeProjectTotal, true);
+  $('native-projects').querySelectorAll('[data-native-width]').forEach(e => { e.style.width = e.dataset.nativeWidth + '%'; });
+  document.querySelectorAll('[data-project-sort]').forEach(button => {
+    const active = button.dataset.projectSort === nativeProjectSort.key;
+    const ascending = nativeProjectSort.direction === 'asc';
+    const label = button.dataset.projectSort === 'tokens' ? 'Token' : 'USD ước tính';
+    button.closest('th').setAttribute('aria-sort', active ? (ascending ? 'ascending' : 'descending') : 'none');
+    button.querySelector('span').textContent = active ? (ascending ? '↑' : '↓') : '↕';
+    button.setAttribute('aria-label', active ? `${label}: ${ascending ? 'tăng' : 'giảm'} dần. Bấm để sắp xếp ${ascending ? 'giảm' : 'tăng'} dần` : `Sắp xếp ${label} giảm dần`);
+  });
+}
+document.querySelectorAll('[data-project-sort]').forEach(button => button.addEventListener('click', () => {
+  const key = button.dataset.projectSort;
+  nativeProjectSort = { key, direction: key === nativeProjectSort.key && nativeProjectSort.direction === 'desc' ? 'asc' : 'desc' };
+  renderNativeProjects();
+}));
 const sourceLabels = { 'gateway-log':'Gateway · từ rollout', exec:'Codex exec', cli:'Codex CLI', vscode:'VS Code / App (vscode)', subagent:'Subagent', unknown:'Chưa xác định' };
 const compact = value => value >= 1000000 ? new Intl.NumberFormat('vi-VN',{notation:'compact',maximumFractionDigits:2}).format(value) : number(value);
 const nativeCost = row => `${row.calls > row.unpriced_events ? money(row.cost_usd) : '—'}${row.unpriced_events ? `<small class="native-cost-unknown">${number(row.unpriced_events)} record chưa có giá</small>` : ''}`;
@@ -276,6 +303,7 @@ function nativePeriodNote(data,key,current,kind='number') {
 function nativeOptions(id,values,label) {
   const selected = $(id).value; $(id).innerHTML = `<option value="">${label}</option>` + values.map(v=>`<option value="${escape(v)}">${escape(id==='native-source' ? sourceLabels[v] ?? v : v)}</option>`).join(''); $(id).value = selected;
 }
+function nativeGrouped(list,total,project=false) { return list.map(r=>`<tr><td class="${project ? 'native-path' : 'model-name'}">${project ? `<strong>${escape(r.key.split('/').filter(Boolean).pop() ?? r.key)}</strong><small>${escape(r.key)}</small>` : escape(r.key)}<div class="native-meter"><span data-native-width="${total ? (r.input_tokens+r.output_tokens)/total*100 : 0}"></span></div></td>${project ? '' : `<td class="number">${number(r.sessions)}</td>`}<td class="number">${number(r.input_tokens+r.output_tokens)}</td><td class="number">${r.tokens_per_turn === null ? '—' : number(Math.round(r.tokens_per_turn))}<small class="native-stat-note">${number(r.usage_turns)} turn có usage</small></td>${project ? `<td class="number">${money(r.cost_per_session)}<small class="native-stat-note">${number(r.priced_sessions)}/${number(r.sessions)} session đủ giá${r.unpriced_sessions ? ' · tổng có thể thiếu' : ''}</small></td>` : ''}<td class="number">${nativeCost(r)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty-table">Chưa có usage trong bộ lọc</td></tr>'; }
 async function loadNative({quiet=false}={}) {
   if (quiet && nativeLoading) return;
   nativeController?.abort(); const controller = nativeController = new AbortController(); nativeLoading=true;
@@ -303,11 +331,11 @@ async function loadNative({quiet=false}={}) {
       return `<article class="metric"><div class="metric-label">${label}</div><div class="metric-value" title="${escape(number(value))}">${kind==='cost' ? money(value) : compact(value)}</div><p>${periodNote ? `${periodNote}<span class="metric-period-note">${escape(note)}</span>` : escape(note)}</p></article>`;
     }).join('');
     $('native-note').textContent=`${d.range.label}: ${date(d.range.since)} ${time(d.range.since)} → ${date(d.range.until)} ${time(d.range.until)} (UTC+7). Giá API tham khảo, không phải hóa đơn Plus. Nguồn lấy từ metadata; vscode có thể là App hoặc VS Code. Gateway trong rollout chỉ là dữ liệu quan sát, không cộng vào thống kê server. Log cũ dùng chênh lệch token_count; record response được ưu tiên. Session không còn rollout hoặc thread ephemeral có thể không có usage.`;
-    const grouped=(list,project=false)=>list.map(r=>`<tr><td class="${project ? 'native-path' : 'model-name'}">${project ? `<strong>${escape(r.key.split('/').filter(Boolean).pop() ?? r.key)}</strong><small>${escape(r.key)}</small>` : escape(r.key)}<div class="native-meter"><span data-native-width="${total ? (r.input_tokens+r.output_tokens)/total*100 : 0}"></span></div></td>${project ? '' : `<td class="number">${number(r.sessions)}</td>`}<td class="number">${number(r.input_tokens+r.output_tokens)}</td><td class="number">${r.tokens_per_turn === null ? '—' : number(Math.round(r.tokens_per_turn))}<small class="native-stat-note">${number(r.usage_turns)} turn có usage</small></td>${project ? `<td class="number">${money(r.cost_per_session)}<small class="native-stat-note">${number(r.priced_sessions)}/${number(r.sessions)} session đủ giá${r.unpriced_sessions ? ' · tổng có thể thiếu' : ''}</small></td>` : ''}<td class="number">${nativeCost(r)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty-table">Chưa có usage trong bộ lọc</td></tr>';
+
     $('native-spike-count').textContent = number(s.context_spikes);
     $('native-spike-note').textContent = `Hiển thị ${number(d.spikes.length)}/${number(s.context_spikes)} cảnh báo gần nhất trong bộ lọc. Input record tăng >2× và ≥50k, cùng session/model; cần kiểm tra, không kết luận lãng phí.`;
     $('native-spikes').innerHTML=d.spikes.map(r=>`<tr><td class="native-path"><strong>${escape(r.cwd.split('/').filter(Boolean).pop() ?? r.cwd)}</strong><small>${escape(r.session_id)}</small></td><td><code>${escape(r.model)}</code><small class="native-stat-note">${escape(date(r.timestamp)+' '+time(r.timestamp))}</small></td><td class="spike-sequence">${r.sequence.map(n=>number(n)).join(' → ')}</td><td class="number">${r.growth_ratio.toFixed(1)}×</td><td><button class="quiet" data-native-session="${escape(r.session_id)}">Xem session ↗</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty-table">Không có context spike trong bộ lọc.</td></tr>';
-    $('native-projects').innerHTML=grouped(d.projects,true);$('native-models').innerHTML=grouped(d.models);
+    nativeProjects=d.projects;nativeProjectTotal=total;renderNativeProjects();$('native-models').innerHTML=nativeGrouped(d.models,total);
     document.querySelectorAll('[data-native-width]').forEach(e=>{e.style.width=e.dataset.nativeWidth+'%';});
     $('native-periods').innerHTML=d.periods.map(r=>`<tr><td>${escape(r.period)}</td><td class="number">${number(r.calls)}</td><td class="number">${number(r.input_tokens)}</td><td class="number">${number(r.cached_tokens)}</td><td class="number">${number(r.output_tokens)}</td><td class="number">${nativeCost(r)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty-table">Chưa có usage</td></tr>';
     $('native-sessions').innerHTML=d.data.map(r=>`<tr><td class="native-path"><strong>${escape(r.cwd.split('/').filter(Boolean).pop() ?? r.cwd)}</strong><small>${escape(r.cwd)}<br>${escape(r.id)}<br>${r.updated_at ? escape(date(r.updated_at)+' '+time(r.updated_at)) : '—'}</small></td><td><span class="badge success">${escape(sourceLabels[r.source] ?? r.source)}</span><div class="endpoint">${escape(r.model)}</div>${r.context_spikes ? `<small class="native-cost-unknown">${number(r.context_spikes)} context spike</small>` : ''}${r.malformed || r.resets ? '<small class="native-cost-unknown">Log có dòng lỗi / bộ đếm reset</small>' : ''}</td><td class="number">${number(r.turns)}</td><td class="number">${r.usage_available ? number(r.input_tokens+r.output_tokens) : '—'}</td><td class="number">${r.tokens_per_turn === null ? '—' : number(Math.round(r.tokens_per_turn))}</td><td class="number">${seconds(r.duration_ms)}</td><td class="number">${nativeCost(r)}</td><td><button class="quiet" data-native-session="${escape(r.id)}">Chi tiết ↗</button></td></tr>`).join('') || '<tr><td colspan="8" class="empty-table">Chưa tìm thấy session trong bộ lọc</td></tr>';

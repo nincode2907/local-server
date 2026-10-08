@@ -1,6 +1,6 @@
 # Codex Local Server — V1
 
-Local HTTP gateway bằng Node.js + TypeScript + `@openai/codex-sdk`, dùng Codex đã đăng nhập bằng ChatGPT. Mặc định lắng nghe tại `http://127.0.0.1:4000`.
+Local HTTP gateway bằng Node.js + TypeScript + `@openai/codex-sdk`, dùng Codex đã đăng nhập bằng ChatGPT. Mặc định lắng nghe tại `http://127.0.0.1:15600`.
 
 ```text
 Python / app / agent → HTTP → Fastify → Codex SDK → Codex CLI → ChatGPT account
@@ -76,7 +76,7 @@ Khởi động lại server sau khi đổi `.env`. Giá trị request-level `mod
 ### Chat kiểu OpenAI
 
 ```bash
-curl http://localhost:4000/v1/chat/completions \
+curl http://localhost:15600/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -d '{
     "model": "gpt-6.1-sol",
@@ -106,7 +106,7 @@ curl http://localhost:4000/v1/chat/completions \
 `usage` ánh xạ token của toàn bộ Codex turn, gồm prompt wrapper/structured output; không chỉ đo text bạn gửi. Chỉ có khi SDK cung cấp usage.
 
 ```bash
-curl http://localhost:4000/chat \
+curl http://localhost:15600/chat \
   -H 'Content-Type: application/json' \
   -d '{"prompt":"Giải thích closure trong JavaScript", "reasoning":"high"}'
 ```
@@ -121,7 +121,7 @@ pip install openai
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:4000/v1",
+    base_url="http://localhost:15600/v1",
     api_key="local",  # hoặc LOCAL_API_KEY nếu bạn cấu hình token gateway
     timeout=200,
     max_retries=0,
@@ -145,7 +145,7 @@ Gateway dùng structured output của Codex để mô phỏng giao thức functi
 import json
 from openai import OpenAI
 
-client = OpenAI(base_url="http://localhost:4000/v1", api_key="local", timeout=200, max_retries=0)
+client = OpenAI(base_url="http://localhost:15600/v1", api_key="local", timeout=200, max_retries=0)
 tools = [{
     "type": "function",
     "function": {
@@ -196,7 +196,7 @@ Hỗ trợ `tool_choice`: `auto`, `none`, `required`, hoặc `{"type":"function"
 ```python
 import requests
 
-base = "http://localhost:4000"
+base = "http://localhost:15600"
 session = requests.post(base + "/v1/sessions", json={
     "model": "gpt-6.1-sol", "reasoning_effort": "high",
     "messages": [{"role": "system", "content": "Trả lời bằng tiếng Việt."}],
@@ -289,14 +289,14 @@ Kiểm tra payload bằng parser và API với database fixture riêng trước 
 API local: `GET /api/videos`, `GET /api/videos/:id` (build + manifest), `GET /api/videos/sessions?search=...`, `POST /api/videos`, `POST /api/videos/import`, `PUT /api/videos/:id`. Ghi dùng JSON và header `X-Codex-Video: 1`; browser cần cùng origin. Cấu hình Bearer hiện có vẫn áp dụng nếu đã bật.
 
 ```bash
-curl http://localhost:4000/api/videos/import \
+curl http://localhost:15600/api/videos/import \
   -H 'Content-Type: application/json' -H 'X-Codex-Video: 1' \
   --data-binary @video-build.json
 ```
 
 ## Dashboard và SQLite
 
-Mở **http://localhost:4000/dashboard** (hoặc `/` để tự chuyển hướng). Trang cập nhật mỗi 5 giây; có thể tắt tự cập nhật. Bộ lọc gồm 1 giờ / 24 giờ / 7 ngày / 30 ngày, model và trạng thái. Bảng lịch sử phân trang 20 call, mở chi tiết để xem reasoning, session ID, token và mã lỗi. Thời gian hiển thị theo Việt Nam, UTC+7.
+Mở **http://localhost:15600/dashboard** (hoặc `/` để tự chuyển hướng). Trang cập nhật mỗi 5 giây; có thể tắt tự cập nhật. Bộ lọc gồm 1 giờ / 24 giờ / 7 ngày / 30 ngày, model và trạng thái. Bảng lịch sử phân trang 20 call, mở chi tiết để xem reasoning, session ID, token và mã lỗi. Thời gian hiển thị theo Việt Nam, UTC+7.
 
 Thống kê chỉ tính các POST chat: `/chat`, `/v1/chat/completions`, `/v1/sessions/:id/messages`. Các request đọc dashboard, health và quản lý session không tăng số call. Call được lưu ngay khi server nhận, có trạng thái đang xử lý, thành công, lỗi, từ chối, hủy hoặc gián đoạn. Request bị từ chối trước khi gọi Codex vẫn được ghi riêng.
 
@@ -307,8 +307,8 @@ Input/output/cache/reasoning lấy từ usage của Codex. Tổng token = input 
 Lịch sử bắt đầu từ khi thêm thống kê; không truy hồi các call cũ. SQLite chỉ lưu metadata, token và timing, không lưu nội dung prompt/câu trả lời. Nếu bật `LOCAL_API_KEY`, trang sẽ yêu cầu nhập token để lấy số liệu; token chỉ giữ trong bộ nhớ trang. Dashboard shell được tải không cần key, API thống kê vẫn yêu cầu Bearer token.
 
 ```bash
-curl 'http://localhost:4000/api/stats/overview?range=24h'
-curl 'http://localhost:4000/api/stats/calls?range=7d&status=error&page=1'
+curl 'http://localhost:15600/api/stats/overview?range=24h'
+curl 'http://localhost:15600/api/stats/calls?range=7d&status=error&page=1'
 ```
 
 Query `model` là tùy chọn; thêm header `Authorization: Bearer ...` nếu bật token gateway.
@@ -341,7 +341,7 @@ Tài liệu chính thức: [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk)
 
 ## Chi phí và test chat
 
-Mở `http://localhost:4000/dashboard`: tab **Thống kê** có tổng chi phí ước tính và bảng theo ngày/tuần/tháng (UTC+7, tuần bắt đầu thứ Hai). Bảng chi phí dùng toàn bộ lịch sử và bộ lọc model; khoảng thời gian chỉ áp dụng thống kê call/token. Giá snapshot clone trong `data/`, được đóng băng theo từng call trong SQLite. Cache được tách khỏi input để tránh tính hai lần. Chi phí theo giá API tham khảo, không phải hóa đơn Plus; lượt thiếu giá/usage được đánh dấu chưa tính được.
+Mở `http://localhost:15600/dashboard`: tab **Thống kê** có tổng chi phí ước tính và bảng theo ngày/tuần/tháng (UTC+7, tuần bắt đầu thứ Hai). Bảng chi phí dùng toàn bộ lịch sử và bộ lọc model; khoảng thời gian chỉ áp dụng thống kê call/token. Giá snapshot clone trong `data/`, được đóng băng theo từng call trong SQLite. Cache được tách khỏi input để tránh tính hai lần. Chi phí theo giá API tham khảo, không phải hóa đơn Plus; lượt thiếu giá/usage được đánh dấu chưa tính được.
 
 Tab **Test chat** có nhiều tab tạm, chọn model/reasoning, system context, copy model, dừng request, trạng thái đang suy nghĩ và chi tiết request/response/usage/chi phí. Context chỉ ở bộ nhớ trang và gửi lại mỗi lượt, không dùng session; Codex chạy `--ephemeral`. Reload xóa chat. SQLite chỉ lưu metadata, không lưu prompt/response. Tab **Model & giá** cho tìm kiếm/copy tất cả model trong snapshot; chỉ model tương thích Codex có nút test. Quyền thực tế còn tùy tài khoản.
 

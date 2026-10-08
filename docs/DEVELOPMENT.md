@@ -73,22 +73,16 @@ cần Bearer token; không đưa token vào tài liệu hay URL.
 
 | Nguồn | Trạng thái kiểm tra ngày 06/10/2026 |
 | --- | --- |
-| Repo | `src/config.ts` / `.env.example`: port 4000; `src/index.ts`: bind 127.0.0.1 |
-| Listener | Node của repo nghe `127.0.0.1:4000`; command dùng Node 24.21.0 |
-| URL hiện tại | `http://127.0.0.1:4000/dashboard` hoặc `http://localhost:4000/dashboard` |
-| Registry | `/Users/buivannin/Desktop/workspace/personal/dev-hub/projects.yml` tồn tại; chưa có entry khớp đường dẫn repo |
-| Block | Chưa được cấp block trung tâm; không xem 4000 là port đã reserve |
-| Proxy | Dev Hub Caddy đang chạy, có route dev/intelligence/ai-model-dashboard; chưa có route cho codex-server |
-| Bind proxy | Docker publish `0.0.0.0:80→80`; không phải chỉ loopback. `lsof` không root thấy listener wildcard IPv6 |
-| Host policy | `src/server.ts` chỉ nhận localhost/loopback; chưa nhận hostname `.localhost` của project |
+| Repo | `src/config.ts` / `.env.example`: port 15600; `src/index.ts`: bind 127.0.0.1 |
+| Listener | Node của repo nghe `127.0.0.1:15600`; command dùng Node 24.21.0 |
+| URL hiện tại | `http://127.0.0.1:15600/dashboard` hoặc `http://localhost:15600/dashboard` |
+| Registry | Entry `codex-server`, block 15600–15699, service web/API tại 15600 |
+| Block | 15600–15699 đã reserve cho repo sau khi discovery + probe IPv4/IPv6 và Docker kiểm tra trống |
+| Proxy | Caddy route `codex-server.localhost` → `127.0.0.1:15600`; HTTP IPv4 trả 200, browser chưa kiểm tra được trong phiên này |
+| Bind proxy | Docker publish `127.0.0.1:80→80`; loopback IPv4 only. IPv6 publication chưa khả dụng trên Docker Desktop này |
+| Host policy | Gateway giữ localhost/loopback và allowlist chính xác `codex-server.localhost`; Origin vẫn phải same-origin, Bearer giữ nguyên |
 
-Port 4000 là endpoint người dùng đã yêu cầu và đang dùng. Bootstrap giữ endpoint
-này; chưa chọn block mới hoặc cấu hình một hostname giả định. Khi thực hiện
-migration Dev Hub, đọc registry và conventions trước, kiểm tra toàn bộ block
-cùng listener, đề xuất mapping/hostname và cách giữ tương thích cho HTTP clients.
-Rà Host/Origin/Bearer và bind của proxy trước khi bật route; không mở wildcard
-Host hoặc CORS để đi tắt. Xác minh HTTP IPv4/IPv6 và browser trước khi công bố
-hostname hoạt động. Không thay proxy/system service ngoài phạm vi được giao.
+Port 15600 là service slot x000 đã reserve. Caddy route dùng hostname cụ thể; backend vẫn bind loopback. Không mở wildcard Host/CORS. HTTP/browser verification quyết định route có thể được công bố hay chưa. Không thay proxy/system service ngoài phạm vi được giao.
 
 ## Kết quả bootstrap
 
@@ -115,8 +109,17 @@ có skill mới cần validator.
 | Knowledge routing | Giữ README cho API, usage và video contract; TECHNICAL/architecture cho kiến trúc; DEVELOPMENT.md/HTML cho vận hành. Bổ sung route Video builds trong AGENTS.md. |
 | Sai lệch import | Global video-builder dùng `schema_version`, ISO timestamps và metadata khác schema dashboard. README bổ sung mapping export; `src/video-builds.ts` vẫn là schema authority. Giữ nguyên manifest nguồn. |
 | Global skills | Tái dùng feature-builder cho implementation, task-qa-review cho review, security-review cho audit và project-ai-bootstrap cho setup. Không sao chép phương pháp global vào repo. |
-| Runtime | `nvm use`: Node 24.21.0, npm 11.19.0; cả hai executable thuộc cùng runtime. Listener PID 48395 là Node 24.21.0 tại 127.0.0.1:4000; GET /health trả 200. |
-| Dev Hub | Registry chưa có repo/block; Caddyfile có dev/intelligence/ai-model-dashboard, không có codex-server. Docker inspect xác nhận publish 0.0.0.0:80; chưa có hostname proxy cho repo. |
+| Runtime | `nvm use`: Node 24.21.0, npm 11.19.0; cả hai executable thuộc cùng runtime. Listener PID hiện do scripts/start.js quản lý tại 127.0.0.1:15600; GET /health trả 200. |
+| Dev Hub | Block 15600–15699 và hostname codex-server.localhost đã đăng ký; Docker Caddy publish 127.0.0.1:80. Discovery xác nhận registry, listener và route HTTP. |
 | User changes | Giữ nguyên thay đổi `.gitignore` có sẵn. Không đổi code runtime, dữ liệu thật, port, registry hay proxy. |
 
 Không đưa lỗi import này thành quy tắc core dài: chi tiết nằm tại mục Video builds trong README, AGENTS.md chỉ dẫn tới contract và validation. Kiểm tra import ở lượt chẩn đoán đã dùng API inject + database tạm: manifest nguồn trả 400, bản export trả 201; không gọi provider thật. Snapshot vận hành không chứng minh quyền model hoặc hạn mức tài khoản.
+
+
+## Đăng ký Dev Hub ngày 08/10/2026
+
+- Đã kiểm registry, discovery, Docker publications và probe toàn block IPv4/IPv6 trước khi reserve `15600–15699`; `15300–15399` thuộc Dev Recall.
+- Service web/API `codex-server` dùng host/internal/target port 15600 và route `codex-server.localhost`. API tiếp tục bind `127.0.0.1`.
+- Gateway chỉ allowlist hostname `codex-server.localhost` cùng localhost/loopback hiện có. Kiểm tra Origin same-origin và Bearer không nới lỏng.
+- Docker proxy chỉ publish `127.0.0.1:80`; Docker Desktop không hỗ trợ publication IPv6 loopback tại thời điểm cấu hình. Không expose ra LAN.
+- Caddy validation đạt; `curl --resolve` tới dashboard qua `codex-server.localhost` trả HTTP 200. Browser automation không khả dụng nên chưa có kiểm tra trực quan. URL trực tiếp `http://127.0.0.1:15600/dashboard`; Docker proxy chỉ bind IPv4 loopback.

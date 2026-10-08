@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   const parsed = z.object({
-    PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+    PORT: z.coerce.number().int().min(1).max(65535).default(15600),
     DEFAULT_MODEL: z.string().min(1).default('gpt-6-luna'),
     DEFAULT_REASONING_EFFORT: z.enum(['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'persistent']).default('low'),
     REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1).default(180_000),

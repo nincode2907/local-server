@@ -81,6 +81,10 @@ test('host/origin guards and optional bearer token', async () => {
     assert.equal((await f.app.inject({ url: '/health' })).statusCode, 401);
     assert.equal((await f.app.inject({ url: '/health', headers: { authorization: 'Bearer secret' } })).statusCode, 200);
     assert.equal((await f.app.inject({ url: '/health', headers: { host: 'attacker.test', authorization: 'Bearer secret' } })).statusCode, 403);
+    assert.equal((await f.app.inject({ url: '/health', headers: { host: 'codex-server.localhost', authorization: 'Bearer secret' } })).statusCode, 200);
+    assert.equal((await f.app.inject({ url: '/health', headers: { host: 'codex-server.localhost.attacker.test', authorization: 'Bearer secret' } })).statusCode, 403);
+    assert.equal((await f.app.inject({ url: '/api/native/overview?range=all', headers: { host: 'codex-server.localhost', origin: 'http://codex-server.localhost', authorization: 'Bearer secret' } })).statusCode, 200);
+    assert.equal((await f.app.inject({ url: '/api/native/overview?range=all', headers: { host: 'codex-server.localhost', origin: 'http://attacker.test', authorization: 'Bearer secret' } })).statusCode, 403);
     assert.equal((await f.app.inject({ url: '/health', headers: { origin: 'https://attacker.test', authorization: 'Bearer secret' } })).statusCode, 403);
   } finally { await f.close(); }
 });

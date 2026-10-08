@@ -65,4 +65,5 @@ built-in SQLite, and vanilla HTML/CSS/JavaScript. No frontend bundler.
 - Before any host port decision, inspect the central Dev Hub registry at
   `/Users/buivannin/Desktop/workspace/personal/dev-hub/projects.yml`.
   This repo has no registered block as of the bootstrap; current API port is
-  4000. Do not claim a reserved block or working proxy hostname without evidence.
+  15600 with registered block 15600–15699 and hostname codex-server.localhost.
+  Verify the route before claiming it works.
