@@ -1,0 +1,9 @@
+{
+  "name":"@codex-local/react-activity-panel","version":"0.2.0","type":"module",
+  "exports":{".":{"types":"./dist/index.d.ts","default":"./dist/index.js"},"./styles.css":"./styles.css"},
+  "files":["dist","styles.css","README.md"],
+  "peerDependencies":{"react":">=18 <20"},
+  "dependencies":{"@codex-local/activity-client":"file:../activity-client"},
+  "devDependencies":{"react":"18.3.1","react-dom":"18.3.1","@types/react":"^18.3.0","typescript":"^7.0.2"},
+  "scripts":{"check":"tsc --noEmit","build":"tsc"}
+}

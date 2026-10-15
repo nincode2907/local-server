@@ -2,8 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import type {ProviderId} from './provider-types.js';
 import { estimateCost, periodKey } from './catalog.js';
-import type { Usage } from '@openai/codex-sdk';
+import type { ProviderUsage as Usage } from './provider-types.js';
 
 export const ranges = { '1h': 3_600_000, '24h': 86_400_000, '7d': 604_800_000, '30d': 2_592_000_000 };
 export type Range = keyof typeof ranges;
@@ -29,11 +30,11 @@ export class Metrics {
 
     `);
     const columns = new Set(this.db.prepare('PRAGMA table_info(calls)').all().map(r => r.name));
-    for (const [name, type] of Object.entries({ cost_usd: 'REAL', input_cost_usd: 'REAL', output_cost_usd: 'REAL', cached_cost_usd: 'REAL', input_rate: 'REAL', output_rate: 'REAL', cached_rate: 'REAL', price_checked_on: 'TEXT', price_source: 'TEXT' })) {
+    for (const [name, type] of Object.entries({ provider:"TEXT NOT NULL DEFAULT 'codex'",cost_usd: 'REAL', input_cost_usd: 'REAL', output_cost_usd: 'REAL', cached_cost_usd: 'REAL', input_rate: 'REAL', output_rate: 'REAL', cached_rate: 'REAL', price_checked_on: 'TEXT', price_source: 'TEXT' })) {
       if (!columns.has(name)) this.db.exec(`ALTER TABLE calls ADD COLUMN ${name} ${type}`);
     }
-    this.db.exec('PRAGMA user_version=2');
-    for (const row of this.db.prepare('SELECT id,model,input_tokens,output_tokens,cached_tokens FROM calls WHERE input_tokens IS NOT NULL AND price_checked_on IS NULL').all()) {
+    this.db.exec('PRAGMA user_version=3');
+    for (const row of this.db.prepare("SELECT id,model,input_tokens,output_tokens,cached_tokens FROM calls WHERE provider='codex' AND input_tokens IS NOT NULL AND price_checked_on IS NULL").all()) {
       this.price(String(row.id), String(row.model), Number(row.input_tokens), Number(row.output_tokens), Number(row.cached_tokens ?? 0));
     }
     // A crashed server cannot know when these turns actually finished.
@@ -44,8 +45,8 @@ export class Metrics {
     this.db.prepare('INSERT INTO calls(id, endpoint, model, reasoning, session_id, started_at) VALUES(?,?,?,?,?,?)').run(id, endpoint, model, reasoning, sessionId, Date.now());
     return id;
   }
-  context(id: string, model: string, reasoning: string) {
-    this.db.prepare('UPDATE calls SET model=?, reasoning=? WHERE id=?').run(model, reasoning, id);
+  context(id: string, model: string, reasoning: string,provider:ProviderId='codex') {
+    this.db.prepare('UPDATE calls SET model=?, reasoning=?,provider=? WHERE id=?').run(model, reasoning,provider, id);
   }
   running(id: string) {
     this.db.prepare("UPDATE calls SET codex_started=1, status='running' WHERE id=?").run(id);
@@ -54,7 +55,7 @@ export class Metrics {
     if (!usage) return;
     this.db.prepare('UPDATE calls SET input_tokens=?, output_tokens=?, cached_tokens=?, reasoning_tokens=? WHERE id=?').run(usage.input_tokens, usage.output_tokens, usage.cached_input_tokens, usage.reasoning_output_tokens ?? null, id);
     const model = String(this.detail(id)!.model);
-    this.price(id, model, usage.input_tokens, usage.output_tokens, usage.cached_input_tokens);
+    if(this.detail(id)!.provider==='codex'&&usage.cached_input_tokens!==null)this.price(id, model, usage.input_tokens, usage.output_tokens, usage.cached_input_tokens);
   }
   private price(id: string, model: string, input: number, output: number, cached: number) {
     const cost = estimateCost(model, input, output, cached);
@@ -104,6 +105,8 @@ export class Metrics {
       COALESCE(SUM(input_tokens),0) AS input_tokens, COALESCE(SUM(output_tokens),0) AS output_tokens,
       COALESCE(SUM(cached_tokens),0) AS cached_tokens, COALESCE(SUM(reasoning_tokens),0) AS reasoning_tokens,
       COALESCE(SUM(input_tokens IS NOT NULL),0) AS usage_known_calls,
+      COALESCE(SUM(input_tokens IS NOT NULL AND cached_tokens IS NULL),0) AS cache_unknown_calls,
+      COALESCE(SUM(input_tokens IS NOT NULL AND reasoning_tokens IS NULL),0) AS reasoning_unknown_calls,
       COALESCE(SUM(codex_started=1 AND input_tokens IS NULL AND status NOT IN ('running','pending')),0) AS usage_unknown_calls,
       COALESCE(SUM(tool_calls),0) AS tool_calls,
       AVG(CASE WHEN codex_started=1 THEN duration_ms END) AS avg_duration_ms
@@ -121,11 +124,11 @@ export class Metrics {
     const byTime = new Map(buckets.map(row => [Number(row.time), row]));
     const timeline = [];
     for (let time = start; time <= now; time += bucket) timeline.push(byTime.get(time) ?? { time, calls: 0, success: 0, errors: 0, rejected: 0, active: 0, tokens: 0, avg_duration_ms: null });
-    const models = this.db.prepare(`SELECT model, COUNT(*) AS calls, SUM(cost_usd) AS cost_usd,
+    const models = this.db.prepare(`SELECT provider,model, COUNT(*) AS calls, SUM(cost_usd) AS cost_usd,
       SUM(status='success') AS success, COALESCE(SUM(input_tokens),0) AS input_tokens,
       COALESCE(SUM(output_tokens),0) AS output_tokens,
       AVG(CASE WHEN codex_started=1 THEN duration_ms END) AS avg_duration_ms
-      FROM calls WHERE ${where} GROUP BY model ORDER BY calls DESC`).all(...params);
+      FROM calls WHERE ${where} GROUP BY provider,model ORDER BY calls DESC`).all(...params);
     const availableModels = this.db.prepare('SELECT DISTINCT model FROM calls ORDER BY model').all().map(r => String(r.model));
     return { range, since, until: now, summary: { ...summary, p95_duration_ms: p95 }, timeline, models, available_models: availableModels,
       recorded_since: this.db.prepare('SELECT MIN(started_at) AS time FROM calls').get()!.time };

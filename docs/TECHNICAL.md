@@ -88,7 +88,7 @@ Sandbox giới hạn khả năng ghi và network của agent nhưng không cô l
 
 Function calling được mô phỏng bằng structured output: model đề xuất `tool_calls`, server kiểm tra JSON Schema draft-07, client tự thực thi rồi gửi lại `role=tool`. Không có lệnh/hàm do caller cung cấp được gateway thực thi.
 
-Không hỗ trợ streaming, ảnh/audio, `n` khác 1, `temperature` khác 0, embeddings hoặc toàn bộ tham số OpenAI API.
+Hỗ trợ streaming opt-in cho stateless completion/run API; không hỗ trợ ảnh/audio, `n` khác 1, `temperature` khác 0, embeddings hoặc toàn bộ tham số OpenAI API.
 
 ## 5. Session và nguồn thống kê
 
@@ -135,6 +135,8 @@ Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `PO
 | `DEFAULT_REASONING_EFFORT` | `low` | Reasoning mặc định |
 | `REQUEST_TIMEOUT_MS` | `180000` | Timeout một lượt |
 | `MAX_CONCURRENT` | `2` | Lượt đồng thời tối đa |
+| `MAX_QUEUE` | `0` | FIFO opt-in 0–64; 0 giữ 429 ngay khi đầy active |
+| `QUEUE_TIMEOUT_MS` | `30000` | Chờ queue tối đa, tách request timeout sau dequeue |
 | `MAX_SESSIONS` | `100` | Gateway session tối đa trong bộ nhớ |
 | `SESSION_TTL_MS` | `86400000` | Hạn session không hoạt động |
 | `DATA_DIR` | `.local` | `sessions.json` và thư mục database mặc định |
@@ -191,3 +193,52 @@ npm start
 Đăng nhập CLI bằng `.\node_modules\.bin\codex.cmd login` trên Windows hoặc `./node_modules/.bin/codex login` trên macOS/Linux. Dashboard ở `http://127.0.0.1:15600/dashboard`; `npm run dev` bật TypeScript watcher. `npm run test:live` gọi Codex thật và tiêu thụ hạn mức tài khoản.
 
 `npm start` qua `scripts/start.js` chạy foreground; `npm start --silent -- -d` chạy nền và bỏ output. `npm stop` kiểm tra PID bằng `ps` rồi gửi SIGTERM trên macOS/Linux. PID được ghi khi spawn, chưa xác nhận HTTP sẵn sàng. Chi tiết runtime, lệch Node/npm và tình trạng port/proxy ở [DEVELOPMENT.md](DEVELOPMENT.md) và [bản trực quan](DEVELOPMENT.html).
+
+## Streaming và run lifecycle
+
+`src/activity.ts` quản lý run ownership, terminal transitions, replay RAM giới hạn,
+metadata-only `gateway_runs` và metric provenance. `src/sse.ts` giới hạn buffer
+subscriber; `src/stream-content.ts` đọc public content trong envelope JSON đang đến.
+`src/server.ts` dùng chung execution path cho JSON, streaming completions và async
+runs; detached run không gắn lifetime với socket subscribe. Shutdown abort và đợi
+job cleanup. `public/live.js` dùng unified feed metadata và stream từng run.
+
+App keys chỉ có quyền stateless inference và run của chính app; dashboard/native,
+inspector, video và legacy sessions vẫn admin-only. Docker HOST/Host allowlist
+là opt-in có auth; provider CLI vẫn giữ isolation flags cũ. SDK policy spike
+không đạt ignore-config/rules/ephemeral parity, nên chưa thay runtime sang SDK.
+API, giới hạn lưu trữ và caveat nằm tại [STREAMING.md](STREAMING.md), bản trực quan
+[STREAMING.html](STREAMING.html). Không nhập output/event body vào SQLite.
+
+
+Phase 2: `src/scheduler.ts` giữ FIFO bounded, slot tới hết provider cleanup;
+queued session khóa từ admission, không xóa session nếu provider chưa được gọi.
+`src/workflows.ts` giữ strict independent state machine, owner/admin, hash dedup,
+quota 60/min +512/run +32 stages. Workflow text chỉ RAM có redaction/TTL;
+SQLite mới chỉ numeric state, identifier và hash. Numeric history 256/run và
+inter-chunk gaps512; lifecycle snapshots copy history để không mutate replay cũ.
+`/api/runs/latency` tổng hợp bounded cohorts theo metadata, không động vào native DB.
+Deep link dashboard `/dashboard/requests/:id` giữ auth ở API; shared ESM client
+trong `clients/activity-client` dùng cả vanilla và optional React package.
+Next BFF example mặc định deny, yêu cầu tích hợp user/run ownership phía app.
+
+
+## Local providers và Performance Lab
+
+`provider-registry.ts` chọn Codex mặc định hoặc adapter local đã cấu hình, không
+fallback. `local-endpoint.ts` giới hạn origins/hosts và `local-provider.ts` đọc
+JSON/NDJSON/SSE có bounds, abort/timeout/redirect checks, dùng key riêng. Native
+content được chuẩn hóa về envelope hiện tại để giữ tool/transcript validation;
+reasoning không forward. `provider-types.ts` định nghĩa usage nullable/timing/capability.
+`calls.provider` migration additive (schema version3), price chỉ cho Codex;
+model aggregation theo provider+model, cache/reasoning unknown có counts.
+
+`performance-lab.ts` gọi cùng execution service, không tự tạo provider path thứ hai.
+Lab admin-only, browser JSON+X-Codex-Lab cùng origin, strict bounds. SQLite STRICT
+lab_batches/lab_daily, unique active batch/idempotency và quota reservation atomic.
+Metadata không chứa prompt/output, benchmark run ephemeral. Crash không resume;
+retention100batch/7ngày mặc định, read/start/startup purge; resource numeric snapshots
+bounded120point/16process. `resources.ts` lấy Node delta CPU/RSS, OS ps cho child/
+configured local PID, không gán shared process/GPU cho từng request. Dashboard
+lab.js dùng shared SSE transport; CLI policy và native read-only collector giữ nguyên.
+API, so sánh metric, limits và verification: [PERFORMANCE.md](PERFORMANCE.md).

@@ -29,12 +29,16 @@ export const toolChoice = z.union([
   z.object({ type: z.literal('function'), function: z.object({ name }).strict() }).strict(),
 ]);
 const options = {
+  provider:z.enum(['codex','ollama','lmstudio']).optional(),
+  max_tokens:z.number().int().min(1).max(8192).optional(),
+  seed:z.number().int().min(0).max(2147483647).optional(),
   model: z.string().min(1).max(128).optional(),
   reasoning_effort: reasoning.optional(), reasoning: reasoning.optional(),
   tools: z.array(tool).max(64).optional(), tool_choice: toolChoice.optional(),
   parallel_tool_calls: z.boolean().default(true),
   temperature: z.literal(0).optional(),
-  stream: z.literal(false).optional(), n: z.literal(1).optional(),
+  stream: z.boolean().optional(), n: z.literal(1).optional(),
+  stream_options: z.object({include_usage:z.boolean().default(false)}).strict().optional(),
 };
 export const chatRequest = z.object({ ...options, messages: z.array(message).min(1).max(512) }).strict();
 export const sessionRequest = z.object({
@@ -44,7 +48,7 @@ export const sessionRequest = z.object({
 export const sessionMessage = z.object({
   ...options, message: z.string().min(1).optional(), messages: z.array(message).min(1).max(512).optional(),
 }).strict().refine(v => Boolean(v.message) !== Boolean(v.messages), 'Provide message OR messages.');
-export const simpleRequest = z.object({ prompt: z.string().min(1), model: options.model, reasoning: options.reasoning, reasoning_effort: options.reasoning_effort }).strict();
+export const simpleRequest = z.object({ prompt: z.string().min(1),provider:options.provider,max_tokens:options.max_tokens,seed:options.seed, model: options.model, reasoning: options.reasoning, reasoning_effort: options.reasoning_effort }).strict();
 export type Message = z.infer<typeof message>;
 export type Tool = z.infer<typeof tool>;
 export type ChatRequest = z.infer<typeof chatRequest>;

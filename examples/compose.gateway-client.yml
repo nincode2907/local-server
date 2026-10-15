@@ -1,0 +1,14 @@
+services:
+  gateway-smoke:
+    image: node:22-alpine
+    pull_policy: never
+    profiles: [tools]
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    environment:
+      GATEWAY_BASE_URL: ${GATEWAY_BASE_URL:-http://host.docker.internal:15600}
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:?Set an application key in your shell}
+      RUN_STREAMING_SMOKE: ${RUN_STREAMING_SMOKE:-0}
+    volumes:
+      - ./docker-smoke.mjs:/smoke.mjs:ro
+    command: [node, /smoke.mjs]

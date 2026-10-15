@@ -1,4 +1,4 @@
-import type { ThreadItem, TurnOptions, Usage } from '@openai/codex-sdk';
+import type { ThreadItem, TurnOptions } from '@openai/codex-sdk';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createInterface } from 'node:readline';
@@ -9,16 +9,20 @@ import { tmpdir, homedir } from 'node:os';
 import { ApiError } from './errors.js';
 import type { Config } from './config.js';
 import type { ChatRequest } from './schema.js';
+import type {ProviderUsage as Usage,ProviderTiming} from './provider-types.js';
 
-interface ProviderTurn {
+export interface ProviderTurn {
+  timing?:ProviderTiming;
+  finishReason?:'stop'|'length'|'tool_calls';
   items: ThreadItem[];
   finalResponse: string;
   usage: Usage | null;
 }
 
 export const gatewayInstructions = 'You are a text assistant for a local chat gateway. Respond to the provided conversation using the requested JSON schema. Do not use local tools, read files, modify files, run shell commands, search the web, or contact integrations. Function calls in your final JSON are proposals for the caller to execute.';
-export type ObservedTurnOptions = TurnOptions & { observe?: (context: unknown) => Promise<void>; observeResponse?: (response: unknown) => Promise<void> };
-interface ProviderThread {
+export type PublicProviderEvent = {type:'output'; item_id:string; text:string} | {type:'usage'; usage:Usage} | {type:'timing';timing:ProviderTiming};
+export type ObservedTurnOptions = TurnOptions & { observe?: (context: unknown) => Promise<void>; observeResponse?: (response: unknown) => Promise<void>; onEvent?: (event:PublicProviderEvent) => void; request?:ChatRequest; onProcess?:(pid:number,active:boolean,scope?:string)=>void };
+export interface ProviderThread {
   readonly id: string | null;
   run(input: string, options?: ObservedTurnOptions): Promise<ProviderTurn>;
 }
@@ -92,6 +96,8 @@ class CliThread implements ProviderThread {
         policy: { sandbox: 'read-only', approval: 'never', network: false, agent_tools: false, ignore_user_config: true, ignore_rules: true },
         internal_context: { provenance: 'Internal / unavailable', available: false, description: 'Provider-internal prompt and resumed CLI history are not exposed by this gateway.' } });
       const child = spawn(this.command, args, { env: this.env, signal: options.signal });
+      if(child.pid)options.onProcess?.(child.pid,true,this.commandPrefix.length?'codex_cli_launcher_process':'codex_cli_process');
+      child.once('close',()=>{if(child.pid)options.onProcess?.(child.pid,false,this.commandPrefix.length?'codex_cli_launcher_process':'codex_cli_process');});
       const stderr: Buffer[] = [];
       child.stderr.on('data', chunk => stderr.push(chunk));
       const exited = new Promise<void>((resolveExit, rejectExit) => {
@@ -113,7 +119,13 @@ class CliThread implements ProviderThread {
       const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
       try {
         for await (const line of lines) {
+          if (Buffer.byteLength(line) > 2_097_152) throw new ApiError(502, 'provider_event_limit', 'Provider event exceeds limit.');
           const event = JSON.parse(line) as CliEvent;
+          if (event.item) {
+            assertNoAgentTools([event.item]);
+            if (['item.started','item.updated','item.completed'].includes(event.type) && event.item.type === 'agent_message')
+              options.onEvent?.({type:'output',item_id:event.item.id,text:event.item.text});
+          }
           if (event.type === 'thread.started' && event.thread_id) this.#id = event.thread_id;
           else if (event.type === 'item.completed' && event.item) {
             items.push(event.item);
@@ -121,6 +133,7 @@ class CliThread implements ProviderThread {
           } else if (event.type === 'turn.completed' && event.usage) {
             event.usage.cache_write_input_tokens ??= 0;
             usage = event.usage;
+            options.onEvent?.({type:'usage',usage});
           }
           else if (event.type === 'turn.failed') failure = event.error?.message ?? 'Codex turn failed.';
           else if (event.type === 'error' && typeof event.message === 'string') publicErrors.push({type:'error',message:event.message});

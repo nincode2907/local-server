@@ -14,7 +14,10 @@
     "test": "tsx --test test/*.test.ts",
     "test:live": "tsx scripts/smoke.ts",
     "check": "tsc --noEmit",
-    "preview:inspector": "tsx scripts/inspector-preview.ts"
+    "preview:inspector": "tsx scripts/inspector-preview.ts",
+    "preview:activity": "tsx scripts/activity-preview.ts",
+    "preview:react": "tsx scripts/react-activity-preview.ts",
+    "preview:lab": "tsx scripts/lab-preview.ts"
   },
   "dependencies": {
     "@openai/codex-sdk": "0.160.0",

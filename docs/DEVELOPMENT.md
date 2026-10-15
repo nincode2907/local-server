@@ -123,3 +123,39 @@ Không đưa lỗi import này thành quy tắc core dài: chi tiết nằm tạ
 - Gateway chỉ allowlist hostname `codex-server.localhost` cùng localhost/loopback hiện có. Kiểm tra Origin same-origin và Bearer không nới lỏng.
 - Docker proxy chỉ publish `127.0.0.1:80`; Docker Desktop không hỗ trợ publication IPv6 loopback tại thời điểm cấu hình. Không expose ra LAN.
 - Caddy validation đạt; `curl --resolve` tới dashboard qua `codex-server.localhost` trả HTTP 200. Browser automation không khả dụng nên chưa có kiểm tra trực quan. URL trực tiếp `http://127.0.0.1:15600/dashboard`; Docker proxy chỉ bind IPv4 loopback.
+
+## Streaming, workflow và Docker (phase 1–2)
+
+`npm run preview:activity` chạy fixture riêng tại 15602, key demo `fixture-admin`,
+không đọc `.env`, gọi tài khoản hay đọc native history. `examples/docker-smoke.mjs`
+và Compose example kiểm tra container → gateway; streaming smoke opt-in vì URL
+thật sẽ tiêu thụ usage. Cấu hình và đường kết nối đã kiểm chứng:
+[STREAMING.md](STREAMING.md) / [bản trực quan](STREAMING.html).
+
+`HOST` mặc định 127.0.0.1; `TRUSTED_HOSTS` exact names và `APP_API_KEYS` theo app
+đều opt-in. Non-loopback/extra hosts/app keys bắt buộc `LOCAL_API_KEY` admin.
+Không tự sửa `.env` thật hoặc đổi key của existing clients. Sau build/assets/config
+cần restart process đã xác định PID và active requests; verify cả API run lẫn
+inspector sau restart để tránh chạy `dist` cũ.
+
+
+Phase 2 có queue opt-in (`MAX_QUEUE=0` mặc định, `QUEUE_TIMEOUT_MS=30000`),
+không tự sửa config đang chạy. Build React riêng bằng `npm install --prefix
+clients/react-activity-panel`, `npm run check --prefix clients/react-activity-panel`,
+`npm run build --prefix clients/react-activity-panel`. Gateway vẫn không có bundler.
+`npm run preview:react` mở fixture React/BFF 15603, yêu cầu preview:activity15602
+đang chạy và có marker synthetic. Dừng cả hai terminal sau QA; không dùng để phục vụ app thật.
+
+
+## Local providers và Performance Lab (phase 3)
+
+Cấu hình OLLAMA_BASE_URL/LM_STUDIO_BASE_URL opt-in là origin, không nối /v1 hoặc
+/api. LOCAL_PROVIDER_HOSTS exact cho host ngoài loopback; backend keys tách riêng.
+Không tự tải model, khởi động Ollama/LM Studio hoặc sửa .env thật khi triển khai.
+Lab Codex mặc định tắt; LAB_ALLOW_CODEX chỉ bật có chủ đích. Cấu hình, quota/retention
+và curl ở [PERFORMANCE.md](PERFORMANCE.md) / [PERFORMANCE.html](PERFORMANCE.html).
+
+`npm run preview:lab`: gateway fixture15602, backend protocol fixture15604,
+DATA_DIR riêng, token fixture-admin; cả3provider đều synthetic. Kiểm tra registry
+và listener trước khi chạy; dừng terminal để cleanup. Không chạy cùng preview
+activity ở15602. Không dùng preview để phục vụ ứng dụng thật.

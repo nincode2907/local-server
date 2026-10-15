@@ -10,6 +10,20 @@ const seconds = value => value === null || value === undefined ? '—' : `${new 
 const statusNames = { success: 'Thành công', error: 'Lỗi', rejected: 'Từ chối', running: 'Đang chạy', pending: 'Chờ xử lý', cancelled: 'Đã hủy', interrupted: 'Gián đoạn' };
 let apiKey = '', page = 1, rows = [], controller, lastOverview, loading = false;
 
+function setTheme(theme, persist = false) {
+  const dark = theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const button = $('theme-toggle');
+  button.setAttribute('aria-pressed', String(dark));
+  button.setAttribute('aria-label', dark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối');
+  button.title = dark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối';
+  if (persist) { try { localStorage.setItem('codex-dashboard-theme', dark ? 'dark' : 'light'); } catch {} }
+}
+let savedTheme = 'light';
+try { savedTheme = localStorage.getItem('codex-dashboard-theme') === 'dark' ? 'dark' : 'light'; } catch {}
+setTheme(savedTheme);
+$('theme-toggle').addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true));
+
 function badge(status) { return `<span class="badge ${escape(status)}">${escape(statusNames[status] ?? status)}</span>`; }
 function setOnline(online, text) {
   $('connection-dot').className = `dot ${online ? 'online' : 'offline'}`;
@@ -19,45 +33,33 @@ async function get(path, signal) {
   const response = await fetch(path, { signal, headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {}, cache: 'no-store' });
   if (response.status === 401) { const error = new Error('Nhập token để xem dữ liệu.'); error.auth = true; throw error; }
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error?.message ?? `HTTP ${response.status}`);
+  if (!response.ok) { const error = new Error(data.error?.message ?? `HTTP ${response.status}`); if (data.error?.code === 'admin_required') error.auth = true; throw error; }
   return data;
 }
 function chart(timeline, range) {
-  const width = Math.max(280, $('activity-chart').clientWidth - 32), height = 230, left = 36, right = 15, top = 15, bottom = 37;
-  const plotH = height - top - bottom, plotW = width - left - right;
-  const max = Math.max(4, ...timeline.map(b => b.calls));
-  const ceiling = Math.ceil(max / 4) * 4;
-  const step = plotW / timeline.length;
-  let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Biểu đồ call theo thời gian. Tổng ${number(timeline.reduce((sum, b) => sum + b.calls, 0))} call.">`;
-  for (let i = 0; i <= 4; i++) {
-    const y = top + plotH * i / 4;
-    svg += `<line x1="${left}" x2="${width - right}" y1="${y}" y2="${y}" stroke="#e7edf5" stroke-dasharray="3 4"/><text x="${left - 10}" y="${y + 4}" text-anchor="end" fill="#627087" font-size="10">${number(ceiling * (4 - i) / 4)}</text>`;
-  }
-  const colors = { success: '#2854d7', errors: '#a33345', rejected: '#9b5d14', active: '#13786f' };
-  timeline.forEach((b, index) => {
-    let offset = 0;
-    const x = left + index * step + step * .19;
-    for (const [key, color] of Object.entries(colors)) {
-      const h = b[key] / ceiling * plotH;
-      if (h) svg += `<rect x="${x}" y="${top + plotH - offset - h}" width="${step * .62}" height="${h}" fill="${color}" rx="1"><title>${escape(date(b.time) + ' ' + time(b.time))}: ${number(b.calls)} call · ${number(b.tokens)} token</title></rect>`;
-      offset += h;
-    }
-    if (index === 0 || index === timeline.length - 1 || index % Math.ceil(timeline.length / 6) === 0) {
-      const label = range === '7d' || range === '30d' ? date(b.time).slice(0, 5) : time(b.time).slice(0, 5);
-      svg += `<text x="${x + step * .31}" y="${height - 12}" text-anchor="middle" fill="#627087" font-size="10">${escape(label)}</text>`;
-    }
-  });
-  $('activity-chart').innerHTML = svg + '</svg>';
+  const host = $('activity-chart'), ceiling = Math.max(4,Math.ceil(Math.max(0,...timeline.map(bucket=>bucket.calls))/4)*4);
+  const keys = [['success','Thành công'],['errors','Lỗi / hủy'],['rejected','Từ chối'],['active','Đang xử lý']];
+  const total = timeline.reduce((sum,bucket)=>sum+bucket.calls,0), animate = total > 0 && !host.dataset.chartRendered;
+  const columns = timeline.map((bucket,index)=>{
+    const label = range === '7d' || range === '30d' ? date(bucket.time).slice(0,5) : time(bucket.time).slice(0,5);
+    const showLabel = index === 0 || index === timeline.length-1 || index % Math.ceil(timeline.length/6) === 0;
+    const details = `${date(bucket.time)} ${time(bucket.time)} · ${number(bucket.calls)} call · ${number(bucket.tokens)} token · ${number(bucket.success)} thành công · ${number(bucket.errors)} lỗi hoặc hủy · ${number(bucket.rejected)} từ chối · ${number(bucket.active)} đang xử lý`;
+    const bars = keys.map(([key])=>`<i class="activity-segment ${key} activity-height-${Math.min(100,Math.round(Math.max(0,bucket[key])/ceiling*100))}"></i>`).join('');
+    return `<div class="activity-column${animate&&bucket.calls?' chart-grow':''} activity-delay-${Math.min(index,18)}" tabindex="0" role="img" aria-label="${escape(details)}" data-tooltip="${escape(details)}"><div class="activity-stack">${bars}</div><span class="activity-label">${showLabel?escape(label):'&nbsp;'}</span></div>`;
+  }).join('');
+  const ticks=[4,3,2,1,0].map((step,index)=>`<span class="activity-tick-${index}">${number(ceiling*step/4)}</span>`).join('');
+  host.innerHTML=`<div class="activity-css-chart" role="group" aria-label="Biểu đồ call theo thời gian. Tổng ${number(total)} call."><div class="activity-y-axis" aria-hidden="true">${ticks}</div><div class="activity-plot"><div class="activity-gridlines" aria-hidden="true"></div><div class="activity-columns">${columns}</div></div></div>`;
+  if(total)host.dataset.chartRendered='true';
   $('chart-empty').hidden = timeline.some(b => b.calls > 0);
 }
 function renderOverview(data) {
   lastOverview = data;
   const s = data.summary;
   $('total').textContent = number(s.total_calls);
-  $('call-breakdown').textContent = `${number(s.codex_calls)} lượt gọi Codex · ${number(s.rejected_calls)} từ chối`;
+  $('call-breakdown').textContent = `${number(s.codex_calls)} lượt gọi provider · ${number(s.rejected_calls)} từ chối`;
   const totalTokens = s.input_tokens + s.output_tokens;
   $('tokens').textContent = number(totalTokens);
-  $('token-breakdown').textContent = `${number(s.input_tokens)} input / ${number(s.output_tokens)} output · cache hit ${s.input_tokens ? (s.cached_tokens/s.input_tokens*100).toFixed(1)+'%' : '—'}`;
+  $('token-breakdown').textContent = `${number(s.input_tokens)} input / ${number(s.output_tokens)} output · cache hit ${s.input_tokens&&!s.cache_unknown_calls ? (s.cached_tokens/s.input_tokens*100).toFixed(1)+'%' : '—'}`;
   $('latency').textContent = seconds(s.avg_duration_ms);
   $('p95').textContent = `p95 ${seconds(s.p95_duration_ms)} · lượt đã gọi Codex`;
   const completed = s.total_calls - s.active_calls;
@@ -67,18 +69,20 @@ function renderOverview(data) {
   $('token-total').textContent = number(totalTokens);
   $('input-tokens').textContent = number(s.input_tokens);
   $('output-tokens').textContent = number(s.output_tokens);
-  $('cached-tokens').textContent = number(s.cached_tokens);
-  $('cache-hit-rate').textContent = s.input_tokens ? `${(s.cached_tokens/s.input_tokens*100).toFixed(1)}%` : '—';
-  $('reasoning-tokens').textContent = number(s.reasoning_tokens);
+  $('cached-tokens').textContent = number(s.cache_unknown_calls===s.usage_known_calls&&s.cache_unknown_calls>0?null:s.cached_tokens);
+  $('cache-hit-rate').textContent = s.input_tokens&&!s.cache_unknown_calls ? `${(s.cached_tokens/s.input_tokens*100).toFixed(1)}%` : '—';
+  $('reasoning-tokens').textContent = number(s.reasoning_unknown_calls===s.usage_known_calls&&s.reasoning_unknown_calls>0?null:s.reasoning_tokens);
   $('tool-calls').textContent = number(s.tool_calls);
   $('token-bar').replaceChildren();
-  for (const [amount, color] of [[s.input_tokens, '#2854d7'], [s.output_tokens, '#13786f']]) {
-    const segment = document.createElement('span'); segment.style.width = `${totalTokens ? amount / totalTokens * 100 : 0}%`; segment.style.backgroundColor = color; $('token-bar').append(segment);
+  for (const [amount, kind] of [[s.input_tokens, 'token-input'], [s.output_tokens, 'token-output']]) {
+    const width = totalTokens ? Math.round(amount / totalTokens * 100) : 0;
+    const segment = document.createElement('span'); segment.className = `token-segment ${kind} token-width-${width}`; $('token-bar').append(segment);
   }
-  $('usage-note').textContent = s.usage_unknown_calls ? `${number(s.usage_unknown_calls)} lượt gọi Codex chưa có usage. Token hiển thị chỉ gồm số đã ghi nhận.` : `Đã ghi nhận usage của ${number(s.usage_known_calls)} lượt. Cache nằm trong input; reasoning nằm trong output.`;
+  $('usage-note').textContent = s.usage_unknown_calls ? `${number(s.usage_unknown_calls)} lượt gọi provider chưa có usage. Token hiển thị chỉ gồm số đã ghi nhận.` : `Đã ghi nhận usage của ${number(s.usage_known_calls)} lượt. Cache nằm trong input; reasoning nằm trong output.`;
   $('default-model').textContent = data.server.default_model;
   $('server-meta').textContent = `${data.server.default_reasoning} reasoning · uptime ${number(Math.floor(data.server.uptime_seconds / 60))} phút`;
-  $('model-rows').innerHTML = data.models.map(m => `<tr><td><span class="model-name">${escape(m.model)}</span><div class="model-meter"><span data-width="${s.total_calls ? m.calls / s.total_calls * 100 : 0}"></span></div></td><td class="number">${number(m.calls)}</td><td class="number">${number(m.input_tokens)}</td><td class="number">${number(m.output_tokens)}</td><td class="number">${seconds(m.avg_duration_ms)}</td><td class="number">${money(m.cost_usd)}</td></tr>`).join('');
+  if(s.cache_unknown_calls||s.reasoning_unknown_calls)$('usage-note').textContent+=` Cache unknown: ${number(s.cache_unknown_calls)} lượt; reasoning unknown: ${number(s.reasoning_unknown_calls)} lượt. Không coi là 0.`;
+  $('model-rows').innerHTML = data.models.map(m => `<tr><td><span class="model-name">${escape(m.provider??'codex')} / ${escape(m.model)}</span><div class="model-meter"><span data-width="${s.total_calls ? m.calls / s.total_calls * 100 : 0}"></span></div></td><td class="number">${number(m.calls)}</td><td class="number">${number(m.input_tokens)}</td><td class="number">${number(m.output_tokens)}</td><td class="number">${seconds(m.avg_duration_ms)}</td><td class="number">${money(m.cost_usd)}</td></tr>`).join('');
   document.querySelectorAll('[data-width]').forEach(e => { e.style.width = `${e.dataset.width}%`; });
   $('models-empty').hidden = data.models.length > 0;
   const selected = $('model').value;
@@ -91,7 +95,7 @@ function renderOverview(data) {
 }
 function renderCalls(data) {
   rows = data.data;
-  $('call-rows').innerHTML = rows.map(r => `<tr><td class="timestamp">${escape(time(r.started_at))}<small>${escape(date(r.started_at))}</small></td><td><span class="model-name">${escape(r.model)}</span><div class="endpoint">${escape(r.endpoint)} · ${escape(r.reasoning)}</div></td><td>${badge(r.status)}</td><td class="number">${r.input_tokens === null ? '—' : number(r.input_tokens + r.output_tokens)}</td><td class="number">${seconds(r.duration_ms)}</td><td class="number">${money(r.cost_usd)}</td><td><button type="button" class="quiet details-button" data-call="${escape(r.id)}" aria-label="Chi tiết call ${escape(r.id)}">Chi tiết ↗</button></td></tr>`).join('');
+  $('call-rows').innerHTML = rows.map(r => `<tr><td class="timestamp">${escape(time(r.started_at))}<small>${escape(date(r.started_at))}</small></td><td><span class="model-name">${escape(r.model)}</span><div class="endpoint">${escape(r.provider??'codex')} · ${escape(r.endpoint)} · ${escape(r.provider&&r.provider!=='codex'?'sampling local':r.reasoning)}</div></td><td>${badge(r.status)}</td><td class="number">${r.input_tokens === null ? '—' : number(r.input_tokens + r.output_tokens)}</td><td class="number latency-value">${seconds(r.duration_ms)}</td><td class="number">${money(r.cost_usd)}</td><td><button type="button" class="quiet details-button" data-call="${escape(r.id)}" aria-label="Chi tiết call ${escape(r.id)}">Chi tiết <span aria-hidden="true">↗</span></button></td></tr>`).join('');
   $('calls-empty').hidden = data.total !== 0;
   $('history-description').textContent = `${number(data.total)} call trong khoảng thời gian đã chọn. Chỉ hiển thị số liệu xử lý.`;
   $('page-info').textContent = data.total ? `${number((page - 1) * data.page_size + 1)}–${number(Math.min(page * data.page_size, data.total))} / ${number(data.total)} call` : '0 call';
@@ -100,6 +104,7 @@ function renderCalls(data) {
   $('next').disabled = page * data.page_size >= data.total;
 }
 function showDetail(id, record) {
+  if(window.openRequestDetail)return window.openRequestDetail(id,record);
   $('call-detail').classList.remove('native-details-dialog');
   $('call-detail').querySelector('h2').textContent = 'Chi tiết call';
   const r = record ?? rows.find(row => row.id === id);
@@ -124,9 +129,10 @@ function showDetail(id, record) {
 }
 let inspectorView = null;
 async function loadInspector(id, record) {
+  inspectorView = { id, record, data: null };
   try {
     const data = await get(`/api/stats/calls/${id}/inspector`);
-    if ($('request-inspector')?.dataset.id !== id || !$('call-detail').open) return;
+    if ($('request-inspector')?.dataset.id !== id || !($('call-detail').open || !$('view-request').hidden)) return;
     inspectorView = { id, record, data };
     renderInspector();
   } catch (error) {
@@ -176,13 +182,14 @@ function filterInspector(query) {
   panel.querySelectorAll('.inspector-segment').forEach(card => { card.hidden = !card.textContent.toLocaleLowerCase().includes(query.toLocaleLowerCase()); if (!card.hidden) { matches++; if (query) card.querySelectorAll('details').forEach(details => { details.open = true; }); } });
   $('inspector-search-status').textContent = query ? `${matches} mục khớp` : '';
 }
-$('detail-content').addEventListener('input', event => { if (event.target.id === 'inspector-search') filterInspector(event.target.value); });
-$('detail-content').addEventListener('keydown', event => {
+document.addEventListener('input', event => { if (event.target.id === 'inspector-search') filterInspector(event.target.value); });
+document.addEventListener('keydown', event => {
   const tab = event.target.closest('[data-inspector-tab]'); if (!tab) return;
   const current = Number(tab.dataset.inspectorTab), next = event.key === 'ArrowRight' ? (current+1)%4 : event.key === 'ArrowLeft' ? (current+3)%4 : event.key === 'Home' ? 0 : event.key === 'End' ? 3 : null;
   if (next !== null) { event.preventDefault(); selectInspectorTab(next); $(`inspector-tab-${next}`).focus(); }
 });
-$('detail-content').addEventListener('click', async event => {
+document.addEventListener('click', async event => {
+  if(!event.target.closest('#request-inspector'))return;
   const button = event.target.closest('button'); if (!button) return;
   if (button.hasAttribute('data-inspector-tab')) return selectInspectorTab(Number(button.dataset.inspectorTab));
   if (button.hasAttribute('data-inspector-refresh') || button.hasAttribute('data-inspector-retry')) { const id = $('request-inspector')?.dataset.id; const record = inspectorView?.id === id ? inspectorView.record : rows.find(r => r.id === id); if (record) await loadInspector(id, record); return; }
@@ -265,8 +272,12 @@ function renderCatalog() {
   $('catalog-rows').innerHTML = modelCatalog.models.filter(m => `${m.id} ${m.provider}`.toLowerCase().includes(search)).map(m => `<tr><td><code>${escape(m.id)}</code><span class="catalog-provider">${escape(m.name)} · ${escape(m.provider)}</span></td><td>${escape(m.availability)}<p class="catalog-note">${escape(m.note)}</p></td><td class="number">${money(m.price?.input_per_million)}</td><td class="number">${money(m.price?.cached_input_per_million)}</td><td class="number">${money(m.price?.output_per_million)}</td><td><div class="catalog-actions"><button class="quiet" data-copy="${escape(m.id)}">Copy</button>${m.chat_supported ? `<button class="quiet" data-try="${escape(m.id)}">Test →</button>` : ''}</div></td></tr>`).join('');
 }
 function view(name) {
-  ['stats','native','videos','chat','catalog'].forEach(id => { $(`view-${id}`).hidden = id !== name; });
+  if(name!=='request'){window.stopRequestDetail?.();if(/^\/dashboard\/requests\//.test(location.pathname))history.pushState({view:name},'', '/dashboard');}
+  ['stats','native','videos','chat','catalog','live','request','lab'].forEach(id => { $(`view-${id}`).hidden = id !== name; });
   document.querySelectorAll('[data-view]').forEach(b => { b.classList.toggle('selected', b.dataset.view === name); b.setAttribute('aria-pressed', String(b.dataset.view === name)); });
+  if(name==='lab')window.refreshLab?.();else window.stopLab?.();
+  if (name === 'live') window.refreshLive?.();
+  else window.stopLive?.();
   if (name === 'native') loadNative();
   if (name === 'videos') loadVideos();
   if (name === 'stats' && lastOverview) chart(lastOverview.timeline,lastOverview.range);
@@ -296,8 +307,104 @@ function renderChat() {
   reasoningOptions(c); $('chat-context').value = c.context; $('chat-input').value = c.draft;
   for (const id of ['chat-model','chat-reasoning','chat-context','send-chat','clear-chat']) $(id).disabled = c.pending;
   $('stop-chat').hidden = !c.pending;
-  $('chat-messages').innerHTML = c.entries.map((e,i) => `<article class="chat-message ${e.role}"><small>${e.role === 'user' ? 'Bạn' : 'Codex'}</small><div class="message-text">${escape(e.text)}</div>${e.details ? `<button class="quiet" data-entry="${i}">Chi tiết lượt này ↗</button>` : ''}</article>`).join('') + (c.pending ? '<div class="thinking" role="status">Codex đang suy nghĩ…</div>' : '') + (!c.entries.length && !c.pending ? '<div class="chat-empty"><h3>Bắt đầu một lượt test</h3><p>Chọn model, mức reasoning và gửi tin nhắn.<br>Mỗi request gửi context hiện có trong tab này.</p></div>' : '');
+  $('chat-hint').textContent = c.pending ? (c.streamStatus ?? 'Đang mở luồng phản hồi…') : (c.streamStatus ?? 'Thread tạm · câu trả lời được nhận theo luồng, không lưu conversation');
+  $('chat-messages').innerHTML = c.entries.map((e,i) => `<article class="chat-message ${e.role}${e.streaming ? ' chat-streaming' : ''}${(e.displayText ?? e.text) ? ' chat-has-content' : ''}" data-chat-entry="${i}"><div class="chat-message-heading"><small>${e.role === 'user' ? 'Bạn' : 'Codex'}</small>${e.streaming ? '<span class="chat-phase">' + (e.text ? 'Đang hiển thị' : 'Đang chờ phản hồi') + '</span>' : ''}</div><div class="chat-waiting" aria-hidden="true"><i></i><i></i><i></i></div><div class="message-text">${escape(e.displayText ?? e.text)}</div>${e.error ? `<p class="chat-message-error" role="status">Luồng chưa hoàn tất: ${escape(e.error)}</p>` : ''}${e.details ? `<button class="quiet" data-entry="${i}">Chi tiết lượt này ↗</button>` : ''}</article>`).join('') + (!c.entries.length && !c.pending ? '<div class="chat-empty"><div class="chat-startmark" aria-hidden="true">✦</div><h3>Bắt đầu một lượt test</h3><p>Chọn model và mức reasoning, rồi gửi tin nhắn. Nội dung nhận từ gateway sẽ được hiển thị dần.</p><div class="chat-suggestions"><button type="button" data-chat-prompt="Hãy viết một câu trả lời dài khoảng 5 đoạn để tôi quan sát nội dung stream xuất hiện dần.">Kiểm tra phản hồi dài và quan sát nội dung stream</button><button type="button" data-chat-prompt="Giải thích cách đọc các sự kiện Server-Sent Events (SSE) trong một ứng dụng trình duyệt.">Giải thích cách đọc sự kiện SSE trong trình duyệt</button><button type="button" data-chat-prompt="Viết ví dụ TypeScript parse một luồng SSE, xử lý dữ liệu chia qua nhiều chunk và kết thúc bằng [DONE].">Viết ví dụ parse SSE bằng TypeScript</button><button type="button" data-chat-prompt="Giải thích cách hủy một request đang stream bằng AbortController.">Giải thích cách dừng request stream</button></div></div>' : '');
   $('chat-messages').scrollTop = $('chat-messages').scrollHeight;
+}
+// Smooth presentation of received text. Network timing/counts are recorded separately.
+function createChatPresenter(chat, entry) {
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let frame = null, previous = 0, stopped = false, finishing = false, resolveFinished;
+  const completed = new Promise(resolve => { resolveFinished = resolve; });
+  entry.displayText = '';
+  const paint = () => {
+    if (activeChat !== chat.id) return;
+    const container = $('chat-messages');
+    const follow = container.scrollHeight - container.clientHeight - container.scrollTop < 80;
+    const article = container.querySelector(`[data-chat-entry="${chat.entries.indexOf(entry)}"]`);
+    if (article) {
+      const text = article.querySelector('.message-text');
+      if (text.textContent !== entry.displayText) text.textContent = entry.displayText;
+      article.classList.toggle('chat-has-content', !!entry.displayText);
+      article.classList.toggle('chat-revealing', !!entry.displayText && entry.streaming);
+      const phase = article.querySelector('.chat-phase');
+      if (phase) phase.textContent = entry.text ? (finishing ? 'Đang hiển thị' : 'Đang nhận phản hồi') : 'Đang chờ phản hồi';
+    }
+    if (follow) container.scrollTop = container.scrollHeight;
+  };
+  const tick = now => {
+    frame = null;
+    const elapsed = previous ? Math.min(now - previous, 64) : 16;
+    previous = now;
+    const remaining = entry.text.length - entry.displayText.length;
+    let end = reducedMotion.matches ? entry.text.length : Math.min(entry.text.length, entry.displayText.length + Math.max(1, Math.ceil(remaining * elapsed / 160)));
+    // Never show half of an emoji/surrogate pair.
+    if (end < entry.text.length && /[\uD800-\uDBFF]/.test(entry.text[end - 1] ?? '')) end++;
+    entry.displayText = entry.text.slice(0,end); paint();
+    if (entry.displayText.length < entry.text.length) schedule();
+    else if (finishing) resolveFinished();
+  };
+  const schedule = () => { if (frame === null && !stopped) frame = requestAnimationFrame(tick); };
+  const flush = () => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    frame = null; entry.displayText = entry.text; paint();
+  };
+  // Hidden tabs must not keep a request pending while animation frames are suspended.
+  const visibility = () => { if (document.hidden) { flush(); if (finishing) resolveFinished(); } };
+  document.addEventListener('visibilitychange',visibility);
+  return {
+    update() { previous = frame === null ? 0 : previous; if (document.hidden || reducedMotion.matches) flush(); else schedule(); },
+    finish() { finishing = true; if (document.hidden || reducedMotion.matches || entry.displayText === entry.text) { flush(); resolveFinished(); } else schedule(); return completed; },
+    stop() { stopped = true; flush(); resolveFinished(); document.removeEventListener('visibilitychange',visibility); },
+  };
+}
+async function readPlaygroundStream(response, onDelta) {
+  if (!response.body) throw new Error('Trình duyệt không đọc được response stream.');
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  const state = { id: null, object: 'chat.completion', created: null, model: null, content: '', finishReason: null, usage: null, toolCalls: new Map(), done: false };
+  const parseBlock = block => {
+    const data = block.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
+    if (!data) return;
+    if (data === '[DONE]') { state.done = true; return; }
+    const chunk = JSON.parse(data);
+    if (chunk.error) throw new Error(chunk.error.message ?? 'Stream bị gián đoạn.');
+    state.id ??= chunk.id ?? null; state.created ??= chunk.created ?? null; state.model ??= chunk.model ?? null;
+    if (chunk.usage !== undefined) state.usage = chunk.usage;
+    for (const choice of chunk.choices ?? []) {
+      const delta = choice.delta ?? {};
+      if (typeof delta.content === 'string' && delta.content) { state.content += delta.content; onDelta(delta.content); }
+      for (const tool of delta.tool_calls ?? []) {
+        const index = Number(tool.index ?? state.toolCalls.size), current = state.toolCalls.get(index) ?? { id: '', type: 'function', function: { name: '', arguments: '' } };
+        if (tool.id) current.id = tool.id;
+        if (tool.type) current.type = tool.type;
+        if (tool.function?.name) current.function.name += tool.function.name;
+        if (tool.function?.arguments) current.function.arguments += tool.function.arguments;
+        state.toolCalls.set(index, current);
+      }
+      if (choice.finish_reason) state.finishReason = choice.finish_reason;
+    }
+  };
+  let buffer = '';
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+      let boundary;
+      while ((boundary = buffer.match(/\r?\n\r?\n/))) {
+        const index = boundary.index;
+        parseBlock(buffer.slice(0,index)); buffer = buffer.slice(index + boundary[0].length);
+      }
+      if (done) { if (buffer.trim()) parseBlock(buffer); break; }
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
+  } finally { reader.releaseLock(); }
+  if (!state.done) throw new Error('Luồng kết thúc trước tín hiệu hoàn tất.');
+  const message = { role: 'assistant', content: state.content };
+  const tool_calls = [...state.toolCalls.entries()].sort((a,b) => a[0]-b[0]).map(([,tool]) => tool);
+  if (tool_calls.length) message.tool_calls = tool_calls;
+  return { id: state.id, object: state.object, created: state.created, model: state.model, choices: [{ index: 0, message, finish_reason: state.finishReason }], usage: state.usage };
 }
 async function copy(value, button) {
   try { await navigator.clipboard.writeText(value); const old = button.textContent; button.textContent = 'Đã copy'; setTimeout(() => { button.textContent = old; },1500); }
@@ -306,19 +413,41 @@ async function copy(value, button) {
 $('chat-form').addEventListener('submit', async event => {
   event.preventDefault(); saveChat(); const c = currentChat(); if (!c || c.pending || !c.draft.trim()) return;
   const message = { role: 'user', content: c.draft.trim() };
-  const submitted = { model: c.model, reasoning_effort: c.reasoning, messages: [...(c.context.trim() ? [{ role: 'system',content: c.context.trim() }] : []), ...c.messages,message] };
-  c.entries.push({ role: 'user',text: message.content }); c.draft = ''; c.pending = true;
+  const submitted = { model: c.model, reasoning_effort: c.reasoning, stream: true, stream_options: { include_usage: true }, messages: [...(c.context.trim() ? [{ role: 'system',content: c.context.trim() }] : []), ...c.messages,message] };
+  c.entries.push({ role: 'user',text: message.content });
+  const assistantEntry = { role: 'assistant', text: '', streaming: true }; c.entries.push(assistantEntry);
+  c.draft = ''; c.pending = true; c.streamStatus = 'Đang kết nối tới luồng phản hồi…';
   c.controller = new AbortController(); const start = performance.now(); renderChat();
+  const presenter = createChatPresenter(c,assistantEntry), signal = c.controller.signal;
+  signal.addEventListener('abort',presenter.stop,{once:true});
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    $('chat-messages').querySelectorAll('.chat-message:nth-last-child(-n+2)').forEach(node => node.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}],{duration:220,easing:'cubic-bezier(.2,.8,.2,1)'}));
+  }
   let callId, result, status, metric, failure;
+  let firstContentAt = null, deltaCount = 0, lastHintAt = 0;
   try {
     const response = await fetch('/api/playground/chat', { method: 'POST', signal: c.controller.signal, headers: { 'Content-Type': 'application/json','X-Codex-Playground': '1',...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) }, body: JSON.stringify(submitted) });
-    callId = response.headers.get('X-Codex-Call-Id'); status = response.status; result = await response.json();
-    if (!response.ok) { if (response.status === 401) $('auth-form').hidden = false; throw new Error(result.error?.message ?? `HTTP ${status}`); }
+    callId = response.headers.get('X-Codex-Call-Id'); status = response.status;
+    if (!response.ok) { const errorBody = await response.json().catch(() => ({})); if (response.status === 401) $('auth-form').hidden = false; throw new Error(errorBody.error?.message ?? `HTTP ${status}`); }
+    if (!response.headers.get('Content-Type')?.includes('text/event-stream')) throw new Error('Gateway không trả về SSE stream như mong đợi.');
+    result = await readPlaygroundStream(response, delta => {
+      const now = performance.now(); firstContentAt ??= now; assistantEntry.text += delta; deltaCount++;
+      c.streamStatus = `Đang nhận · TTFO ${((firstContentAt-start)/1000).toFixed(2)} s · ${deltaCount} đoạn · ${assistantEntry.text.length} ký tự`;
+      presenter.update();
+      if (activeChat === c.id && now-lastHintAt > 150) { $('chat-hint').textContent = c.streamStatus; lastHintAt = now; }
+    });
     c.messages.push(message,result.choices[0].message);
-  } catch (error) { failure = error.name === 'AbortError' ? 'Đã dừng lượt chat.' : error.message; }
+  } catch (error) { failure = error.name === 'AbortError' ? 'Đã dừng lượt chat.' : error.message; assistantEntry.error = failure; }
   const elapsed = performance.now() - start;
+  c.streamStatus = failure ? 'Luồng đã dừng.' : `Đã nhận ${deltaCount} đoạn · ${assistantEntry.text.length} ký tự · đang hiển thị`;
+  if (activeChat === c.id) $('chat-hint').textContent = c.streamStatus;
+  if (failure) presenter.stop();
+  await presenter.finish();
+  presenter.stop(); signal.removeEventListener('abort',presenter.stop);
   if (callId) { try { metric = await get(`/api/stats/calls/${callId}`); } catch {} }
-  c.entries.push({ role: 'assistant', text: failure ?? result.choices[0].message.content ?? '', details: { request: submitted, response: result ?? null, metrics: metric ?? null, call_id: callId ?? null, http_status: status ?? null, client_duration_ms: elapsed, error: failure ?? null } });
+  assistantEntry.streaming = false;
+  assistantEntry.details = { request: submitted, response: result ?? null, metrics: metric ?? null, call_id: callId ?? null, http_status: status ?? null, client_duration_ms: elapsed, first_content_ms: firstContentAt === null ? null : firstContentAt-start, received_content_deltas: deltaCount, error: failure ?? null };
+  c.streamStatus = failure ? `Stream dừng · ${assistantEntry.text.length} ký tự đã nhận` : `Hoàn tất · TTFO ${firstContentAt === null ? '—' : ((firstContentAt-start)/1000).toFixed(2)+' s'} · ${(elapsed/1000).toFixed(2)} s nhận · ${deltaCount === 1 ? 'Gateway trả 1 đoạn; giao diện hiển thị dần' : `${deltaCount} đoạn nhận từ gateway`}`;
   c.pending = false; c.controller = null;
   if (activeChat === c.id) renderChat(); load({ quiet: true });
 });
@@ -330,7 +459,7 @@ $('stop-chat').addEventListener('click', () => currentChat()?.controller?.abort(
 $('new-chat').addEventListener('click', () => { saveChat(); newChat(); });
 $('clear-chat').addEventListener('click', () => { const c = currentChat(); if (c.pending) return; chats = chats.filter(t => t.id !== c.id); if (!chats.length) newChat(); else { activeChat = chats[0].id; renderChat(); } });
 $('chat-tabs').addEventListener('click', event => { const b = event.target.closest('[data-chat]'); if (b) { saveChat(); activeChat = b.dataset.chat; renderChat(); } });
-$('chat-messages').addEventListener('click', event => { const b = event.target.closest('[data-entry]'); if (!b) return; const details = currentChat().entries[Number(b.dataset.entry)].details; if (details.metrics) showDetail(details.call_id, details.metrics); else { $('detail-content').innerHTML = '<p class="usage-note">' + escape(details.error ?? 'Chưa có metadata từ server.') + '</p>'; $('call-detail').showModal(); } const raw = document.createElement('details'); raw.className = 'system-context'; const summary = document.createElement('summary'); summary.textContent = 'Request / response đầy đủ · chỉ trong bộ nhớ trang'; const pre = document.createElement('pre'); pre.className = 'detail-json'; pre.textContent = JSON.stringify(details,null,2); raw.append(summary,pre); $('detail-content').append(raw); });
+$('chat-messages').addEventListener('click', event => { const prompt = event.target.closest('[data-chat-prompt]'); if (prompt) { $('chat-input').value = prompt.dataset.chatPrompt; $('chat-input').dispatchEvent(new Event('input',{bubbles:true})); $('chat-input').focus(); return; } const b = event.target.closest('[data-entry]'); if (!b) return; const details = currentChat().entries[Number(b.dataset.entry)].details; if (details.metrics) showDetail(details.call_id, details.metrics); else { $('detail-content').innerHTML = '<p class="usage-note">' + escape(details.error ?? 'Chưa có metadata từ server.') + '</p>'; $('call-detail').showModal(); } const raw = document.createElement('details'); raw.className = 'system-context'; const summary = document.createElement('summary'); summary.textContent = 'Request / response đầy đủ · chỉ trong bộ nhớ trang'; const pre = document.createElement('pre'); pre.className = 'detail-json'; pre.textContent = JSON.stringify(details,null,2); raw.append(summary,pre); $('detail-content').append(raw); });
 $('copy-model').addEventListener('click', event => copy($('chat-model').value,event.currentTarget));
 $('catalog-rows').addEventListener('click', event => { const b = event.target.closest('button'); if (b?.dataset.copy) copy(b.dataset.copy,b); if (b?.dataset.try) { saveChat(); newChat(b.dataset.try); view('chat'); } });
 $('model-search').addEventListener('input',renderCatalog);

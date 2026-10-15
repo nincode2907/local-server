@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Ajv } from 'ajv';
 import { z } from 'zod';
-import type { Usage } from '@openai/codex-sdk';
+import type { ProviderUsage as Usage } from './provider-types.js';
 import type { ChatRequest, Message } from './schema.js';
 import { ApiError } from './errors.js';
 
@@ -46,23 +46,24 @@ export function promptFor(messages: Message[], request: ChatRequest) {
 }
 export function completion(raw: string, model: string, request: ChatRequest, usage: Usage | null) {
   const prepared = prepareTools(request);
+  const invalidCode=request.provider&&request.provider!=='codex'?'invalid_provider_output':'invalid_codex_output';
   let result: z.infer<typeof envelope>;
   try { result = envelope.parse(JSON.parse(raw)); }
-  catch { throw new ApiError(502, 'invalid_codex_output', 'Codex returned an invalid structured result.'); }
+  catch { throw new ApiError(502, invalidCode, 'Provider returned an invalid structured result.'); }
   const calls = result.tool_calls;
-  const invalid = (text: string): never => { throw new ApiError(502, 'invalid_codex_output', text); };
-  if (prepared.choice === 'none' && calls.length) invalid('Codex returned disallowed function calls.');
-  if ((prepared.choice === 'required' || typeof prepared.choice === 'object') && !calls.length) invalid('Codex did not return a required function call.');
-  if (!request.parallel_tool_calls && calls.length > 1) invalid('Codex returned multiple calls when parallel_tool_calls=false.');
+  const invalid = (text: string): never => { throw new ApiError(502, invalidCode, text); };
+  if (prepared.choice === 'none' && calls.length) invalid('Provider returned disallowed function calls.');
+  if ((prepared.choice === 'required' || typeof prepared.choice === 'object') && !calls.length) invalid('Provider did not return a required function call.');
+  if (!request.parallel_tool_calls && calls.length > 1) invalid('Provider returned multiple calls when parallel_tool_calls=false.');
   for (const call of calls) {
-    if (typeof prepared.choice === 'object' && call.name !== prepared.choice.function.name) invalid('Codex selected the wrong function.');
+    if (typeof prepared.choice === 'object' && call.name !== prepared.choice.function.name) invalid('Provider selected the wrong function.');
     const validate = prepared.validators.get(call.name);
-    if (!validate) invalid('Codex returned an unknown function.');
+    if (!validate) invalid('Provider returned an unknown function.');
     let args: unknown;
     try { args = JSON.parse(call.arguments); } catch { invalid('Function arguments are not valid JSON.'); }
     if (!validate!(args)) invalid('Function arguments do not match the supplied JSON Schema.');
   }
-  if (!calls.length && result.content === null) invalid('Codex returned no answer.');
+  if (!calls.length && result.content === null) invalid('Provider returned no answer.');
   const assistant: Message = { role: 'assistant', content: result.content };
   if (calls.length) assistant.tool_calls = calls.map(call => ({ id: `call_${randomUUID().replaceAll('-', '')}`, type: 'function', function: call }));
   return {
@@ -72,7 +73,7 @@ export function completion(raw: string, model: string, request: ChatRequest, usa
       prompt_tokens: usage.input_tokens, completion_tokens: usage.output_tokens,
       total_tokens: usage.input_tokens + usage.output_tokens,
       prompt_tokens_details: { cached_tokens: usage.cached_input_tokens },
-      completion_tokens_details: { reasoning_tokens: usage.reasoning_output_tokens ?? 0 },
+      completion_tokens_details: { reasoning_tokens: usage.reasoning_output_tokens ?? (request.provider&&request.provider!=='codex'?null:0) },
     } }),
   };
 }

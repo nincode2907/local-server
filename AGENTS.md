@@ -26,8 +26,16 @@ built-in SQLite, and vanilla HTML/CSS/JavaScript. No frontend bundler.
   Preserve ChatGPT auth, read-only sandbox, disabled agent tools/network,
   and rejection of unexpected tool execution. Function calls are proposals
   executed by the caller, never commands executed by this gateway.
-- Bind remains `127.0.0.1`; preserve Host/Origin/Bearer checks. Do not broaden
-  trusted hosts, CORS, binds or provider capabilities to make a proxy work.
+- Default bind remains `127.0.0.1`; preserve Host/Origin/Bearer checks. The
+  user-authorized Docker integration supports explicit `HOST`/`TRUSTED_HOSTS`;
+  non-loopback binds, extra hosts and app keys require `LOCAL_API_KEY`.
+  Never enable wildcard Host/CORS or change provider capabilities for routing.
+- `src/activity.ts` owns run lifecycle, metadata-only persistence, bounded RAM
+  replay and metric provenance. App keys own only their runs; stats, native data,
+  inspector and legacy sessions remain admin-only. See `docs/STREAMING.md`.
+- Phase 3 local adapters are opt-in via configured origins and separate backend
+  keys; no caller URLs or silent provider fallback. Performance Lab is admin-only,
+  bounded and metadata-only; Codex benchmarks default off. See `docs/PERFORMANCE.md`.
 - `sessions.json` stores conversation messages; SQLite stores metadata and
   usage only. Preserve this privacy boundary and playground ephemerality.
 - Native usage reads Codex state/rollouts only. Never mutate the source DB,

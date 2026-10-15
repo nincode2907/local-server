@@ -1,9 +1,18 @@
 # Codex Local Server — V1
 
+Streaming và run API: xem [Streaming / Live Requests / Docker](docs/STREAMING.md)
+([bản trực quan](docs/STREAMING.html)). `stream: true` là opt-in; JSON API cũ giữ tương thích.
+Phase 2 có Request Detail deep link, numeric chart/p50/p95, queue FIFO opt-in,
+workflow và [AIActivityPanel React/Next.js](clients/react-activity-panel/README.md).
+Phase 3: [Ollama / LM Studio / Performance Lab](docs/PERFORMANCE.md)
+([bản trực quan](docs/PERFORMANCE.html)) với benchmark có giới hạn và resource scope rõ ràng.
+
+
 Local HTTP gateway bằng Node.js + TypeScript + `@openai/codex-sdk`, dùng Codex đã đăng nhập bằng ChatGPT. Mặc định lắng nghe tại `http://127.0.0.1:15600`.
 
 ```text
-Python / app / agent → HTTP → Fastify → Codex SDK → Codex CLI → ChatGPT account
+Python / app / agent → HTTP → Fastify → isolated Codex CLI → ChatGPT account
+                                 └→ configured Ollama / LM Studio (opt-in)
 ```
 
 Tài liệu kiến trúc: [TECHNICAL.md](docs/TECHNICAL.md) · [Sơ đồ trực quan HTML](docs/architecture.html).
@@ -356,7 +365,7 @@ Query `model` là tùy chọn; thêm header `Authorization: Bearer ...` nếu b�
 - Gateway không thực thi tool do caller cung cấp. Không kế thừa biến môi trường bí mật của app; dùng auth store Codex hiện có để tiếp tục refresh login như CLI.
 - Read-only bảo vệ việc ghi file; **không phải sandbox bảo mật đầy đủ để cô lập quyền đọc dữ liệu**. Chỉ dùng cho app local tin cậy. Không expose ra internet; nếu cần chạy prompt không tin cậy, dùng user/container riêng với dữ liệu và auth tách biệt.
 - Giới hạn body 1 MiB, mặc định 2 lượt đồng thời, timeout 180 giây. Request vượt concurrency trả `429`, không xếp hàng; session đang chạy trả `409`.
-- V1 nhận text messages, tools kiểu function, `n=1`, `stream=false`. Chưa có streaming, ảnh/audio, `response_format`, `max_tokens`, embeddings hoặc full OpenAI API. Tham số ngoài phạm vi trả `400`.
+- V1 nhận text messages, tools kiểu function, `n=1`, JSON hoặc `stream=true` cho stateless API. Session routes chưa streaming; chưa có ảnh/audio, `response_format`, `max_tokens`, embeddings hoặc full OpenAI API. Tham số ngoài phạm vi trả `400`.
 
 Lỗi theo dạng `{"error":{"message":"...","type":"...","code":"..."}}`. Codex lỗi trả `502`, timeout `504`. Response không chứa raw CLI stderr hay credential. Kiểm tra `codex login status`, model và phiên bản CLI khi gặp `codex_error`. `CODEX_BIN` chỉ dùng khi bạn chủ động muốn thay CLI bundle tương thích.
 

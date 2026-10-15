@@ -10,15 +10,21 @@ import { VideoBuilds } from './video-builds.js';
 import type { Inspector } from './inspector.js';
 
 export function dashboardAsset(path: string) {
-  return ['/', '/dashboard', '/dashboard/assets/style.css', '/dashboard/assets/app.js', '/dashboard/assets/favicon.svg'].includes(path);
+  if (/^\/dashboard\/requests\/[a-f0-9-]{36}$/.test(path)) return true;
+  return ['/', '/dashboard', '/dashboard/assets/style.css', '/dashboard/assets/app.js', '/dashboard/assets/live.js', '/dashboard/assets/lab.js', '/dashboard/assets/activity-client.js', '/dashboard/assets/favicon.svg'].includes(path);
 }
 export function dashboardRead(path: string) {
+  if(path==='/api/resources'||path==='/v1/providers'||path==='/v1/models'||/^\/api\/lab(?:\/batches(?:\/[a-f0-9-]{36}(?:\/(?:events|export))?)?)?$/.test(path))return true;
+  if (['/api/runs','/api/runs/events','/api/runs/latency'].includes(path) || /^\/v1\/runs\/[a-f0-9-]{36}(?:\/events)?$/.test(path)) return true;
   return /^\/api\/videos(?:\/[^/]{1,128})?$/.test(path) || /^\/api\/native\/(overview|sessions\/[^/]{1,128})$/.test(path) || dashboardAsset(path) || ['/api/models', '/api/stats/costs', '/api/stats/overview', '/api/stats/calls'].includes(path) || /^\/api\/stats\/calls\/[a-f0-9-]{36}(?:\/inspector)?$/.test(path);
 }
 export async function registerDashboard(app: FastifyInstance, metrics: Metrics, config: Config, active: () => number, native: NativeUsage, inspector: Inspector) {
   const html = await readFile(new URL('../public/dashboard.html', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/dashboard.css', import.meta.url), 'utf8');
   const js = await readFile(new URL('../public/dashboard.js', import.meta.url), 'utf8');
+  const liveJs = await readFile(new URL('../public/live.js', import.meta.url), 'utf8');
+  const labJs=await readFile(new URL('../public/lab.js',import.meta.url),'utf8');
+  const activityClient = await readFile(new URL('../clients/activity-client/index.js', import.meta.url), 'utf8');
   const favicon = await readFile(new URL('../public/favicon.svg', import.meta.url), 'utf8');
   const videos = new VideoBuilds(config.statsDbPath);
   app.addHook('onClose', async()=>videos.close());
@@ -29,9 +35,13 @@ export async function registerDashboard(app: FastifyInstance, metrics: Metrics, 
     'Cache-Control': 'no-store',
   };
   app.get('/', async (_req, reply) => reply.redirect('/dashboard'));
+  app.get('/dashboard/requests/:id', async(req,reply)=>{z.uuid().parse((req.params as {id:string}).id);return reply.headers(security).type('text/html; charset=utf-8').send(html);});
   app.get('/dashboard', async (_req, reply) => reply.headers(security).type('text/html; charset=utf-8').send(html));
   app.get('/dashboard/assets/style.css', async (_req, reply) => reply.headers(security).type('text/css; charset=utf-8').send(css));
   app.get('/dashboard/assets/app.js', async (_req, reply) => reply.headers(security).type('text/javascript; charset=utf-8').send(js));
+  app.get('/dashboard/assets/live.js', async (_req, reply) => reply.headers(security).type('text/javascript; charset=utf-8').send(liveJs));
+  app.get('/dashboard/assets/lab.js',async(_req,reply)=>reply.headers(security).type('text/javascript; charset=utf-8').send(labJs));
+  app.get('/dashboard/assets/activity-client.js', async (_req, reply) => reply.headers(security).type('text/javascript; charset=utf-8').send(activityClient));
   app.get('/dashboard/assets/favicon.svg', async (_req, reply) => reply.headers(security).type('image/svg+xml; charset=utf-8').send(favicon));
   app.get('/api/videos', async (_req,reply)=>reply.headers(security).send(videos.overview()));
   app.get('/api/videos/sessions', async(req,reply)=>{

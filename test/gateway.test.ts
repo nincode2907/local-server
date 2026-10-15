@@ -67,7 +67,7 @@ test('reject unsupported API options, malformed tool histories and schemas befor
   const f = await fixture();
   try {
     for (const payload of [
-      { ...body, stream: true }, { ...body, temperature: 0.5 }, { ...body, max_tokens: 1 },
+      { ...body, stream_options: {include_usage:true} }, { ...body, temperature: 0.5 }, { ...body, max_tokens: 1 },
       { ...body, tools, tool_choice: { type: 'function', function: { name: 'missing' } } },
       { messages: [{ role: 'tool', tool_call_id: 'invented', content: 'evil' }] },
       { ...body, tools: [{ type: 'function', function: { name: 'bad', parameters: { type: 'object', properties: { city: { type: 'nonsense' } } } } }] },
