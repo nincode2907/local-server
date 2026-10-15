@@ -7,14 +7,15 @@ import { z } from 'zod';
 import type { Config } from './config.js';
 import type { Metrics } from './metrics.js';
 import { VideoBuilds } from './video-builds.js';
+import type { Inspector } from './inspector.js';
 
 export function dashboardAsset(path: string) {
   return ['/', '/dashboard', '/dashboard/assets/style.css', '/dashboard/assets/app.js', '/dashboard/assets/favicon.svg'].includes(path);
 }
 export function dashboardRead(path: string) {
-  return /^\/api\/videos(?:\/[^/]{1,128})?$/.test(path) || /^\/api\/native\/(overview|sessions\/[^/]{1,128})$/.test(path) || dashboardAsset(path) || ['/api/models', '/api/stats/costs', '/api/stats/overview', '/api/stats/calls'].includes(path) || /^\/api\/stats\/calls\/[a-f0-9-]{36}$/.test(path);
+  return /^\/api\/videos(?:\/[^/]{1,128})?$/.test(path) || /^\/api\/native\/(overview|sessions\/[^/]{1,128})$/.test(path) || dashboardAsset(path) || ['/api/models', '/api/stats/costs', '/api/stats/overview', '/api/stats/calls'].includes(path) || /^\/api\/stats\/calls\/[a-f0-9-]{36}(?:\/inspector)?$/.test(path);
 }
-export async function registerDashboard(app: FastifyInstance, metrics: Metrics, config: Config, active: () => number, native: NativeUsage) {
+export async function registerDashboard(app: FastifyInstance, metrics: Metrics, config: Config, active: () => number, native: NativeUsage, inspector: Inspector) {
   const html = await readFile(new URL('../public/dashboard.html', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/dashboard.css', import.meta.url), 'utf8');
   const js = await readFile(new URL('../public/dashboard.js', import.meta.url), 'utf8');
@@ -58,6 +59,21 @@ export async function registerDashboard(app: FastifyInstance, metrics: Metrics, 
     return reply.headers(security).send({...result,video_tags:videos.links(req.params.id)});
   });
   app.get('/api/models' , async (_req, reply) => reply.headers(security).send(catalog));
+  app.get<{ Params: { id: string } }>('/api/stats/calls/:id/inspector', async (req, reply) => {
+    const id = z.uuid().parse(req.params.id), row = metrics.detail(id);
+    if (!row) throw new ApiError(404, 'call_not_found', 'Call not found.');
+    return reply.headers(security).send(await inspector.detail(id, row.endpoint === '/api/playground/chat'));
+  });
+  app.delete<{ Params: { id: string } }>('/api/stats/calls/:id/inspector', async (req, reply) => {
+    const id = z.uuid().parse(req.params.id);
+    if (!metrics.detail(id)) throw new ApiError(404, 'call_not_found', 'Call not found.');
+    if (!await inspector.delete(id)) throw new ApiError(503, 'inspector_storage_error', 'Could not delete inspector snapshot.');
+    return reply.headers(security).code(204).send();
+  });
+  app.delete('/api/stats/inspector', async (_req, reply) => {
+    if (!await inspector.delete()) throw new ApiError(503, 'inspector_storage_error', 'Could not delete inspector snapshots.');
+    return reply.headers(security).code(204).send();
+  });
   app.get<{ Params: { id: string } }>('/api/stats/calls/:id', async (req, reply) => {
     const row = metrics.detail(z.uuid().parse(req.params.id));
     if (!row) throw new ApiError(404, 'call_not_found', 'Call not found.');

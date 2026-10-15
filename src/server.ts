@@ -11,16 +11,23 @@ import { assertNoAgentTools, type Provider } from './provider.js';
 import { Sessions, type Session } from './sessions.js';
 import { Metrics } from './metrics.js';
 import { dashboardAsset, dashboardRead, registerDashboard } from './dashboard.js';
+import { Inspector } from './inspector.js';
 
 export async function buildServer(config: Config, provider: Provider) {
   const app = Fastify({ logger: { redact: ['req.headers.authorization'] }, bodyLimit: 1_048_576 });
   const sessions = new Sessions(config.dataDir, config.sessionTtl, config.maxSessions);
   await sessions.init();
   const metrics = new Metrics(config.statsDbPath);
+  const inspector = new Inspector(config, () => app.log.warn({ code: 'inspector_storage_error' }, 'Request inspector storage unavailable'));
+  await inspector.init();
   const native = new NativeUsage(config.statsDbPath, config.nativeCodexHome, config.nativeUsageInterval);
   native.start();
   const running = new Set<AbortController>();
-  const tracked = new WeakMap<FastifyRequest, { id: string; start: number }>();
+  const tracked = new WeakMap<FastifyRequest, { id: string; start: number; createdAt: number; ephemeral: boolean }>();
+  const capture = async (req: FastifyRequest, key: string, provenance: Parameters<Inspector['capture']>[3], data: unknown) => {
+    const call = tracked.get(req);
+    if (call) await inspector.capture(call.id, call.createdAt, key, provenance, data, call.ephemeral);
+  };
   const finishCall = (req: FastifyRequest, status: number, cancelled = false) => {
     const call = tracked.get(req);
     if (call) metrics.finish(call.id, performance.now() - call.start, status, cancelled);
@@ -31,7 +38,7 @@ export async function buildServer(config: Config, provider: Provider) {
     if (req.method === 'POST' && (path === '/api/playground/chat' || path === '/chat' || path === '/v1/chat/completions' || match)) {
       const session = match ? sessions.records.get(match[1]!) : undefined;
       const id = metrics.begin(match ? '/v1/sessions/:id/messages' : path, session?.model ?? config.model, session?.effort ?? config.reasoningEffort, match?.[1] ?? null);
-      tracked.set(req, { id, start: performance.now() });
+      tracked.set(req, { id, start: performance.now(), createdAt: Date.now(), ephemeral: path === '/api/playground/chat' });
       reply.header('X-Codex-Call-Id', id);
       req.raw.once('aborted', () => finishCall(req, 499, true));
       reply.raw.once('close', () => { if (!reply.raw.writableEnded) finishCall(req, 499, true); });
@@ -41,10 +48,13 @@ export async function buildServer(config: Config, provider: Provider) {
     if (!/^(localhost|127\.0\.0\.1|\[::1\]|codex-server\.localhost)(?::\d+)?$/.test(host)) throw new ApiError(403, 'invalid_host', 'Only localhost Host headers are accepted.');
     const playground = req.method === 'POST' && path === '/api/playground/chat';
     const videoWrite=['POST','PUT'].includes(req.method)&&/^\/api\/videos(?:\/[^/]{1,128})?$/.test(path);
+    const inspectorWrite = req.method === 'DELETE' && (/^\/api\/stats\/calls\/[a-f0-9-]{36}\/inspector$/.test(path) || path === '/api/stats/inspector');
+    if (inspectorWrite && (req.headers['x-codex-inspector'] !== '1' || !req.headers['content-type']?.startsWith('application/json') || req.headers.origin && req.headers.origin !== `http://${host}`))
+      throw new ApiError(403, 'inspector_origin_denied', 'Inspector deletion requires same-origin JSON and X-Codex-Inspector: 1.');
     if(videoWrite&&(!req.headers['content-type']?.startsWith('application/json')||req.headers['x-codex-video']!=='1'||req.headers.origin&&req.headers.origin!==`http://${host}`))
       throw new ApiError(403,'video_origin_denied','Video metadata cần JSON, cùng origin và X-Codex-Video: 1.');
     if (playground && (req.headers.origin !== `http://${host}` || req.headers['x-codex-playground'] !== '1' || !req.headers['content-type']?.startsWith('application/json'))) throw new ApiError(403, 'browser_origin_denied', 'Playground requires same-origin JSON requests.');
-    if (req.headers.origin && !((req.method === 'GET' && dashboardRead(path) || playground || videoWrite) && req.headers.origin === `http://${host}`)) {
+    if (req.headers.origin && !((req.method === 'GET' && dashboardRead(path) || playground || videoWrite || inspectorWrite) && req.headers.origin === `http://${host}`)) {
       throw new ApiError(403, 'browser_origin_denied', 'Only same-origin dashboard reads are allowed.');
     }
     // The dashboard shell is public; its data endpoints still require the gateway key.
@@ -64,6 +74,14 @@ export async function buildServer(config: Config, provider: Provider) {
     metrics.context(call.id, model, effort);
   });
   app.addHook('onResponse', async (req, reply) => { finishCall(req, reply.statusCode); });
+  app.addHook('onSend', async (req, reply, payload) => {
+    if (tracked.has(req) && config.inspectorEnabled) {
+      let body: unknown = payload;
+      if (typeof payload === 'string') { try { body = JSON.parse(payload); } catch { /* serialized response text */ } }
+      await capture(req, 'http_response', 'Gateway generated', { status: reply.statusCode, body });
+    }
+    return payload;
+  });
   app.setErrorHandler((error, req, reply) => {
     const call = tracked.get(req);
     if (call) metrics.error(call.id, error instanceof ApiError ? error.code : error instanceof z.ZodError ? 'invalid_request' : 'internal_error');
@@ -74,6 +92,10 @@ export async function buildServer(config: Config, provider: Provider) {
     return reply.code(status).send({ error: { message: known ? error.message : status < 500 && error instanceof Error ? error.message : 'Internal server error.', type: status < 500 ? 'invalid_request_error' : 'server_error', code: known ? error.code : 'internal_error' } });
   });
   const execute = async (request: ChatRequest, req: FastifyRequest, reply: FastifyReply, session?: Session) => {
+    // Zod validation has completed; retain original client payload before normalization/context assembly.
+    await capture(req, 'incoming', 'Client supplied', { payload: req.body,
+      messages: (req.body as { messages?: unknown; message?: unknown; prompt?: unknown }).messages ?? request.messages,
+      message_mapping: req.url.split('?')[0] === '/chat' ? 'Gateway generated user role from client prompt' : (req.body as { message?: unknown }).message ? 'Gateway generated user role from client message' : 'Original client messages' });
     prepareTools(request);
     if (request.reasoning && request.reasoning_effort && request.reasoning !== request.reasoning_effort) throw new ApiError(400, 'invalid_reasoning', 'reasoning and reasoning_effort conflict.');
     const history = session ? [...session.messages, ...request.messages] : request.messages;
@@ -97,7 +119,24 @@ export async function buildServer(config: Config, provider: Provider) {
       const call = tracked.get(req);
       if (call) { metrics.context(call.id, model, effort); metrics.running(call.id); }
       const thread = session?.threadId ? provider.resume(session.threadId, model, effort) : provider.start(model, effort, req.url.split('?')[0] === '/api/playground/chat');
-      const turn = await thread.run(promptFor(session?.threadId ? request.messages : history, request), { outputSchema, signal: controller.signal });
+      const forwardedMessages = session?.threadId ? request.messages : history;
+      const prompt = promptFor(forwardedMessages, request);
+      await capture(req, 'gateway', 'Gateway generated', { prompt, output_schema: outputSchema, effective_parameters: { model, reasoning_effort: effort },
+        validated_request: request, session_id: session?.id ?? null, thread_id_before: thread.id,
+        forwarded_messages: forwardedMessages.map((message, index) => {
+          const restored = !session?.threadId && index < (session?.messages.length ?? 0);
+          return { message, provenance: restored ? 'Gateway generated' : 'Client supplied', restored_by_gateway: restored,
+            ...(restored && { original_source: { provenance: 'Internal / unavailable', reason: 'Legacy saved session messages do not independently track client versus Codex authorship.' } }) };
+        }),
+        context: session?.threadId ? { provenance: 'Internal / unavailable', reason: 'Resumed CLI history is managed by Codex; only new messages are forwarded. Gateway session history is not a reconstruction of the internal prompt.' } : { provenance: 'Gateway generated', reason: session ? 'Gateway prepends its saved session messages for the initial CLI turn.' : 'New stateless CLI thread.' } });
+      let responseObserved = false;
+      const turn = await thread.run(prompt, { outputSchema, signal: controller.signal,
+        observe: async context => capture(req, 'cli_boundary', 'Gateway generated', context),
+        observeResponse: async response => { responseObserved = true; await capture(req, 'codex_response', 'SDK observable', response); } });
+      if (!responseObserved) await capture(req, 'codex_response', 'SDK observable', { final_response: turn.finalResponse,
+        assistant_messages: turn.items.filter(item => item.type === 'agent_message'), usage: turn.usage, thread_id: thread.id, complete: true,
+        excluded_items: turn.items.filter(item => item.type !== 'agent_message').map(item => item.type),
+        internal_reasoning: { provenance: 'Internal / unavailable', available: false, reason: 'Private reasoning items are never recorded.' } });
       if (call) metrics.usage(call.id, turn.usage);
       assertNoAgentTools(turn.items);
       const result = completion(turn.finalResponse, model, request, turn.usage);
@@ -151,8 +190,8 @@ export async function buildServer(config: Config, provider: Provider) {
     await sessions.remove(req.params.id); return reply.code(204).send();
   });
   app.addHook('preClose', async () => { for (const controller of running) controller.abort(); });
-  app.addHook('onClose', async () => { try { await provider.close(); } finally { await native.close(); metrics.close(); } });
-  try { await registerDashboard(app, metrics, config, () => running.size, native); }
-  catch (error) { await native.close(); metrics.close(); throw error; }
+  app.addHook('onClose', async () => { try { await provider.close(); } finally { await inspector.close(); await native.close(); metrics.close(); } });
+  try { await registerDashboard(app, metrics, config, () => running.size, native, inspector); }
+  catch (error) { await inspector.close(); await native.close(); metrics.close(); throw error; }
   return app;
 }

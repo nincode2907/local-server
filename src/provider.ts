@@ -16,9 +16,11 @@ interface ProviderTurn {
   usage: Usage | null;
 }
 
+export const gatewayInstructions = 'You are a text assistant for a local chat gateway. Respond to the provided conversation using the requested JSON schema. Do not use local tools, read files, modify files, run shell commands, search the web, or contact integrations. Function calls in your final JSON are proposals for the caller to execute.';
+export type ObservedTurnOptions = TurnOptions & { observe?: (context: unknown) => Promise<void>; observeResponse?: (response: unknown) => Promise<void> };
 interface ProviderThread {
   readonly id: string | null;
-  run(input: string, options?: TurnOptions): Promise<ProviderTurn>;
+  run(input: string, options?: ObservedTurnOptions): Promise<ProviderTurn>;
 }
 
 export interface Provider {
@@ -33,6 +35,7 @@ interface CliEvent {
   item?: ThreadItem;
   usage?: Usage;
   error?: { message: string };
+  message?: string;
 }
 
 class CliThread implements ProviderThread {
@@ -52,7 +55,7 @@ class CliThread implements ProviderThread {
 
   get id() { return this.#id; }
 
-  async run(input: string, options: TurnOptions = {}): Promise<ProviderTurn> {
+  async run(input: string, options: ObservedTurnOptions = {}): Promise<ProviderTurn> {
     const schemaPath = options.outputSchema ? join(this.runtime, `schema-${randomUUID()}.json`) : undefined;
     if (schemaPath) await writeFile(schemaPath, JSON.stringify(options.outputSchema), 'utf8');
     const config = (key: string, value: unknown) => ['--config', `${key}=${JSON.stringify(value)}`];
@@ -84,6 +87,10 @@ class CliThread implements ProviderThread {
     ];
 
     try {
+      await options.observe?.({ stdin: input, instructions: gatewayInstructions, output_schema: options.outputSchema ?? null,
+        model: this.model, reasoning_effort: this.effort ?? null, thread_id: this.#id, ephemeral: this.ephemeral,
+        policy: { sandbox: 'read-only', approval: 'never', network: false, agent_tools: false, ignore_user_config: true, ignore_rules: true },
+        internal_context: { provenance: 'Internal / unavailable', available: false, description: 'Provider-internal prompt and resumed CLI history are not exposed by this gateway.' } });
       const child = spawn(this.command, args, { env: this.env, signal: options.signal });
       const stderr: Buffer[] = [];
       child.stderr.on('data', chunk => stderr.push(chunk));
@@ -94,11 +101,15 @@ class CliThread implements ProviderThread {
           else rejectExit(new Error(`Codex Exec exited with ${signal ? `signal ${signal}` : `code ${code ?? 1}`}: ${Buffer.concat(stderr).toString('utf8')}`));
         });
       });
+      // stdout may close after the exit event; keep rejection handled until awaited below.
+      void exited.catch(() => {});
       child.stdin.end(input);
       const items: ThreadItem[] = [];
       let finalResponse = '';
       let usage: Usage | null = null;
       let failure: string | undefined;
+      const publicErrors: { type: string; message: string }[] = [];
+      let exitedSuccessfully = false;
       const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
       try {
         for await (const line of lines) {
@@ -112,11 +123,18 @@ class CliThread implements ProviderThread {
             usage = event.usage;
           }
           else if (event.type === 'turn.failed') failure = event.error?.message ?? 'Codex turn failed.';
+          else if (event.type === 'error' && typeof event.message === 'string') publicErrors.push({type:'error',message:event.message});
         }
         await exited;
+        exitedSuccessfully = true;
       } finally {
         lines.close();
         if (!child.killed) child.kill();
+        await options.observeResponse?.({ final_response: finalResponse, assistant_messages: items.filter(item => item.type === 'agent_message'),
+          usage, thread_id: this.#id, complete: exitedSuccessfully && !failure, turn_error: failure ?? null,
+          errors: publicErrors,
+          error_code: !exitedSuccessfully ? 'cli_incomplete' : failure ? 'turn_failed' : null,
+          internal_reasoning: { provenance: 'Internal / unavailable', available: false, reason: 'Private reasoning and stderr are never recorded.' } });
       }
       if (failure) throw new Error(failure);
       return { items, finalResponse, usage };
@@ -131,7 +149,7 @@ export async function createProvider(config: Config): Promise<Provider> {
   const require = createRequire(import.meta.url);
   const bundledCli = require.resolve('@openai/codex/bin/codex.js');
   const instructions = join(runtime, 'instructions.md');
-  await writeFile(instructions, 'You are a text assistant for a local chat gateway. Respond to the provided conversation using the requested JSON schema. Do not use local tools, read files, modify files, run shell commands, search the web, or contact integrations. Function calls in your final JSON are proposals for the caller to execute.');
+  await writeFile(instructions, gatewayInstructions);
   const command = config.codexBin ? resolve(config.codexBin) : process.execPath;
   const commandPrefix = config.codexBin ? [] : [bundledCli];
   const env: Record<string, string> = { PATH: process.env.PATH ?? '', HOME: homedir() };

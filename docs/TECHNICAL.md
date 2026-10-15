@@ -168,6 +168,16 @@ Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `PO
 
 ## 10. Chạy local
 
+### AI Request Inspector
+
+`src/inspector.ts` lưu các snapshot opt-in trong `DATA_DIR/request-inspector/*.json` (mode 0600, thư mục 0700 trên hệ thống hỗ trợ POSIX); không thêm body vào SQLite. `INSPECTOR_ENABLED=false` mặc định, retention 24h và giới hạn snapshot 8 MiB. Ghi tuần tự, atomic rename, redaction trước ghi; failures được cảnh báo chỉ bằng code, không ảnh hưởng chat response. Cleanup ở startup/read/timer; xóa có tombstone/cutoff để capture đang chạy không tái tạo body. `.tmp` tồn tại sau crash cũng được expiry cleanup. Windows ACL phụ thuộc thư mục `DATA_DIR` và tài khoản chạy server; POSIX mode không thay thế ACL.
+
+`execute()` capture raw client body sau Zod; snapshot thứ hai capture `promptFor()` sau session/default transformations ngay trước `thread.run()`. `CliThread.run()` có callback observation ngay trước spawn, chứa gateway instructions, stdin, schema và policy, không chứa args/env/auth/stderr. Gateway response capture tại `onSend` giữ đúng HTTP envelope của `/chat`, completions và stateful session (bao gồm lỗi). CLI response chỉ giữ `agent_message` / finalResponse / actual usage / public turn.failed; private reasoning item không được serialize. Public response đã phát trước lỗi được đánh dấu partial (`complete=false`), stderr không ghi. Playground luôn bỏ qua persistence body.
+
+API đọc/xóa mới dùng cùng Host/Origin/Bearer và no-store/CSP hiện có. DELETE cần JSON `{}` và `X-Codex-Inspector: 1`. Existing call detail API và chat response contracts không đổi. Dashboard thêm inspector trong modal, provenance labels, tab keyboard navigation, search/copy và JSON details. Usage chưa biết vẫn null; không có accounting theo message/context.
+
+“Full Prompt” giới hạn ở gateway/CLI boundary; không thấy provider hidden instructions, CLI resumed history/compaction hoặc private reasoning. SDK observable là public JSONL output/usage trong provider CLI hiện tại. Saved gateway messages không chứng minh lịch sử internal provider hay authorship của legacy context. Redaction theo key/pattern không bảo đảm nhận diện arbitrary free-text secrets. Chi tiết cấu hình/xóa/verification và preview fixture: [README — AI Request Inspector](../README.md#ai-request-inspector).
+
 Yêu cầu Node.js 22.13+. Trên Windows, chọn phiên bản rõ ràng trong NVM for Windows:
 
 ```powershell

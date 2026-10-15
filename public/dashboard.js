@@ -117,7 +117,91 @@ function showDetail(id, record) {
     field('Đã gọi Codex', r.codex_started ? 'Có' : 'Chưa') + field('Mã lỗi', r.error_code ?? '—') +
     field('Session ID', r.session_id ?? 'Chat stateless', true) + '</dl>';
   if (!$('call-detail').open) $('call-detail').showModal();
+  $('call-detail').classList.add('inspector-dialog');
+  const metricsContent = $('detail-content').innerHTML;
+  $('detail-content').innerHTML = `<details class="inspector-summary"><summary>Metadata, usage, giá và độ trễ</summary>${metricsContent}</details><section id="request-inspector" data-id="${escape(id)}"><p class="usage-note" role="status">Đang tải AI Request Inspector…</p></section>`;
+  loadInspector(id, r);
 }
+let inspectorView = null;
+async function loadInspector(id, record) {
+  try {
+    const data = await get(`/api/stats/calls/${id}/inspector`);
+    if ($('request-inspector')?.dataset.id !== id || !$('call-detail').open) return;
+    inspectorView = { id, record, data };
+    renderInspector();
+  } catch (error) {
+    if ($('request-inspector')?.dataset.id === id) $('request-inspector').innerHTML = `<p class="notice" role="alert">${escape(error.message)} <button type="button" data-inspector-retry>Thử lại</button></p>`;
+  }
+}
+function inspectorCard(title, provenance, value, json = false) {
+  if (value === undefined) return '';
+  const text = json ? JSON.stringify(value, null, 2) : String(value);
+  return `<article class="inspector-segment"><header><strong>${escape(title)}</strong><span class="provenance">${escape(provenance)}</span><button type="button" class="quiet" data-inspector-copy>Sao chép</button></header>${json ? '<details><summary>JSON · mở / thu gọn</summary>' : ''}<pre class="detail-json" tabindex="0">${escape(text)}</pre>${json ? '</details>' : ''}</article>`;
+}
+function inspectorMessages(messages, provenance = 'Client supplied') {
+  return (messages ?? []).map((entry, index) => {
+    const message = entry.message ?? entry, source = entry.provenance ?? provenance;
+    return `<article class="inspector-segment message-card role-${escape(message.role)}"><header><strong>${index + 1}. ${escape(message.role)}</strong><span class="provenance">${escape(source)}${entry.restored_by_gateway ? ' · Gateway restored' : ''}</span><button type="button" class="quiet" data-inspector-copy>Sao chép</button></header><pre class="detail-json" tabindex="0">${escape(message.content === null ? 'null' : message.content ?? '')}</pre>${Object.keys(message).some(k => !['role','content'].includes(k)) ? `<details><summary>Tool calls / thuộc tính message</summary><pre class="detail-json">${escape(JSON.stringify(message,null,2))}</pre></details>` : ''}</article>`;
+  }).join('');
+}
+function renderInspector() {
+  if (!inspectorView || !$('request-inspector')) return;
+  const {record, data} = inspectorView, segments = data.snapshot?.segments ?? [];
+  const segment = key => segments.find(s => s.key === key);
+  const incoming = segment('incoming'), gateway = segment('gateway'), cli = segment('cli_boundary');
+  const reasons = { disabled: 'Ghi body đang tắt. Bật INSPECTOR_ENABLED=true rồi restart để ghi các request mới.', unavailable: 'Không có snapshot: call cũ, đã xóa, hết retention hoặc không ghi được. Không thể khôi phục body từ metadata.', ephemeral: 'Playground không lưu body trên server; request/response chỉ có trong bộ nhớ tab hiện tại.' };
+  const missing = '<p class="usage-note">Phần này chưa có dữ liệu quan sát được.</p>';
+  const rawSegment = s => !s ? '' : s.unavailable ? inspectorCard(s.key, 'Internal / unavailable', s.unavailable) : inspectorCard(s.key === 'codex_response' && s.data?.complete === false ? 'Codex response · partial / CLI chưa hoàn tất' : s.key, s.provenance, s.data, true);
+  const messages = incoming?.data ? inspectorMessages(incoming.data.messages, incoming.data.message_mapping === 'Original client messages' ? 'Client supplied' : 'Client supplied · Gateway generated role') : missing;
+  const fullPrompt = rawSegment(incoming) + (gateway?.data ? inspectorCard('Prompt truyền vào provider.run()', 'Gateway generated · Client supplied messages', gateway.data.prompt) + inspectorCard('Request đã chuẩn hóa và tham số hiệu lực', 'Gateway generated', gateway.data, true) + inspectorMessages(gateway.data.forwarded_messages) : rawSegment(gateway)) +
+    (cli?.data ? inspectorCard('Instructions file của gateway', 'Gateway generated', cli.data.instructions) + inspectorCard('Ngay trước CLI spawn', 'Gateway generated', cli.data, true) : rawSegment(cli)) +
+    inspectorCard('Context nội bộ Codex', 'Internal / unavailable', 'Không quan sát được system prompt nội bộ, history do CLI resume, compaction hay private reasoning. Full Prompt chỉ là payload và prompt quan sát được ở gateway.');
+  const response = rawSegment(segment('codex_response')) + rawSegment(segment('http_response'));
+  const metadata = inspectorCard('Metadata / usage / pricing / latency', 'Gateway generated · usage: SDK observable', record, true) +
+    (incoming?.data ? inspectorCard('Request parameters gốc', 'Client supplied', Object.fromEntries(Object.entries(incoming.data.payload).filter(([key])=>!['messages','message','prompt'].includes(key))), true) : '') +
+    (gateway?.data ? inspectorCard('Tham số hiệu lực, session và thread', 'Gateway generated · thread_id_after: SDK observable', {effective_parameters: gateway.data.effective_parameters, normalized_parameters:Object.fromEntries(Object.entries(gateway.data.validated_request).filter(([key])=>key!=='messages')), session_id: gateway.data.session_id, thread_id_before: gateway.data.thread_id_before, thread_id_after:segment('codex_response')?.data?.thread_id ?? null}, true) : '') +
+    inspectorCard('Thời điểm capture & retention', 'Gateway generated', {created_at: data.snapshot?.created_at ?? null, expires_at: data.snapshot?.expires_at ?? null, capture_points: segments.map(({key,provenance,captured_at,unavailable}) => ({key,provenance,captured_at,unavailable}))}, true) +
+    inspectorCard('Token accounting', 'SDK observable', record.input_tokens === null ? 'Chưa có usage thực tế. Không ước tính token hoặc phân bổ theo context.' : 'Input/output/cache/reasoning token ở metadata là usage thực tế. Cache thuộc input, reasoning thuộc output. Không có token accounting cho từng message/context; không tính phần dư để suy ra context nội bộ.');
+  $('request-inspector').innerHTML = `<div class="inspector-heading"><h3>AI Request Inspector</h3><button type="button" class="quiet" data-inspector-refresh>Làm mới</button><button type="button" class="quiet" data-inspector-delete ${data.snapshot ? '' : 'disabled'}>Xóa snapshot này</button><button type="button" class="quiet" data-inspector-delete-all>Xóa toàn bộ snapshot</button></div><p class="usage-note">Bản ghi đã áp dụng redaction; credentials và secret đã biết được che. Không ghi headers xác thực hoặc private reasoning. Retention: ${escape(data.retention_ms ? `${number(data.retention_ms / 3600000)} giờ` : '—')}.</p>${data.status !== 'captured' ? `<p class="notice">${escape(reasons[data.status] ?? reasons.unavailable)}</p>` : ''}<p class="usage-note">Đây là context gateway quan sát được, không phải toàn bộ provider-internal prompt.</p><div class="inspector-tools"><label>Tìm trong tab hiện tại <input id="inspector-search" type="search" placeholder="Nội dung, role, tham số…"></label><span id="inspector-search-status" role="status" aria-live="polite"></span></div><div class="inspector-tabs" role="tablist" aria-label="AI Request Inspector">${['Messages','Full Prompt','Response','Metadata'].map((title,i)=>`<button type="button" role="tab" id="inspector-tab-${i}" data-inspector-tab="${i}" aria-controls="inspector-panel-${i}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}">${title}</button>`).join('')}</div>${[messages, fullPrompt || missing, response || missing, metadata].map((content,i)=>`<div role="tabpanel" id="inspector-panel-${i}" aria-labelledby="inspector-tab-${i}" tabindex="0" ${i ? 'hidden' : ''}>${content}</div>`).join('')}<p id="inspector-action-status" class="usage-note" role="status" aria-live="polite"></p>`;
+}
+function selectInspectorTab(index) {
+  document.querySelectorAll('[data-inspector-tab]').forEach(button => { const selected = Number(button.dataset.inspectorTab) === index; button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1; });
+  for (let i = 0; i < 4; i++) $(`inspector-panel-${i}`).hidden = i !== index;
+  if ($('inspector-search')) { $('inspector-search').value = ''; filterInspector(''); }
+}
+function filterInspector(query) {
+  const panel = document.querySelector('#request-inspector [role=tabpanel]:not([hidden])');
+  if (!panel) return;
+  let matches = 0;
+  panel.querySelectorAll('.inspector-segment').forEach(card => { card.hidden = !card.textContent.toLocaleLowerCase().includes(query.toLocaleLowerCase()); if (!card.hidden) { matches++; if (query) card.querySelectorAll('details').forEach(details => { details.open = true; }); } });
+  $('inspector-search-status').textContent = query ? `${matches} mục khớp` : '';
+}
+$('detail-content').addEventListener('input', event => { if (event.target.id === 'inspector-search') filterInspector(event.target.value); });
+$('detail-content').addEventListener('keydown', event => {
+  const tab = event.target.closest('[data-inspector-tab]'); if (!tab) return;
+  const current = Number(tab.dataset.inspectorTab), next = event.key === 'ArrowRight' ? (current+1)%4 : event.key === 'ArrowLeft' ? (current+3)%4 : event.key === 'Home' ? 0 : event.key === 'End' ? 3 : null;
+  if (next !== null) { event.preventDefault(); selectInspectorTab(next); $(`inspector-tab-${next}`).focus(); }
+});
+$('detail-content').addEventListener('click', async event => {
+  const button = event.target.closest('button'); if (!button) return;
+  if (button.hasAttribute('data-inspector-tab')) return selectInspectorTab(Number(button.dataset.inspectorTab));
+  if (button.hasAttribute('data-inspector-refresh') || button.hasAttribute('data-inspector-retry')) { const id = $('request-inspector')?.dataset.id; const record = inspectorView?.id === id ? inspectorView.record : rows.find(r => r.id === id); if (record) await loadInspector(id, record); return; }
+  const status = $('inspector-action-status');
+  if (button.hasAttribute('data-inspector-copy')) {
+    try { await navigator.clipboard.writeText(button.closest('.inspector-segment').querySelector('pre').textContent); if (status) status.textContent = 'Đã sao chép nội dung đã redact.'; }
+    catch { if (status) status.textContent = 'Không truy cập được clipboard. Chọn và sao chép văn bản trong khung.'; }
+  }
+  if ((button.hasAttribute('data-inspector-delete') || button.hasAttribute('data-inspector-delete-all')) && inspectorView) {
+    const all = button.hasAttribute('data-inspector-delete-all');
+    if (!confirm(all ? 'Xóa toàn bộ snapshot inspector? Metadata, usage và session vẫn được giữ.' : 'Xóa snapshot inspector của call này? Metadata và usage vẫn được giữ.')) return;
+    const view = inspectorView; button.disabled = true;
+    try {
+      const response = await fetch(all ? '/api/stats/inspector' : `/api/stats/calls/${view.id}/inspector`, {method:'DELETE', body:'{}', headers:{'Content-Type':'application/json','X-Codex-Inspector':'1', ...(apiKey ? {Authorization:`Bearer ${apiKey}`} : {})}});
+      if (!response.ok) throw new Error((await response.json()).error?.message ?? `HTTP ${response.status}`);
+      if (inspectorView === view) await loadInspector(view.id, view.record);
+    } catch (error) { if (status) status.textContent = `Xóa thất bại: ${error.message}`; button.disabled = false; }
+  }
+});
 async function load({ quiet = false } = {}) {
   if (quiet && loading) return;
   controller?.abort(); controller = new AbortController();

@@ -294,6 +294,40 @@ curl http://localhost:15600/api/videos/import \
   --data-binary @video-build.json
 ```
 
+## AI Request Inspector
+
+Mở **Chi tiết ↗** trong lịch sử call. Số liệu metadata, token, pricing, error và latency vẫn giữ nguyên. Bốn tab **Messages / Full Prompt / Response / Metadata** có role cards, nguồn context, JSON thu gọn, copy và tìm nội dung trong tab. Những call cũ không có snapshot không thể khôi phục prompt từ usage.
+
+Ghi body **tắt mặc định**. Chỉ bật trong `.env` khi muốn lưu các request mới rồi restart server:
+
+```dotenv
+INSPECTOR_ENABLED=true
+INSPECTOR_RETENTION_MS=86400000
+INSPECTOR_MAX_BYTES=8388608
+```
+
+Snapshot redacted nằm riêng tại `DATA_DIR/request-inspector/<call-id>.json`; SQLite vẫn chỉ chứa metadata/usage. Headers, process environment, auth/config Codex và private reasoning không được ghi. Redaction che các giá trị credential đã biết từ environment, sensitive JSON keys, credentials trong tool argument JSON, Bearer/Basic, API key patterns, private keys và URL credentials. Nội dung không có secret giữ nguyên thứ tự, roles và whitespace; bản inspector đã redact có thể khác payload gốc. Đây là redaction theo key/pattern, không thể nhận diện mọi secret tùy ý trong văn bản.
+
+Retention tính từ lúc nhận call, mặc định 24h (cấu hình 1 giây–30 ngày); cleanup khi khởi động, khi đọc và định kỳ tối đa 60 giây trong lúc server chạy. File còn trên đĩa nếu server đã dừng sẽ được cleanup lúc khởi động lại. Giới hạn mặc định 8 MiB/call: segment vượt giới hạn bị đánh dấu unavailable, không âm thầm cắt rồi gọi là đầy đủ. Lỗi lưu inspector không đổi HTTP response chat. Playground vẫn ephemeral và không ghi body xuống đĩa kể cả khi bật inspector.
+
+Hai capture points: sau structural validation giữ payload client gốc; trước `thread.run()` giữ validated request, effective model/reasoning, session context và chính chuỗi `promptFor()`. Provider có thêm observation ngay trước CLI `spawn()` với stdin, gateway instructions, output schema và các policy công khai. Không ghi executable arguments, auth hay stderr của CLI. Response gồm assistant messages công khai / final structured output và HTTP response/error thực sự; nếu CLI đã phát public assistant message hoặc turn.failed trước khi lỗi, bản partial được ghi rõ `complete=false`. Nội dung chưa phát ra / stderr vẫn unavailable.
+
+Nhãn **Client supplied**, **Gateway generated**, **SDK observable**, **Internal / unavailable** phân biệt nguồn. Repo gọi CLI trực tiếp, dùng SDK types; “SDK observable” ở đây là dữ liệu công khai từ giao thức JSONL. Khi resume, CLI giữ history và có thể compact; gateway chỉ gửi messages mới. Snapshot không chứa toàn bộ history/instructions nội bộ của provider, private reasoning hoặc hidden system prompt. Context được lấy lại từ legacy gateway session được ghi rõ nguồn authorship không được theo dõi độc lập. Usage thực tế không có accounting theo từng context segment; không ước tính prompt token rồi trừ ra “internal context”.
+
+Xóa snapshot bằng nút trong inspector, hoặc API (giữ nguyên metadata, usage và sessions):
+
+```text
+GET    /api/stats/calls/:id/inspector
+DELETE /api/stats/calls/:id/inspector
+DELETE /api/stats/inspector
+```
+
+DELETE cần `Content-Type: application/json`, body `{}`, `X-Codex-Inspector: 1`, cùng Origin nếu gửi Origin, và Bearer khi `LOCAL_API_KEY` bật. Xóa trong lúc call chạy ngăn các capture muộn tạo lại snapshot đã xóa. Xóa này không xóa `sessions.json`, Codex native history hay bản copy người dùng đã lấy.
+
+Preview bằng **`npm run preview:inspector`**, mở `http://127.0.0.1:15601/dashboard`. Preview dùng provider mock, fixture và thư mục tạm riêng; không đọc dữ liệu thật, không gọi tài khoản, usage để unknown. Có calls stateless, `/chat`, stateful/resume, lỗi output và prompt dài với marker `needle-inspector`. Ctrl+C dừng preview. Có thể chọn port bằng `INSPECTOR_PREVIEW_PORT` sau khi đối chiếu Dev Hub registry.
+
+Kiểm tra: `npm run check`, `npm test`, `npm run build`; trong preview mở Chi tiết, chuyển bốn tab, tìm marker, mở JSON, copy, xóa snapshot và kiểm tra metadata vẫn còn. Trên server thật cần restart sau build để load assets mới; inspector vẫn tắt cho tới khi opt-in.
+
 ## Dashboard và SQLite
 
 Mở **http://localhost:15600/dashboard** (hoặc `/` để tự chuyển hướng). Trang cập nhật mỗi 5 giây; có thể tắt tự cập nhật. Bộ lọc gồm 1 giờ / 24 giờ / 7 ngày / 30 ngày, model và trạng thái. Bảng lịch sử phân trang 20 call, mở chi tiết để xem reasoning, session ID, token và mã lỗi. Thời gian hiển thị theo Việt Nam, UTC+7.
