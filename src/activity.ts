@@ -5,7 +5,7 @@ import { ApiError } from './errors.js';
 import type { Config } from './config.js';
 import { Workflows } from './workflows.js';
 
-import {codexCapabilities,providerCapabilities,type ProviderId,type ProviderTiming} from './provider-types.js';
+import {codexCapabilities,providerCapabilities,type ProviderId,type ProviderTiming,type CliLifecycleTiming} from './provider-types.js';
 export const capabilities=codexCapabilities;
 export interface BenchmarkTag {batch_id:string;phase:'warmup'|'measured';iteration:number;scenario:string}
 export interface ActivityEvent {
@@ -42,6 +42,7 @@ export class ActivityRun {
   outputChars = 0;
   usage: Usage | null = null;
   timing:ProviderTiming={};
+  cliLifecycle:CliLifecycleTiming|null=null;
   error: string | null = null;
   cancelReason: 'explicit' | 'disconnect' | 'timeout' | 'shutdown' | null = null;
   constructor(readonly id: string, readonly owner: string, readonly model: string,
@@ -78,6 +79,7 @@ export class ActivityRun {
         output_tokens_per_e2e_second: metric(this.usage && this.duration && this.duration > 0 ? this.usage.output_tokens / (this.duration / 1000) : null,
           'tokens/s', 'derived', 'Requires final usage and elapsed duration; includes reasoning.'),
         output_tokens: metric(this.usage?.output_tokens ?? null, 'tokens', 'provider_reported', 'Final usage not reported yet.'),
+        cli_lifecycle:this.cliLifecycle?{...this.cliLifecycle,unit:'ms',origin:'provider.run start',source:'gateway_observed'}:null,
         output_bytes: metric(this.outputBytes, 'bytes', 'gateway_observed'),
         output_characters: metric(this.outputChars, 'characters', 'gateway_observed'),
         output_updates: metric(this.outputUpdates, 'updates', 'gateway_observed'),

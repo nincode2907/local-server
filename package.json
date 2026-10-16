@@ -13,6 +13,7 @@
     "stop": "node scripts/start.js --stop",
     "test": "tsx --test test/*.test.ts",
     "test:live": "tsx scripts/smoke.ts",
+    "benchmark:latency": "tsx --env-file-if-exists=.env scripts/benchmark-latency.ts",
     "check": "tsc --noEmit",
     "preview:inspector": "tsx scripts/inspector-preview.ts",
     "preview:activity": "tsx scripts/activity-preview.ts",

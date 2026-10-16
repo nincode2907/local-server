@@ -244,7 +244,7 @@ $('previous').addEventListener('click', () => { page = Math.max(1, page - 1); lo
 $('next').addEventListener('click', () => { page++; load(); });
 $('call-rows').addEventListener('click', event => { const button = event.target.closest('[data-call]'); if (button) showDetail(button.dataset.call); });
 $('close-detail').addEventListener('click', () => $('call-detail').close());
-$('auth-form').addEventListener('submit', event => { event.preventDefault(); apiKey = $('api-key').value; $('api-key').value = ''; load(); });
+$('auth-form').addEventListener('submit', event => { event.preventDefault(); apiKey = $('api-key').value; $('api-key').value = ''; load(); if (!$('view-native').hidden) loadNative(); });
 setInterval(() => { if ($('auto-refresh').checked && !document.hidden && $('auth-form').hidden) load({ quiet: true }); }, 5000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && $('auto-refresh').checked) load({ quiet: true }); });
 window.addEventListener('resize', () => { if (lastOverview) chart(lastOverview.timeline, lastOverview.range); });
@@ -671,4 +671,5 @@ $('video-refresh').onclick=async()=>{await loadVideos();if(videoOpenId)await sho
 $('video-comparison').onchange=renderVideoComparisons;
 $('view-videos').addEventListener('click',e=>{const b=e.target.closest('[data-video-open]');if(b)showVideoBuild(b.dataset.videoOpen);const s=e.target.closest('[data-native-session]');if(s)nativeDetail(s.dataset.nativeSession);});
 setInterval(()=>{if(!$('view-videos').hidden&&!document.hidden&&$('auto-refresh').checked&&!$('video-editor').open)loadVideos();},5000);
+view('native');
 load();

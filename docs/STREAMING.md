@@ -211,6 +211,21 @@ known/unknown sample counts, method. Tối đa 100.000 run mới nhất; `total_
 `truncated` công khai nếu bị cắt. Không trộn native usage; call cũ chưa có gateway_run
 không được backfill thành sample 0. Dashboard có cùng bộ lọc và sample counts.
 
+Codex run snapshot còn có `metrics.cli_lifecycle`, với mốc monotonic tính từ lúc
+provider bắt đầu: yêu cầu spawn, process spawn, stdin finish/close, event stdout
+đầu tiên, `turn.completed` nhận và được gateway xử lý, số event stdout sau mốc đó,
+iterator kết thúc, stdout/stderr end/close, process exit/close, observer response,
+xóa schema tạm và provider return. Đây là mốc ở ranh giới CLI/Node quan sát được;
+không suy diễn thời gian inference, reasoning hay decode nội bộ. Provider local
+giữ trường này null. Field mới chỉ bổ sung metadata; usage và thống kê call hiện
+có không đổi.
+
+Benchmark thật có thể chạy tuần tự bằng `npm run benchmark:latency -- --runs=5`.
+Script dùng provider/CLI thật, server HTTP trên cổng OS cấp tự động và thư mục
+SQLite tạm; không ghi transcript hoặc thay đổi dữ liệu `.local`. Direct comparison
+dùng cùng CLI, policy, model, reasoning, prompt envelope và output schema nhưng
+bỏ HTTP gateway. Báo cáo lần đo ngày 16/10/2026: [Codex latency benchmark](CODEX-LATENCY-BENCHMARK.md).
+
 ## Client dùng chung và React/Next.js
 
 `clients/activity-client` là ESM JS + TypeScript declarations, không phụ thuộc UI.

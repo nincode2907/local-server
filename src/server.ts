@@ -197,6 +197,7 @@ export async function buildServer(config: Config, provider: Provider) {
               if (text !== null) run.content(String(redact(withoutSecretPrefix(text,config.inspectorSecrets),config.inspectorSecrets)));
             } else if(event.type==='usage'){ run.reportUsage(event.usage); metrics.usage(run.id,event.usage); }else run.reportTiming(event.timing);
           },
+          onLifecycle: timing => { run.cliLifecycle=timing; },
           observe: async context => captureStep('cli_boundary', 'Gateway generated', context),
           observeResponse: async response => { responseObserved = true; await captureStep('codex_response', 'SDK observable', response); } });
         run.providerFinished = run.elapsed(); run.emit('provider.finished');

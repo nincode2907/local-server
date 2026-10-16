@@ -9,10 +9,11 @@ import { tmpdir, homedir } from 'node:os';
 import { ApiError } from './errors.js';
 import type { Config } from './config.js';
 import type { ChatRequest } from './schema.js';
-import type {ProviderUsage as Usage,ProviderTiming} from './provider-types.js';
+import type {ProviderUsage as Usage,ProviderTiming,CliLifecycleTiming} from './provider-types.js';
 
 export interface ProviderTurn {
   timing?:ProviderTiming;
+  cliLifecycle?:CliLifecycleTiming;
   finishReason?:'stop'|'length'|'tool_calls';
   items: ThreadItem[];
   finalResponse: string;
@@ -21,7 +22,7 @@ export interface ProviderTurn {
 
 export const gatewayInstructions = 'You are a text assistant for a local chat gateway. Respond to the provided conversation using the requested JSON schema. Do not use local tools, read files, modify files, run shell commands, search the web, or contact integrations. Function calls in your final JSON are proposals for the caller to execute.';
 export type PublicProviderEvent = {type:'output'; item_id:string; text:string} | {type:'usage'; usage:Usage} | {type:'timing';timing:ProviderTiming};
-export type ObservedTurnOptions = TurnOptions & { observe?: (context: unknown) => Promise<void>; observeResponse?: (response: unknown) => Promise<void>; onEvent?: (event:PublicProviderEvent) => void; request?:ChatRequest; onProcess?:(pid:number,active:boolean,scope?:string)=>void };
+export type ObservedTurnOptions = TurnOptions & { observe?: (context: unknown) => Promise<void>; observeResponse?: (response: unknown) => Promise<void>; onEvent?: (event:PublicProviderEvent) => void; onLifecycle?:(timing:CliLifecycleTiming)=>void; request?:ChatRequest; onProcess?:(pid:number,active:boolean,scope?:string)=>void };
 export interface ProviderThread {
   readonly id: string | null;
   run(input: string, options?: ObservedTurnOptions): Promise<ProviderTurn>;
@@ -60,6 +61,13 @@ class CliThread implements ProviderThread {
   get id() { return this.#id; }
 
   async run(input: string, options: ObservedTurnOptions = {}): Promise<ProviderTurn> {
+    const lifecycle:CliLifecycleTiming={spawn_requested_ms:null,process_spawned_ms:null,stdin_finished_ms:null,stdin_closed_ms:null,
+      first_stdout_event_ms:null,turn_completed_event_received_ms:null,turn_completed_event_delivered_ms:null,stdout_iterator_completed_ms:null,
+      stdout_ended_ms:null,stdout_closed_ms:null,stderr_ended_ms:null,stderr_closed_ms:null,child_process_exited_ms:null,child_process_closed_ms:null,
+      response_observer_started_ms:null,response_observer_finished_ms:null,schema_cleanup_started_ms:null,schema_cleanup_finished_ms:null,provider_returned_ms:null,
+      stdout_event_count:0,events_after_turn_completed_count:0,last_post_turn_event_type:null,last_post_turn_event_ms:null};
+    const lifecycleStarted=performance.now();
+    const mark=(point:Exclude<keyof CliLifecycleTiming,'stdout_event_count'|'events_after_turn_completed_count'|'last_post_turn_event_type'|'last_post_turn_event_ms'>)=>{lifecycle[point]=performance.now()-lifecycleStarted;options.onLifecycle?.({...lifecycle});};
     const schemaPath = options.outputSchema ? join(this.runtime, `schema-${randomUUID()}.json`) : undefined;
     if (schemaPath) await writeFile(schemaPath, JSON.stringify(options.outputSchema), 'utf8');
     const config = (key: string, value: unknown) => ['--config', `${key}=${JSON.stringify(value)}`];
@@ -90,12 +98,23 @@ class CliThread implements ProviderThread {
       ...(this.#id ? ['resume', this.#id] : []),
     ];
 
+    let result:ProviderTurn|undefined;
     try {
       await options.observe?.({ stdin: input, instructions: gatewayInstructions, output_schema: options.outputSchema ?? null,
         model: this.model, reasoning_effort: this.effort ?? null, thread_id: this.#id, ephemeral: this.ephemeral,
         policy: { sandbox: 'read-only', approval: 'never', network: false, agent_tools: false, ignore_user_config: true, ignore_rules: true },
         internal_context: { provenance: 'Internal / unavailable', available: false, description: 'Provider-internal prompt and resumed CLI history are not exposed by this gateway.' } });
+      mark('spawn_requested_ms');
       const child = spawn(this.command, args, { env: this.env, signal: options.signal });
+      child.once('spawn',()=>mark('process_spawned_ms'));
+      child.stdin.once('finish',()=>mark('stdin_finished_ms'));
+      child.stdin.once('close',()=>mark('stdin_closed_ms'));
+      child.stdout.once('end',()=>mark('stdout_ended_ms'));
+      child.stdout.once('close',()=>mark('stdout_closed_ms'));
+      child.stderr.once('end',()=>mark('stderr_ended_ms'));
+      child.stderr.once('close',()=>mark('stderr_closed_ms'));
+      child.once('exit',()=>mark('child_process_exited_ms'));
+      const processClosed=new Promise<void>(resolveClose=>child.once('close',()=>{mark('child_process_closed_ms');resolveClose();}));
       if(child.pid)options.onProcess?.(child.pid,true,this.commandPrefix.length?'codex_cli_launcher_process':'codex_cli_process');
       child.once('close',()=>{if(child.pid)options.onProcess?.(child.pid,false,this.commandPrefix.length?'codex_cli_launcher_process':'codex_cli_process');});
       const stderr: Buffer[] = [];
@@ -119,8 +138,15 @@ class CliThread implements ProviderThread {
       const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
       try {
         for await (const line of lines) {
+          if(lifecycle.first_stdout_event_ms===null)mark('first_stdout_event_ms');
           if (Buffer.byteLength(line) > 2_097_152) throw new ApiError(502, 'provider_event_limit', 'Provider event exceeds limit.');
           const event = JSON.parse(line) as CliEvent;
+          lifecycle.stdout_event_count++;
+          if(lifecycle.turn_completed_event_received_ms!==null){
+            lifecycle.events_after_turn_completed_count++;
+            lifecycle.last_post_turn_event_type=event.type;
+            lifecycle.last_post_turn_event_ms=performance.now()-lifecycleStarted;
+          }
           if (event.item) {
             assertNoAgentTools([event.item]);
             if (['item.started','item.updated','item.completed'].includes(event.type) && event.item.type === 'agent_message')
@@ -130,30 +156,40 @@ class CliThread implements ProviderThread {
           else if (event.type === 'item.completed' && event.item) {
             items.push(event.item);
             if (event.item.type === 'agent_message') finalResponse = event.item.text;
-          } else if (event.type === 'turn.completed' && event.usage) {
-            event.usage.cache_write_input_tokens ??= 0;
-            usage = event.usage;
-            options.onEvent?.({type:'usage',usage});
+          } else if (event.type === 'turn.completed') {
+            mark('turn_completed_event_received_ms');
+            if(event.usage){event.usage.cache_write_input_tokens ??= 0;usage = event.usage;options.onEvent?.({type:'usage',usage});}
+            mark('turn_completed_event_delivered_ms');
           }
           else if (event.type === 'turn.failed') failure = event.error?.message ?? 'Codex turn failed.';
           else if (event.type === 'error' && typeof event.message === 'string') publicErrors.push({type:'error',message:event.message});
         }
+        mark('stdout_iterator_completed_ms');
         await exited;
         exitedSuccessfully = true;
       } finally {
         lines.close();
         if (!child.killed) child.kill();
+        await processClosed;
+        mark('response_observer_started_ms');
         await options.observeResponse?.({ final_response: finalResponse, assistant_messages: items.filter(item => item.type === 'agent_message'),
           usage, thread_id: this.#id, complete: exitedSuccessfully && !failure, turn_error: failure ?? null,
           errors: publicErrors,
           error_code: !exitedSuccessfully ? 'cli_incomplete' : failure ? 'turn_failed' : null,
           internal_reasoning: { provenance: 'Internal / unavailable', available: false, reason: 'Private reasoning and stderr are never recorded.' } });
+        mark('response_observer_finished_ms');
       }
       if (failure) throw new Error(failure);
-      return { items, finalResponse, usage };
+      result={items,finalResponse,usage,cliLifecycle:lifecycle};
     } finally {
-      if (schemaPath) await rm(schemaPath, { force: true });
+      if (schemaPath) {mark('schema_cleanup_started_ms');await rm(schemaPath, { force: true });mark('schema_cleanup_finished_ms');}
+      options.onLifecycle?.({...lifecycle});
     }
+    if(!result)throw new Error('Codex provider completed without a result.');
+    mark('provider_returned_ms');
+    result.cliLifecycle={...lifecycle};
+    options.onLifecycle?.({...lifecycle});
+    return result;
   }
 }
 

@@ -161,3 +161,26 @@ test('CLI public partial output and turn.failed are observable; reasoning and st
     assert.ok(!JSON.stringify(observed).includes('PRIVATE_SENTINEL'));assert.ok(!JSON.stringify(observed).includes('STDERR_PRIVATE_SENTINEL'));
   } finally {process.chdir(originalCwd);await provider.close();await rm(directory,{recursive:true,force:true});}
 });
+
+test('CLI lifecycle separates turn.completed delivery from iterator, exit, stdio and cleanup; a later process failure remains an error',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'codex-lifecycle-fake-'));
+  const originalCwd=process.cwd(),events:unknown[]=[],observed:unknown[]=[];let lifecycle:any;
+  const cliEvents=[{type:'thread.started',thread_id:'fake-thread'},
+    {type:'item.completed',item:{id:'answer',type:'agent_message',text:'{"content":"OK","tool_calls":[]}'}},
+    {type:'turn.completed',usage}];
+  await writeFile(join(directory,'exec'),`for(const event of ${JSON.stringify(cliEvents)})console.log(JSON.stringify(event));setTimeout(()=>process.exit(1),160);`);
+  const provider=await createProvider(readConfig({CODEX_BIN:process.execPath}));
+  try {
+    process.chdir(directory);
+    await assert.rejects(provider.start('fixture').run('synthetic',{outputSchema:{type:'object'},
+      onEvent:event=>events.push(event),onLifecycle:value=>{lifecycle=value;},observeResponse:value=>{observed.push(value);}}),/exited with code 1/);
+    assert.equal(events.filter((event:any)=>event.type==='usage').length,1);
+    assert.equal((observed[0] as any).complete,false);
+    assert.ok(lifecycle.turn_completed_event_received_ms<lifecycle.child_process_exited_ms);
+    assert.ok(lifecycle.turn_completed_event_delivered_ms<=lifecycle.stdout_iterator_completed_ms);
+    assert.ok(lifecycle.child_process_exited_ms<=lifecycle.child_process_closed_ms);
+    assert.ok(lifecycle.child_process_closed_ms<=lifecycle.schema_cleanup_started_ms);
+    assert.ok(lifecycle.schema_cleanup_started_ms<lifecycle.schema_cleanup_finished_ms);
+    assert.equal(lifecycle.provider_returned_ms,null);
+  } finally {process.chdir(originalCwd);await provider.close();await rm(directory,{recursive:true,force:true});}
+});
