@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline';
 import { join, basename } from 'node:path';
 import { estimateCost, periodKey } from './catalog.js';
 
-type Usage = { input_tokens: number; cached_input_tokens: number; output_tokens: number; reasoning_output_tokens: number };
+type Usage = { input_tokens: number; cached_input_tokens: number; cache_known: boolean; output_tokens: number; reasoning_output_tokens: number };
 type Turn = { id: string; model: string; reasoning: string; started_at: number; finished_at: number | null; status: string };
 type Event = Usage & { id: string; turn_id: string; model: string; timestamp: number; basis: string };
 type Metadata = { id: string; cwd: string; source: string; model: string; created_at: number; updated_at: number };
@@ -13,6 +13,7 @@ const keys = ['input_tokens','cached_input_tokens','output_tokens','reasoning_ou
 function usage(value: any): Usage | null {
   if (!value || !['input_tokens','output_tokens'].every(k => Number.isSafeInteger(value[k]) && value[k] >= 0)) return null;
   const result = Object.fromEntries(keys.map(k => [k, value[k] ?? 0])) as Usage;
+  result.cache_known = Number.isSafeInteger(value.cached_input_tokens) && value.cached_input_tokens >= 0;
   return keys.every(k => Number.isSafeInteger(result[k]) && result[k] >= 0) ? result : null;
 }
 function sourceName(source: unknown, cwd: string) {
@@ -66,7 +67,7 @@ export async function parseRollout(lines: AsyncIterable<string>, fallback?: Meta
       if (!total) continue;
       if (previous && keys.every(k => total[k] === previous![k])) continue;
       let delta: Usage | null;
-      if (previous && keys.every(k => total[k] >= previous![k])) delta = Object.fromEntries(keys.map(k => [k,total[k]-previous![k]])) as Usage;
+      if (previous && keys.every(k => total[k] >= previous![k])) delta = { ...Object.fromEntries(keys.map(k => [k,total[k]-previous![k]])) as Omit<Usage,'cache_known'>, cache_known:total.cache_known && previous.cache_known };
       else { delta = last; if (previous) resets++; }
       previous = total;
       if (!delta || keys.every(k => !delta![k])) continue;
@@ -96,6 +97,14 @@ export function contextSpikes(samples: SpikeSample[]) {
 
 export type NativeRange = 'today' | 'yesterday' | '7d' | '30d' | 'all' | '24h';
 export type NativeFilter = { range: NativeRange; group: 'day' | 'week' | 'month'; model?: string; source?: string; project?: string; page: number };
+export type NativeInsightsFilter = Pick<NativeFilter,'range'|'model'|'source'|'project'>;
+export interface NativeInsightsBucket {
+  key:string; label:string; start:number; end:number; complete:boolean; activity_present:boolean;
+  usage_records:number; turns:number; usage_known_turns:number; usage_unknown_turns:number; sessions_without_usage:number; unattributed_events:number;
+  input_tokens:number; output_tokens:number; total_tokens:number; cached_known_input_tokens:number; uncached_known_input_tokens:number;
+  cache_unknown_input_tokens:number; cached_input_tokens:number|null; uncached_input_tokens:number|null; cache_known_events:number; cache_unknown_events:number;
+  cost_usd:number; unpriced_events:number;
+}
 const DAY = 86_400_000;
 const VIETNAM_OFFSET = 7 * 3_600_000;
 function dayStart(timestamp: number) {
@@ -123,6 +132,8 @@ export class NativeUsage {
       CREATE TABLE IF NOT EXISTS native_sessions(id TEXT PRIMARY KEY,cwd TEXT NOT NULL,source TEXT NOT NULL,model TEXT NOT NULL,created_at INTEGER,updated_at INTEGER,rollout_path TEXT,malformed INTEGER DEFAULT 0,resets INTEGER DEFAULT 0);
       CREATE TABLE IF NOT EXISTS native_turns(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,model TEXT,reasoning TEXT,started_at INTEGER,finished_at INTEGER,status TEXT);
       CREATE TABLE IF NOT EXISTS native_events(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,turn_id TEXT NOT NULL,model TEXT NOT NULL,timestamp INTEGER NOT NULL,input_tokens INTEGER,cached_tokens INTEGER,output_tokens INTEGER,reasoning_tokens INTEGER,basis TEXT,cost_usd REAL,price_json TEXT);
+      CREATE TABLE IF NOT EXISTS native_event_cache(event_id TEXT PRIMARY KEY,cache_known INTEGER NOT NULL CHECK(cache_known IN (0,1)));
+      CREATE INDEX IF NOT EXISTS native_event_cache_known ON native_event_cache(cache_known,event_id);
       CREATE INDEX IF NOT EXISTS native_events_time ON native_events(timestamp);
       CREATE INDEX IF NOT EXISTS native_events_session ON native_events(session_id);
       CREATE INDEX IF NOT EXISTS native_turns_session ON native_turns(session_id);
@@ -130,9 +141,11 @@ export class NativeUsage {
       CREATE TABLE IF NOT EXISTS native_settings(key TEXT PRIMARY KEY,value TEXT);
 
     `);
-    const parserVersion = '2';
+    const parserVersion = '3';
     if (this.db.prepare("SELECT value FROM native_settings WHERE key='parser_version'").get()?.value !== parserVersion) {
       this.db.exec('DELETE FROM native_files');
+      this.db.exec('DELETE FROM native_event_cache');
+      this.db.exec('UPDATE native_events SET cost_usd=NULL');
       this.db.prepare("INSERT OR REPLACE INTO native_settings VALUES('parser_version',?)").run(parserVersion);
     }
   }
@@ -187,13 +200,14 @@ export class NativeUsage {
               this.db.prepare('UPDATE native_sessions SET rollout_path=?,malformed=?,resets=? WHERE id=?').run(path,parsed.malformed,parsed.resets,m.id);
               // Keep frozen rates for existing event IDs even when the growing file is replayed.
               const prices = new Map(this.db.prepare('SELECT id,model,price_json FROM native_events WHERE session_id=?').all(m.id).map(r => [String(r.id),r]));
+              this.db.prepare('DELETE FROM native_event_cache WHERE event_id IN (SELECT id FROM native_events WHERE session_id=?)').run(m.id);
               this.db.prepare('DELETE FROM native_events WHERE session_id=?').run(m.id);
               this.db.prepare('DELETE FROM native_turns WHERE session_id=?').run(m.id);
               for (const t of parsed.turns) this.db.prepare('INSERT INTO native_turns VALUES(?,?,?,?,?,?,?)').run(`${m.id}:${t.id}`,m.id,t.model,t.reasoning,t.started_at,t.finished_at,t.status);
               for (const e of parsed.events) {
                 const id = `${m.id}:${e.id}`, existing = prices.get(id);
-                let cost = estimateCost(e.model,e.input_tokens,e.output_tokens,e.cached_input_tokens);
-                if (existing?.price_json && existing.model === e.model) {
+                let cost = e.cache_known ? estimateCost(e.model,e.input_tokens,e.output_tokens,e.cached_input_tokens) : null;
+                if (e.cache_known && existing?.price_json && existing.model === e.model) {
                   const frozen = JSON.parse(String(existing.price_json)) as NonNullable<typeof cost>;
                   const cache = Math.min(e.input_tokens,e.cached_input_tokens);
                   frozen.input_cost_usd = (e.input_tokens-cache)*frozen.input_rate/1e6;
@@ -203,6 +217,7 @@ export class NativeUsage {
                   cost = frozen;
                 }
                 this.db.prepare('INSERT INTO native_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(id,m.id,`${m.id}:${e.turn_id}`,e.model,e.timestamp,e.input_tokens,e.cached_input_tokens,e.output_tokens,e.reasoning_output_tokens,e.basis,cost?.cost_usd ?? null,cost ? JSON.stringify(cost) : null);
+                this.db.prepare('INSERT INTO native_event_cache VALUES(?,?)').run(id,Number(e.cache_known));
               }
               if (before.size === after.size && before.mtimeMs === after.mtimeMs && !parsed.malformed) this.db.prepare('INSERT OR REPLACE INTO native_files VALUES(?,?,?)').run(path,after.size,after.mtimeMs);
               this.db.exec('COMMIT');
@@ -222,7 +237,7 @@ export class NativeUsage {
     const params: (string|number)[] = [since,window.until];
     let where = 'e.timestamp >= ? AND e.timestamp < ?';
     for (const [field,value] of [['e.model',filter.model],['s.source',filter.source],['s.cwd',filter.project]]) if (value) { where += ` AND ${field}=?`; params.push(value); }
-    const events = this.db.prepare(`SELECT e.*,s.cwd,s.source FROM native_events e JOIN native_sessions s ON s.id=e.session_id WHERE ${where} ORDER BY e.timestamp,e.rowid`).all(...params);
+    const events = this.db.prepare(`SELECT e.*,s.cwd,s.source,c.cache_known FROM native_events e JOIN native_sessions s ON s.id=e.session_id LEFT JOIN native_event_cache c ON c.event_id=e.id WHERE ${where} ORDER BY e.timestamp,e.rowid`).all(...params);
     const sessions = this.db.prepare('SELECT * FROM native_sessions ORDER BY updated_at DESC').all().filter(s => (!filter.source || s.source === filter.source) && (!filter.project || s.cwd === filter.project));
     const relevant = new Set(events.map(e => String(e.session_id)));
     const selected = sessions.filter(s => relevant.has(String(s.id)) || Number(s.updated_at) >= since && Number(s.updated_at) < window.until && (!filter.model || s.model === filter.model));
@@ -230,7 +245,11 @@ export class NativeUsage {
     const allTurns = this.db.prepare('SELECT * FROM native_turns ORDER BY started_at').all();
     const eventTurns = new Set(events.map(e => e.turn_id));
     const turns = allTurns.filter(t => selectedIds.has(t.session_id) && (eventTurns.has(t.id) || Number(t.started_at)>=since && Number(t.started_at)<window.until && (!filter.model || t.model===filter.model)));
-    const sum = (rows: typeof events) => ({ input_tokens:rows.reduce((n,e)=>n+Number(e.input_tokens),0),cached_tokens:rows.reduce((n,e)=>n+Number(e.cached_tokens),0),output_tokens:rows.reduce((n,e)=>n+Number(e.output_tokens),0),reasoning_tokens:rows.reduce((n,e)=>n+Number(e.reasoning_tokens),0),cost_usd:rows.reduce((n,e)=>n+Number(e.cost_usd ?? 0),0),unpriced_events:rows.filter(e=>e.cost_usd===null).length,calls:rows.length });
+    const sum = (rows: typeof events) => {
+      const cacheKnown = rows.filter(e=>Number(e.cache_known)===1);
+      return { input_tokens:rows.reduce((n,e)=>n+Number(e.input_tokens),0),cached_tokens:rows.length===cacheKnown.length?cacheKnown.reduce((n,e)=>n+Number(e.cached_tokens),0):null,cache_known_events:cacheKnown.length,cache_unknown_events:rows.length-cacheKnown.length,
+        output_tokens:rows.reduce((n,e)=>n+Number(e.output_tokens),0),reasoning_tokens:rows.reduce((n,e)=>n+Number(e.reasoning_tokens),0),cost_usd:rows.reduce((n,e)=>n+Number(e.cost_usd ?? 0),0),unpriced_events:rows.filter(e=>e.cost_usd===null).length,calls:rows.length };
+    };
     const efficiency = (rows: typeof events) => {
       const sessionIds = [...new Set(rows.map(e => String(e.session_id)))];
       const attributed = rows.filter(e => !String(e.turn_id).endsWith(':unattributed'));
@@ -250,14 +269,14 @@ export class NativeUsage {
       const scopedParams: (string|number)[] = [start,end];
       let scopedWhere = 'e.timestamp >= ? AND e.timestamp < ?';
       for (const [field,value] of [['e.model',filter.model],['s.source',filter.source],['s.cwd',filter.project]]) if (value) { scopedWhere += ` AND ${field}=?`; scopedParams.push(value); }
-      const scopedEvents = this.db.prepare(`SELECT e.*,s.cwd,s.source FROM native_events e JOIN native_sessions s ON s.id=e.session_id WHERE ${scopedWhere} ORDER BY e.timestamp,e.rowid`).all(...scopedParams);
+      const scopedEvents = this.db.prepare(`SELECT e.*,s.cwd,s.source,c.cache_known FROM native_events e JOIN native_sessions s ON s.id=e.session_id LEFT JOIN native_event_cache c ON c.event_id=e.id WHERE ${scopedWhere} ORDER BY e.timestamp,e.rowid`).all(...scopedParams);
       const scopedRelevant = new Set(scopedEvents.map(e=>String(e.session_id)));
       const scopedSessions = sessions.filter(s => scopedRelevant.has(String(s.id)) || Number(s.updated_at)>=start && Number(s.updated_at)<end && (!filter.model || s.model===filter.model));
       const scopedIds = new Set(scopedSessions.map(s=>s.id));
       const scopedEventTurns = new Set(scopedEvents.map(e=>e.turn_id));
       const scopedTurns = allTurns.filter(t => scopedIds.has(t.session_id) && (scopedEventTurns.has(t.id) || Number(t.started_at)>=start && Number(t.started_at)<end && (!filter.model || t.model===filter.model)));
       const totals = sum(scopedEvents);
-      return {...totals,...efficiency(scopedEvents),cache_hit_rate:totals.input_tokens ? totals.cached_tokens/totals.input_tokens : null,sessions:scopedSessions.length,turns:scopedTurns.length};
+      return {...totals,...efficiency(scopedEvents),cache_hit_rate:totals.cache_unknown_events||!totals.input_tokens ? null : totals.cached_tokens!/totals.input_tokens,sessions:scopedSessions.length,turns:scopedTurns.length};
     };
     // Compare against the prior record even when it falls outside the selected time window.
     const history = this.db.prepare(`SELECT e.id,e.session_id,e.turn_id,e.model,e.timestamp,e.input_tokens,s.cwd,s.source
@@ -271,10 +290,10 @@ export class NativeUsage {
     const data = selected.map(s => {
       const rows = events.filter(e=>e.session_id===s.id), ts = turns.filter(t=>t.session_id===s.id), u = sum(rows);
       const duration = ts.reduce((n,t)=>n+(t.finished_at===null ? 0 : Math.max(0,Number(t.finished_at)-Number(t.started_at))),0);
-      return {...s,...u,turns:ts.length,usage_available:rows.length>0,duration_ms:ts.some(t=>t.finished_at!==null)?duration:null,tokens_per_turn:ts.length&&rows.length?(u.input_tokens+u.output_tokens)/ts.length:null,cache_ratio:u.input_tokens?u.cached_tokens/u.input_tokens:null,context_spikes:spikes.filter(e=>e.session_id===s.id).length};
+      return {...s,...u,turns:ts.length,usage_available:rows.length>0,duration_ms:ts.some(t=>t.finished_at!==null)?duration:null,tokens_per_turn:ts.length&&rows.length?(u.input_tokens+u.output_tokens)/ts.length:null,cache_ratio:u.input_tokens&&!u.cache_unknown_events?u.cached_tokens!/u.input_tokens:null,context_spikes:spikes.filter(e=>e.session_id===s.id).length};
     });
     const totals = sum(events);
-    const summary = {...totals,...efficiency(events),cache_hit_rate:totals.input_tokens ? totals.cached_tokens/totals.input_tokens : null,context_spikes:spikes.length,sessions:selected.length,turns:turns.length,usage_unavailable_sessions:data.filter(s=>!s.usage_available).length};
+    const summary = {...totals,...efficiency(events),cache_hit_rate:totals.cache_unknown_events||!totals.input_tokens ? null : totals.cached_tokens!/totals.input_tokens,context_spikes:spikes.length,sessions:selected.length,turns:turns.length,usage_unavailable_sessions:data.filter(s=>!s.usage_available).length};
     const comparison = window.key === 'today' ? { label:'Hôm qua', summary:scopedSummary(window.since-DAY,window.since) } : null;
     let averageDivisor: number | null = window.average_divisor;
     if (window.key === 'all' && events.length) {
@@ -289,11 +308,108 @@ export class NativeUsage {
       data:data.slice((filter.page-1)*20,filter.page*20),total:data.length,page:filter.page,page_size:20,
       filters:{models:this.db.prepare('SELECT DISTINCT model FROM native_events ORDER BY model').all().map(r=>r.model),projects:this.db.prepare('SELECT DISTINCT cwd FROM native_sessions ORDER BY cwd').all().map(r=>r.cwd),sources:this.db.prepare('SELECT DISTINCT source FROM native_sessions ORDER BY source').all().map(r=>r.source)} };
   }
+  insights(filter:NativeInsightsFilter, now=Date.now()) {
+    const window=nativeWindow(filter.range,now),hourly=window.key==='today'||window.key==='yesterday',step=hourly?3_600_000:DAY;
+    const first=Math.floor((window.since+VIETNAM_OFFSET)/step)*step-VIETNAM_OFFSET;
+    const last=Math.floor(((window.until-1)+VIETNAM_OFFSET)/step)*step-VIETNAM_OFFSET;
+    const bucketFormat=hourly?'%Y-%m-%dT%H':'%Y-%m-%d';
+    const bucketExpr=`strftime('${bucketFormat}',e.timestamp/1000,'unixepoch','+7 hours')`;
+    const eventFilters=['e.timestamp>=?','e.timestamp<?'],eventParams:(string|number)[]=[window.since,window.until];
+    for(const [field,value] of [['e.model',filter.model],['s.source',filter.source],['s.cwd',filter.project]] as const)if(value){eventFilters.push(`${field}=?`);eventParams.push(value);}
+    const eventFrom=`FROM native_events e JOIN native_sessions s ON s.id=e.session_id LEFT JOIN native_event_cache c ON c.event_id=e.id WHERE ${eventFilters.join(' AND ')}`;
+    const eventAggregate=`COUNT(*) AS usage_records,COALESCE(SUM(e.input_tokens),0) AS input_tokens,
+      COALESCE(SUM(CASE WHEN c.cache_known=1 THEN e.cached_tokens ELSE 0 END),0) AS cached_known_input_tokens,
+      COALESCE(SUM(CASE WHEN c.cache_known=1 THEN e.input_tokens-e.cached_tokens ELSE 0 END),0) AS uncached_known_input_tokens,
+      COALESCE(SUM(CASE WHEN c.cache_known=1 THEN 1 ELSE 0 END),0) AS cache_known_events,
+      COALESCE(SUM(CASE WHEN c.cache_known=1 THEN 0 ELSE 1 END),0) AS cache_unknown_events,
+      COALESCE(SUM(e.output_tokens),0) AS output_tokens,
+      COALESCE(SUM(CASE WHEN e.cost_usd IS NULL THEN 0 ELSE e.cost_usd END),0) AS cost_usd,
+      COALESCE(SUM(CASE WHEN e.cost_usd IS NULL THEN 1 ELSE 0 END),0) AS unpriced_events,
+      COALESCE(SUM(CASE WHEN e.turn_id LIKE '%:unattributed' THEN 1 ELSE 0 END),0) AS unattributed_events,
+      COUNT(DISTINCT CASE WHEN e.turn_id NOT LIKE '%:unattributed' THEN e.turn_id END) AS usage_known_turns`;
+    const summaryRow=this.db.prepare(`SELECT ${eventAggregate} ${eventFrom}`).get(...eventParams);
+    const eventBuckets=this.db.prepare(`SELECT ${bucketExpr} AS bucket,${eventAggregate} ${eventFrom} GROUP BY bucket`).all(...eventParams);
+
+    const turnFilters=['(se.turn_id IS NOT NULL OR (t.started_at>=? AND t.started_at<?))'],turnParams:(string|number)[]=[...eventParams,window.since,window.until];
+    if(filter.source){turnFilters.push('s.source=?');turnParams.push(filter.source);}
+    if(filter.project){turnFilters.push('s.cwd=?');turnParams.push(filter.project);}
+    if(filter.model){turnFilters.push('(se.turn_id IS NOT NULL OR t.model=?)');turnParams.push(filter.model);}
+    const turnsCte=`WITH scoped_events AS (
+        SELECT e.session_id,e.turn_id,e.timestamp FROM native_events e JOIN native_sessions s ON s.id=e.session_id WHERE ${eventFilters.join(' AND ')}
+      ), scoped_turns AS (
+        SELECT t.id,t.session_id,t.started_at,MIN(se.timestamp) AS event_timestamp,
+          MAX(CASE WHEN se.turn_id IS NOT NULL THEN 1 ELSE 0 END) AS has_usage
+        FROM native_turns t JOIN native_sessions s ON s.id=t.session_id
+        LEFT JOIN scoped_events se ON se.session_id=t.session_id AND se.turn_id=t.id
+        WHERE ${turnFilters.join(' AND ')} AND t.id NOT LIKE '%:unattributed' GROUP BY t.session_id,t.id
+      )`;
+    const turnBucketExpr=hourly
+      ? `strftime('${bucketFormat}',COALESCE(event_timestamp,started_at)/1000,'unixepoch','+7 hours')`
+      : `strftime('${bucketFormat}',COALESCE(event_timestamp,started_at)/1000,'unixepoch','+7 hours')`;
+    const turnBuckets=this.db.prepare(`${turnsCte} SELECT ${turnBucketExpr} AS bucket,COUNT(*) AS turns,
+      COALESCE(SUM(has_usage),0) AS usage_known_turns,COALESCE(SUM(CASE WHEN has_usage=0 THEN 1 ELSE 0 END),0) AS usage_unknown_turns
+      FROM scoped_turns GROUP BY bucket`).all(...turnParams);
+    const turnSummary=this.db.prepare(`${turnsCte} SELECT COUNT(*) AS turns,COALESCE(SUM(has_usage),0) AS usage_known_turns,
+      COALESCE(SUM(CASE WHEN has_usage=0 THEN 1 ELSE 0 END),0) AS usage_unknown_turns FROM scoped_turns`).get(...turnParams);
+    const sessionFilters=['s.updated_at>=?','s.updated_at<?'],sessionParams:(string|number)[]=[window.since,window.until];
+    for(const [field,value] of [['s.model',filter.model],['s.source',filter.source],['s.cwd',filter.project]] as const)if(value){sessionFilters.push(`${field}=?`);sessionParams.push(value);}
+    let usageScope='e.timestamp>=? AND e.timestamp<?';
+    const usageParams:(string|number)[]=[window.since,window.until];
+    if(filter.model){usageScope+=' AND e.model=?';usageParams.push(filter.model);}
+    const sessionFrom=`FROM native_sessions s WHERE ${sessionFilters.join(' AND ')} AND NOT EXISTS (SELECT 1 FROM native_events e WHERE e.session_id=s.id AND ${usageScope})`;
+    const sessionBucketExpr=`strftime('${bucketFormat}',s.updated_at/1000,'unixepoch','+7 hours')`;
+    const sessionBuckets=this.db.prepare(`SELECT ${sessionBucketExpr} AS bucket,COUNT(*) AS sessions_without_usage ${sessionFrom} GROUP BY bucket`).all(...sessionParams,...usageParams);
+    const sessionSummary=this.db.prepare(`SELECT COUNT(*) AS sessions_without_usage ${sessionFrom}`).get(...sessionParams,...usageParams);
+
+    const normalize=(row:any)=>{
+      const cacheKnownEvents=Number(row.cache_known_events),cacheUnknownEvents=Number(row.cache_unknown_events),inputTokens=Number(row.input_tokens),cachedKnown=Number(row.cached_known_input_tokens),uncachedKnown=Number(row.uncached_known_input_tokens);
+      return {usage_records:Number(row.usage_records),input_tokens:inputTokens,output_tokens:Number(row.output_tokens),total_tokens:inputTokens+Number(row.output_tokens),
+        cached_known_input_tokens:cachedKnown,uncached_known_input_tokens:uncachedKnown,cache_unknown_input_tokens:Math.max(0,inputTokens-cachedKnown-uncachedKnown),
+        cached_input_tokens:cacheUnknownEvents?null:cachedKnown,uncached_input_tokens:cacheUnknownEvents?null:inputTokens-cachedKnown,
+        cache_known_events:cacheKnownEvents,cache_unknown_events:cacheUnknownEvents,cost_usd:Number(row.cost_usd),unpriced_events:Number(row.unpriced_events),
+        unattributed_events:Number(row.unattributed_events),usage_known_turns:Number(row.usage_known_turns),sessions_without_usage:Number(row.sessions_without_usage??0)};
+    };
+    const emptyAggregate=normalize({usage_records:0,input_tokens:0,output_tokens:0,cached_known_input_tokens:0,uncached_known_input_tokens:0,cache_known_events:0,cache_unknown_events:0,cost_usd:0,unpriced_events:0,unattributed_events:0,usage_known_turns:0});
+    const bucketValues=new Map<string,any>();
+    // Usage stays at each event's timestamp; each turn belongs only to its first matching usage bucket.
+    for(const row of eventBuckets)bucketValues.set(String(row.bucket),{...normalize(row),turns:0,usage_known_turns:0,usage_unknown_turns:0});
+    for(const row of turnBuckets){const value=bucketValues.get(String(row.bucket))??{...emptyAggregate,turns:0,usage_unknown_turns:0};value.turns=Number(row.turns);value.usage_known_turns=Number(row.usage_known_turns);value.usage_unknown_turns=Number(row.usage_unknown_turns);bucketValues.set(String(row.bucket),value);}
+    for(const row of sessionBuckets){const value=bucketValues.get(String(row.bucket))??{...emptyAggregate,turns:0,usage_unknown_turns:0};value.sessions_without_usage=Number(row.sessions_without_usage);bucketValues.set(String(row.bucket),value);}
+    const localKey=(timestamp:number)=>{const date=new Date(timestamp+VIETNAM_OFFSET).toISOString();return hourly?date.slice(0,13):date.slice(0,10);};
+    const label=(key:string)=>hourly?`${key.slice(11,13)}:00`:`${key.slice(8,10)}/${key.slice(5,7)}`;
+    const buckets:NativeInsightsBucket[]=[];
+    for(let start=first;start<=last;start+=step){const key=localKey(start),value=bucketValues.get(key)??{...emptyAggregate,turns:0,usage_unknown_turns:0,sessions_without_usage:0};
+      buckets.push({key,label:label(key),start,end:start+step,complete:start+step<=now,activity_present:value.usage_records>0||value.turns>0||value.sessions_without_usage>0,...value});}
+    let hourlyActivity:NativeInsightsBucket[]=[];
+    if(window.key==='7d'){
+      const hourFormat='%Y-%m-%dT%H',hourExpr=`strftime('${hourFormat}',e.timestamp/1000,'unixepoch','+7 hours')`;
+      const hourEvents=this.db.prepare(`SELECT ${hourExpr} AS bucket,${eventAggregate} ${eventFrom} GROUP BY bucket`).all(...eventParams);
+      const hourTurns=this.db.prepare(`${turnsCte} SELECT strftime('${hourFormat}',COALESCE(event_timestamp,started_at)/1000,'unixepoch','+7 hours') AS bucket,
+        COUNT(*) AS turns,COALESCE(SUM(has_usage),0) AS usage_known_turns,COALESCE(SUM(CASE WHEN has_usage=0 THEN 1 ELSE 0 END),0) AS usage_unknown_turns
+        FROM scoped_turns GROUP BY bucket`).all(...turnParams);
+      const hourValues=new Map<string,any>();
+      for(const row of hourEvents)hourValues.set(String(row.bucket),{...normalize(row),turns:0,usage_known_turns:0,usage_unknown_turns:0});
+      for(const row of hourTurns){const value=hourValues.get(String(row.bucket))??{...emptyAggregate,turns:0,usage_unknown_turns:0,sessions_without_usage:0};value.turns=Number(row.turns);value.usage_known_turns=Number(row.usage_known_turns);value.usage_unknown_turns=Number(row.usage_unknown_turns);hourValues.set(String(row.bucket),value);}
+      const hourSessions=this.db.prepare(`SELECT strftime('%Y-%m-%dT%H',s.updated_at/1000,'unixepoch','+7 hours') AS bucket,COUNT(*) AS sessions_without_usage ${sessionFrom} GROUP BY bucket`).all(...sessionParams,...usageParams);
+      for(const row of hourSessions){const value=hourValues.get(String(row.bucket))??{...emptyAggregate,turns:0,usage_unknown_turns:0,sessions_without_usage:0};value.sessions_without_usage=Number(row.sessions_without_usage);hourValues.set(String(row.bucket),value);}
+      const hourFirst=Math.floor((window.since+VIETNAM_OFFSET)/3_600_000)*3_600_000-VIETNAM_OFFSET;
+      const hourLast=Math.floor((now+VIETNAM_OFFSET)/3_600_000)*3_600_000-VIETNAM_OFFSET;
+      for(let start=hourFirst;start<=hourLast;start+=3_600_000){const key=new Date(start+VIETNAM_OFFSET).toISOString().slice(0,13),value=hourValues.get(key)??{...emptyAggregate,turns:0,usage_unknown_turns:0,sessions_without_usage:0};
+        hourlyActivity.push({key,label:`${key.slice(11,13)}:00`,start,end:start+3_600_000,complete:start+3_600_000<=now,activity_present:value.usage_records>0||value.turns>0||value.sessions_without_usage>0,...value});}
+    }
+    const aggregateRows=(dimension:'cwd'|'model'|'source')=>this.db.prepare(`SELECT s.${dimension==='cwd'?'cwd':dimension} AS key,${eventAggregate} ${eventFrom} GROUP BY s.${dimension==='cwd'?'cwd':dimension} ORDER BY input_tokens+output_tokens DESC`).all(...eventParams).map((row:any)=>({key:String(row.key),...normalize(row)}));
+    const summary=normalize(summaryRow),turns=Number(turnSummary!.turns),knownTurns=Number(turnSummary!.usage_known_turns),unknownTurns=Number(turnSummary!.usage_unknown_turns);
+    const sessionsWithoutUsage=Number(sessionSummary!.sessions_without_usage);
+    return {range:{key:window.key,label:window.label,since:window.since,until:window.until-1},time_zone:'Asia/Ho_Chi_Minh',bucket_unit:hourly?'hour':'day',summary:{...summary,turns,usage_known_turns:knownTurns,usage_unknown_turns:unknownTurns,sessions_without_usage:sessionsWithoutUsage,usage_complete:unknownTurns===0&&sessionsWithoutUsage===0,
+      cache_complete:summary.cache_unknown_events===0&&unknownTurns===0&&sessionsWithoutUsage===0,cache_coverage:{known_events:summary.cache_known_events,unknown_events:summary.cache_unknown_events},cost_complete:summary.unpriced_events===0&&unknownTurns===0&&sessionsWithoutUsage===0},
+      buckets,hourly_activity:hourlyActivity,projects:aggregateRows('cwd'),models:aggregateRows('model'),sources:aggregateRows('source'),
+      filters:{model:filter.model??null,source:filter.source??null,project:filter.project??null},limitations:{historical_cache:'Cache được đánh dấu đã biết chỉ khi rollout còn đọc được và record có trường cached_input_tokens. Row lịch sử thiếu coverage sau replay vẫn là unknown; không suy ra cache bằng 0.'}};
+  }
   detail(id: string) {
     const session = this.db.prepare('SELECT * FROM native_sessions WHERE id=?').get(id); if (!session) return null;
     const samples = this.db.prepare('SELECT * FROM native_events WHERE session_id=? ORDER BY timestamp,rowid').all(id);
     const spikes = contextSpikes(samples.map(e => ({id:String(e.id),session_id:id,turn_id:String(e.turn_id),model:String(e.model),timestamp:Number(e.timestamp),input_tokens:Number(e.input_tokens)})));
-    return {session,spikes,turns:this.db.prepare(`SELECT t.*,COUNT(e.id) AS calls,SUM(e.input_tokens) AS input_tokens,SUM(e.cached_tokens) AS cached_tokens,SUM(e.output_tokens) AS output_tokens,SUM(e.reasoning_tokens) AS reasoning_tokens,SUM(e.cost_usd) AS cost_usd FROM native_turns t LEFT JOIN native_events e ON e.turn_id=t.id WHERE t.session_id=? GROUP BY t.id ORDER BY t.started_at`).all(id),events:this.db.prepare('SELECT * FROM native_events WHERE session_id=? ORDER BY timestamp DESC LIMIT 200').all(id)};
+    return {session,spikes,turns:this.db.prepare(`SELECT t.*,COUNT(e.id) AS calls,SUM(e.input_tokens) AS input_tokens,CASE WHEN SUM(CASE WHEN e.id IS NOT NULL AND c.cache_known IS NOT 1 THEN 1 ELSE 0 END)>0 THEN NULL ELSE SUM(e.cached_tokens) END AS cached_tokens,SUM(e.output_tokens) AS output_tokens,SUM(e.reasoning_tokens) AS reasoning_tokens,SUM(e.cost_usd) AS cost_usd FROM native_turns t LEFT JOIN native_events e ON e.turn_id=t.id LEFT JOIN native_event_cache c ON c.event_id=e.id WHERE t.session_id=? GROUP BY t.id ORDER BY t.started_at`).all(id),events:this.db.prepare('SELECT e.*,c.cache_known FROM native_events e LEFT JOIN native_event_cache c ON c.event_id=e.id WHERE e.session_id=? ORDER BY e.timestamp DESC LIMIT 200').all(id)};
   }
   async close() { this.stopped=true; clearInterval(this.timer); await this.syncing; this.db.close(); }
 }

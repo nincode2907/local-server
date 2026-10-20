@@ -46,3 +46,13 @@ test('chart presentation keeps reduced-motion and responsive rules in CSS',async
   assert.match(js,/token-segment \$\{kind\} token-width-\$\{width\}/);
   assert.match(css,/\.activity-column:hover::after/);
 });
+test('Usage Insights is additive, reuses native filters, and has mobile heatmap scrolling and theme contrast',async()=>{
+  const html=await readFile(new URL('../public/dashboard.html',import.meta.url),'utf8');
+  const css=await readFile(new URL('../public/usage-insights.css',import.meta.url),'utf8');
+  const js=await readFile(new URL('../public/usage-insights.js',import.meta.url),'utf8');
+  assert.ok(html.indexOf('id="native-cards"')<html.indexOf('id="native-insights"'));
+  assert.ok(html.indexOf('id="native-insights"')<html.indexOf('class="panel spike-panel"'));
+  assert.match(html,/id="native-range"/);assert.match(html,/data-insight-metric="tokens"/);
+  assert.match(css,/\.insight-heatmap-scroll\{overflow-x:auto/);assert.match(css,/html\[data-theme=dark\] \.heat-cell\.unknown/);
+  assert.match(js,/function assertData/);assert.match(js,/Total tokens phải bằng input \+ output/);
+});

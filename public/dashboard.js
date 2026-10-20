@@ -523,6 +523,16 @@ async function loadNative({quiet=false}={}) {
   $('native-refresh').disabled=true;
   const params = new URLSearchParams({range:$('native-range').value,group:$('native-group').value,page:nativePage});
   for (const key of ['model','source','project']) if ($(`native-${key}`).value) params.set(key,$(`native-${key}`).value);
+  if ($('native-range').value === 'all') {
+    $('insights-content').hidden=true;$('insights-status').hidden=false;$('insights-status').classList.remove('notice');
+    $('insights-status').textContent='Usage Insights hỗ trợ Hôm nay, Hôm qua, 7 ngày và 30 ngày. Chọn một khoảng để xem biểu đồ.';
+  } else {
+    const insightParams=new URLSearchParams({range:$('native-range').value});
+    for(const key of ['model','source','project'])if($(`native-${key}`).value)insightParams.set(key,$(`native-${key}`).value);
+    get('/api/native/insights?'+insightParams,controller.signal).then(data=>{
+      if(controller===nativeController)window.renderNativeInsights(data);
+    }).catch(error=>{if(error.name!=='AbortError'&&controller===nativeController)window.failNativeInsights(error);});
+  }
   try {
     const d = await get(`/api/native/overview?${params}`,controller.signal);
     if (controller !== nativeController) return;
@@ -532,10 +542,10 @@ async function loadNative({quiet=false}={}) {
     const cards = [
       ['Sessions',s.sessions,`${s.usage_unavailable_sessions} session chưa có usage`,'sessions','number'],
       ['Turns',s.turns,`${s.calls} usage record · không phải số HTTP call`,'turns','number'],
-      ['Input tokens',s.input_tokens,`Cache hit rate: ${s.cache_hit_rate === null ? '—' : (s.cache_hit_rate*100).toFixed(1)+'%'} · cached / input`,'input_tokens','number'],
-      ['Output tokens',s.output_tokens,`${number(s.reasoning_tokens)} reasoning trong output`,'output_tokens','number'],
-      ['Cached tokens',s.cached_tokens,s.input_tokens ? `${(s.cached_tokens/s.input_tokens*100).toFixed(1)}% input được cache` : '—','cached_tokens','number'],
-      ['Tổng token',total,`Cache hit rate: ${s.cache_hit_rate === null ? '—' : (s.cache_hit_rate*100).toFixed(1)+'%'}`,'total_tokens','number'],
+      ['Input tokens',s.input_tokens,`Usage ghi nhận · ${number(s.usage_unavailable_sessions)} session chưa có usage · cache hit rate: ${s.cache_hit_rate === null ? '—' : (s.cache_hit_rate*100).toFixed(1)+'%'}`,'input_tokens','number'],
+      ['Output tokens',s.output_tokens,`Usage ghi nhận · ${number(s.usage_unavailable_sessions)} session chưa có usage · ${number(s.reasoning_tokens)} reasoning trong output`,'output_tokens','number'],
+      ['Cached tokens',s.cache_unknown_events ? null : s.cached_tokens,s.cache_unknown_events ? `${number(s.cache_unknown_events)} record chưa rõ cache` : s.input_tokens ? `${(s.cached_tokens/s.input_tokens*100).toFixed(1)}% input được cache` : '—','cached_tokens','number'],
+      ['Tokens đã ghi nhận',total,`${number(s.usage_unavailable_sessions)} session chưa có usage; tổng có thể thiếu`,'total_tokens','number'],
       ['API-equivalent cost',s.cost_usd,`${s.unpriced_events} record chưa có giá`,'cost_usd','cost'],
       ['Token / turn',s.tokens_per_turn === null ? null : Math.round(s.tokens_per_turn),`${number(s.usage_turns)} turn có usage · ${number(s.unattributed_events)} record chưa gắn turn`,'tokens_per_turn','number']
     ];
@@ -543,7 +553,7 @@ async function loadNative({quiet=false}={}) {
       const periodNote=nativePeriodNote(d,key,value,kind);
       return `<article class="metric"><div class="metric-label">${label}</div><div class="metric-value" title="${escape(number(value))}">${kind==='cost' ? money(value) : compact(value)}</div><p>${periodNote ? `${periodNote}<span class="metric-period-note">${escape(note)}</span>` : escape(note)}</p></article>`;
     }).join('');
-    $('native-note').textContent=`${d.range.label}: ${date(d.range.since)} ${time(d.range.since)} → ${date(d.range.until)} ${time(d.range.until)} (UTC+7). Giá API tham khảo, không phải hóa đơn Plus. Nguồn lấy từ metadata; vscode có thể là App hoặc VS Code. Gateway trong rollout chỉ là dữ liệu quan sát, không cộng vào thống kê server. Log cũ dùng chênh lệch token_count; record response được ưu tiên. Session không còn rollout hoặc thread ephemeral có thể không có usage.`;
+    $('native-note').textContent=`${d.range.label}: ${date(d.range.since)} ${time(d.range.since)} → ${date(d.range.until)} ${time(d.range.until)} (UTC+7). Giá API tham khảo, không phải hóa đơn Plus. Nguồn lấy từ metadata; vscode có thể là App hoặc VS Code. Gateway trong rollout chỉ là dữ liệu quan sát, không cộng vào thống kê server. Log cũ dùng chênh lệch token_count; record response được ưu tiên. Tổng token là usage đã ghi nhận; ${number(s.usage_unavailable_sessions)} session chưa có usage. Cache để — nếu ${number(s.cache_unknown_events)} usage record thiếu trường cached_input_tokens.`;
 
     $('native-spike-count').textContent = number(s.context_spikes);
     $('native-spike-note').textContent = `Hiển thị ${number(d.spikes.length)}/${number(s.context_spikes)} cảnh báo gần nhất trong bộ lọc. Input record tăng >2× và ≥50k, cùng session/model; cần kiểm tra, không kết luận lãng phí.`;

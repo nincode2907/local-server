@@ -22,7 +22,10 @@ test('legacy cumulative deltas are deduplicated; canonical response records over
   const record=event('token_usage_record',{thread_id:'session-a',turn_id:'turn-a',response_id:'response-a',usage:u(100,10,40)});
   const parsed=await parseRollout(lines([meta,start,context,record,legacy(u(100,10,40)),record,event('response_item',{type:'message',content:'SECRET PROMPT'}),'bad JSON']));
   assert.equal(parsed.events.length,1);assert.equal(parsed.events[0]!.cached_input_tokens,40);
+  assert.equal(parsed.events[0]!.cache_known,true);
   assert.equal(parsed.malformed,1);assert.ok(!JSON.stringify(parsed).includes('SECRET PROMPT'));
+  const absent=await parseRollout(lines([meta,start,context,event('token_usage_record',{thread_id:'session-a',turn_id:'turn-a',response_id:'without-cache',usage:{input_tokens:10,output_tokens:2}})]));
+  assert.equal(absent.events[0]!.cache_known,false);
 });
 
 test('fork replay excludes inherited records; missing usage remains unknown and counter resets use last usage',async()=>{
@@ -77,6 +80,16 @@ test('collector sync is idempotent, persists after restart, imports metadata-onl
   }finally{await collector.close();await rm(dir,{recursive:true,force:true});}
 });
 
+test('parser migration marks unrecoverable historical cache and cost as unknown while retaining frozen rates for safe replay',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'native-parser-migration-')),path=join(dir,'stats.sqlite'),now=Date.now(),db=new DatabaseSync(path);
+  db.exec('CREATE TABLE native_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE native_sessions(id TEXT PRIMARY KEY,cwd TEXT NOT NULL,source TEXT NOT NULL,model TEXT NOT NULL,created_at INTEGER,updated_at INTEGER,rollout_path TEXT,malformed INTEGER DEFAULT 0,resets INTEGER DEFAULT 0); CREATE TABLE native_events(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,turn_id TEXT NOT NULL,model TEXT NOT NULL,timestamp INTEGER NOT NULL,input_tokens INTEGER,cached_tokens INTEGER,output_tokens INTEGER,reasoning_tokens INTEGER,basis TEXT,cost_usd REAL,price_json TEXT);');
+  db.prepare("INSERT INTO native_settings VALUES('parser_version','2')").run();
+  db.prepare('INSERT INTO native_sessions(id,cwd,source,model,created_at,updated_at) VALUES(?,?,?,?,?,?)').run('old','/old','cli','sol',now,now);
+  db.prepare('INSERT INTO native_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run('old-event','old','old:turn','sol',now,1000,0,100,0,'response_record',42.5,JSON.stringify({input_rate:1,cached_rate:.1,output_rate:2}));
+  db.close();const collector=new NativeUsage(path,join(dir,'missing-rollouts'));
+  try{const s=collector.overview({range:'all',group:'day',page:1}).summary;assert.equal(s.cached_tokens,null);assert.equal(s.cache_unknown_events,1);assert.equal(s.cost_usd,0);assert.equal(s.unpriced_events,1);}finally{await collector.close();await rm(dir,{recursive:true,force:true});}
+});
+
 
 test('context spikes compare generation input within session/model, include 20k → 80k → 300k, and ignore tiny jumps',()=>{
   const sample=(id:string,input:number,model='gpt-6.1-sol',session='s')=>({id,session_id:session,turn_id:'same-turn',model,timestamp:Number(id),input_tokens:input});
@@ -92,7 +105,7 @@ test('project/model efficiency counts distinct used turns and sessions, excludes
   const collector=new NativeUsage(dbpath,join(dir,'no-codex'));const db=new DatabaseSync(dbpath),now=Date.now();
   const addSession=(id:string,cwd:string,model:string)=>db.prepare('INSERT INTO native_sessions(id,cwd,source,model,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id,cwd,'vscode',model,now-200000000,now);
   const addTurn=(session:string,id:string,model:string)=>db.prepare('INSERT INTO native_turns VALUES(?,?,?,?,?,?,?)').run(`${session}:${id}`,session,model,'high',now-200000000,now,'completed');
-  const addEvent=(id:string,session:string,turn:string,model:string,input:number,output:number,cached:number,cost:number|null,time=now-10000)=>db.prepare('INSERT INTO native_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(id,session,`${session}:${turn}`,model,time,input,cached,output,0,'response_record',cost,null);
+  const addEvent=(id:string,session:string,turn:string,model:string,input:number,output:number,cached:number,cost:number|null,time=now-10000)=>{db.prepare('INSERT INTO native_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(id,session,`${session}:${turn}`,model,time,input,cached,output,0,'response_record',cost,null);db.prepare('INSERT INTO native_event_cache VALUES(?,1)').run(id);};
   try {
     addSession('s1','/project-a','sol');addSession('s2','/project-a','astra');addSession('no-usage','/project-a','sol');addSession('s3','/project-b','sol');
     addTurn('s1','t1','sol');addTurn('s1','t2','astra');addTurn('s1','missing','sol');addTurn('s2','t1','astra');addTurn('s3','t1','sol');
@@ -116,5 +129,98 @@ test('project/model efficiency counts distinct used turns and sessions, excludes
     assert.equal(missingTurn.summary.unattributed_events,1);assert.equal(missingTurn.summary.tokens_per_turn,560500/4);
     const empty=collector.overview({range:'all',group:'day',page:1,project:'/none'});
     assert.equal(empty.summary.cache_hit_rate,null);assert.equal(empty.summary.tokens_per_turn,null);assert.equal(empty.spikes.length,0);
+  }finally{db.close();await collector.close();await rm(dir,{recursive:true,force:true});}
+});
+
+test('insights SQL reconciles filtered buckets and breakdowns, UTC+7 boundaries, missing usage, zero usage, cache and price uncertainty',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'native-insights-')),dbpath=join(dir,'stats.sqlite'),now=Date.parse('2026-10-20T05:30:00Z');
+  const collector=new NativeUsage(dbpath,join(dir,'no-codex')),db=new DatabaseSync(dbpath),day=Date.parse('2026-10-19T17:00:00Z');
+  const addSession=(id:string,cwd:string,model:string)=>db.prepare('INSERT INTO native_sessions(id,cwd,source,model,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id,cwd,'vscode',model,day,now);
+  const addTurn=(session:string,id:string,model:string,started:number)=>db.prepare('INSERT INTO native_turns VALUES(?,?,?,?,?,?,?)').run(session+':'+id,session,model,'high',started,now,'completed');
+  const addEvent=(id:string,session:string,turn:string,model:string,at:number,input:number,output:number,cached:number,cacheKnown:boolean,cost:number|null)=>{db.prepare('INSERT INTO native_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(id,session,session+':'+turn,model,at,input,cached,output,0,'response_record',cost,null);if(cacheKnown)db.prepare('INSERT INTO native_event_cache VALUES(?,1)').run(id);};
+  try{
+    addSession('s1','/project-a','sol');addSession('s2','/project-a','astra');addSession('s3','/project-b','sol');
+    // Turn started yesterday in UTC, but usage event belongs to today in UTC+7.
+    addTurn('s1','cross','sol',day-60_000);addEvent('e1','s1','cross','sol',day+30*60_000,1000,100,200,true,0.01);
+    addTurn('s2','unknown-cache','astra',day+60*60_000);addEvent('e2','s2','unknown-cache','astra',day+90*60_000,500,50,0,false,null);
+    addTurn('s3','zero','sol',day+2*60*60_000);addEvent('e3','s3','zero','sol',day+2*60*60_000,0,0,0,true,0);
+    addTurn('s3','missing','sol',day+3*60*60_000); // activity, no usage record
+    addSession('no-rollout','/project-b','sol');db.prepare('UPDATE native_sessions SET updated_at=? WHERE id=?').run(day+3.5*60*60_000,'no-rollout');
+    const result=collector.insights({range:'today'},now),s=result.summary;
+    assert.equal(result.time_zone,'Asia/Ho_Chi_Minh');assert.equal(result.bucket_unit,'hour');
+    assert.equal(s.input_tokens,1500);assert.equal(s.output_tokens,150);assert.equal(s.total_tokens,s.input_tokens+s.output_tokens);
+    assert.equal(s.cached_input_tokens,null);assert.equal(s.cache_unknown_input_tokens,500);assert.equal(s.uncached_input_tokens,null);
+    assert.equal(s.cache_known_events,2);
+    assert.equal(s.cache_unknown_events,1);
+    assert.equal(s.cost_usd,0.01);
+    assert.equal(s.unpriced_events,1);
+    assert.equal(s.turns,4);assert.equal(s.usage_known_turns,3);assert.equal(s.usage_unknown_turns,1);assert.equal(s.usage_complete,false);
+    assert.equal(s.sessions_without_usage,1);
+    assert.equal(result.buckets.reduce((a,b)=>a+b.total_tokens,0),s.total_tokens);
+    assert.equal(result.buckets.find(b=>b.key==='2026-10-20T00')!.total_tokens,1100);
+    assert.equal(result.buckets.find(b=>b.key==='2026-10-20T02')!.activity_present,true);assert.equal(result.buckets.find(b=>b.key==='2026-10-20T02')!.total_tokens,0);
+    assert.equal(result.buckets.find(b=>b.key==='2026-10-20T03')!.activity_present,true);assert.equal(result.buckets.find(b=>b.key==='2026-10-20T03')!.usage_unknown_turns,1);assert.equal(result.buckets.find(b=>b.key==='2026-10-20T03')!.sessions_without_usage,1);
+    assert.equal(result.buckets.at(-1)!.complete,false);
+    assert.equal(result.projects.reduce((a,b)=>a+b.total_tokens,0),s.total_tokens);assert.equal(result.models.reduce((a,b)=>a+b.total_tokens,0),s.total_tokens);assert.equal(result.sources.reduce((a,b)=>a+b.total_tokens,0),s.total_tokens);
+    const seven=collector.insights({range:'7d'},now);
+    assert.equal(seven.hourly_activity.filter(b=>b.activity_present).length,4);
+    assert.match(seven.hourly_activity[0]!.key,/^\d{4}-\d{2}-\d{2}T\d{2}$/);
+    const filtered=collector.insights({range:'today',project:'/project-a',model:'sol',source:'vscode'},now);
+    assert.equal(filtered.summary.total_tokens,1100);assert.equal(filtered.projects.length,1);assert.equal(filtered.models.length,1);assert.equal(filtered.sources.length,1);
+    const yesterday=collector.insights({range:'yesterday'},now);assert.equal(yesterday.summary.total_tokens,0);
+  }finally{db.close();await collector.close();await rm(dir,{recursive:true,force:true});}
+});
+
+test('insights counts each used turn once across hourly and daily buckets in the active filters',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'native-insights-turn-buckets-')),dbpath=join(dir,'stats.sqlite');
+  const now=Date.parse('2026-10-20T05:30:00Z'),day=Date.parse('2026-10-19T17:00:00Z'),hour=3_600_000;
+  const collector=new NativeUsage(dbpath,join(dir,'no-codex')),db=new DatabaseSync(dbpath);
+  try{
+    db.prepare('INSERT INTO native_sessions(id,cwd,source,model,created_at,updated_at) VALUES(?,?,?,?,?,?)').run('s','/long-turn','cli','sol',day-hour,now);
+    for(const [id,started] of [['long',day-hour],['second',day+2.75*hour],['missing',day+3*hour],['zero',day+4*hour]] as const)
+      db.prepare('INSERT INTO native_turns VALUES(?,?,?,?,?,?,?)').run('s:'+id,'s','sol','high',started,now,'completed');
+    for(const [id,turn,at,input] of [
+      ['before','long',day-.5*hour,100],['first','long',day+.5*hour,100],
+      ['later','long',day+1.5*hour,100],['same-hour','long',day+1.6*hour,100],
+      ['last','long',day+2.5*hour,100],['second','second',day+2.75*hour,100],
+      ['zero','zero',day+4*hour,0],['unattributed','unattributed',day+5*hour,100],
+    ] as const){
+      db.prepare('INSERT INTO native_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(id,'s','s:'+turn,'sol',at,input,0,0,0,'response_record',0,null);
+      db.prepare('INSERT INTO native_event_cache VALUES(?,1)').run(id);
+    }
+    for(const range of ['today','yesterday','7d','30d'] as const)for(const filters of [{},{project:'/long-turn',model:'sol',source:'cli'},{model:'absent'}]){
+      const result=collector.insights({range,...filters},now),s=result.summary;
+      assert.equal(s.usage_known_turns,filters.model==='absent'?0:range==='yesterday'?1:3);
+      for(const rows of [result.buckets,...(range==='7d'?[result.hourly_activity]:[])]){
+        for(const key of ['turns','usage_known_turns','usage_unknown_turns','total_tokens'] as const)
+          assert.equal(rows.reduce((sum,row)=>sum+row[key],0),s[key],`${range}: ${key} must reconcile`);
+      }
+      for(const rows of [result.projects,result.models,result.sources])
+        assert.equal(rows.reduce((sum,row)=>sum+row.usage_known_turns,0),s.usage_known_turns);
+    }
+    const today=collector.insights({range:'today'},now);
+    assert.equal(today.buckets.find(b=>b.key.endsWith('T00'))!.usage_known_turns,1);
+    assert.equal(today.buckets.find(b=>b.key.endsWith('T01'))!.usage_known_turns,0);
+    assert.equal(today.buckets.find(b=>b.key.endsWith('T02'))!.usage_known_turns,1);
+    assert.equal(today.buckets.find(b=>b.key.endsWith('T05'))!.usage_known_turns,0);
+    const seven=collector.insights({range:'7d'},now);
+    assert.equal(seven.buckets.find(b=>b.key==='2026-10-19')!.usage_known_turns,1);
+    assert.equal(seven.buckets.find(b=>b.key==='2026-10-20')!.usage_known_turns,2);
+  }finally{db.close();await collector.close();await rm(dir,{recursive:true,force:true});}
+});
+
+test('insights aggregates a large isolated event history in SQLite without session pagination',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'native-insights-large-')),dbpath=join(dir,'stats.sqlite'),now=Date.parse('2026-10-20T05:30:00Z');
+  const collector=new NativeUsage(dbpath,join(dir,'no-codex')),db=new DatabaseSync(dbpath);
+  try{
+    db.prepare('INSERT INTO native_sessions(id,cwd,source,model,created_at,updated_at) VALUES(?,?,?,?,?,?)').run('large','/large','cli','sol',now-30*86_400_000,now);
+    db.exec(`WITH RECURSIVE seq(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM seq WHERE i<40000)
+      INSERT INTO native_events SELECT 'event-'||i,'large','large:unattributed','sol',${now}-(i%30)*86400000,(i%1000),0,(i%100),0,'response_record',NULL,NULL FROM seq`);
+    db.exec("INSERT INTO native_event_cache SELECT id,1 FROM native_events");
+    const began=performance.now(),result=collector.insights({range:'30d'},now),elapsed=performance.now()-began;
+    assert.equal(result.summary.usage_records,40000);assert.equal(result.summary.input_tokens,19980000);
+    assert.equal(result.buckets.reduce((a,b)=>a+b.usage_records,0),40000);assert.equal(result.projects.length,1);
+    assert.ok(elapsed<10000,`40k usage records aggregation took ${Math.round(elapsed)}ms`);
+    console.info('Native Insights fixture: 40k events in '+Math.round(elapsed)+'ms');
   }finally{db.close();await collector.close();await rm(dir,{recursive:true,force:true});}
 });

@@ -62,6 +62,12 @@ test('dashboard routes preserve auth and record successful, invalid, tool and fa
     assert.equal((await app.inject({url:'/api/native/overview',headers:{...headers,origin:'https://evil.test'}})).statusCode,403);
     assert.equal((await app.inject({url:'/api/native/overview',headers:{...headers,origin:'http://localhost:80'}})).statusCode,200);
     assert.equal((await app.inject({url:'/api/native/overview?range=bad',headers})).statusCode,400);
+    assert.equal((await app.inject({url:'/api/native/insights'})).statusCode,401);
+    assert.equal((await app.inject({url:'/api/native/insights',headers:{...headers,origin:'https://evil.test'}})).statusCode,403);
+    assert.equal((await app.inject({url:'/api/native/insights?range=today',headers:{...headers,origin:'http://localhost:80'}})).statusCode,200);
+    assert.equal((await app.inject({url:'/api/native/insights?range=bad',headers})).statusCode,400);
+    assert.equal((await app.inject({url:'/dashboard/assets/usage-insights.js'})).statusCode,200);
+    assert.equal((await app.inject({url:'/dashboard/assets/usage-insights.css'})).statusCode,200);
     assert.equal((await app.inject({ url: '/api/stats/overview', headers: { ...headers, origin: 'https://evil.test' } })).statusCode, 403);
     assert.equal((await app.inject({ url: '/api/stats/overview', headers: { ...headers, origin: 'http://localhost:80' } })).statusCode, 200);
     assert.equal((await app.inject({ method: 'POST', url: '/chat', headers, payload: { prompt: 'hi', model: 'custom-model', reasoning: 'high' } })).statusCode, 200);

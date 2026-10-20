@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eff3f8">
+  <title>Codex Usage Insights · Prototype</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brandmark" aria-hidden="true">C</span>
+      <div><strong>Codex Server</strong><span class="brand-divider"></span><span>Usage Insights</span></div>
+    </div>
+    <div class="topbar-actions">
+      <span class="prototype-label"><i></i>Dữ liệu mẫu · Prototype</span>
+      <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Chuyển sang chế độ tối" aria-pressed="false">◐</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-heading">
+      <div>
+        <p class="eyebrow">CODEX USAGE</p>
+        <h1>Usage Insights</h1>
+        <p class="subtitle">Hiểu cách token được dùng theo thời gian, project và model.</p>
+      </div>
+      <div class="heading-meta"><span class="tz-chip">UTC+7 · Hồ Chí Minh</span><span id="updated-at"></span></div>
+    </section>
+
+    <section class="toolbar" aria-label="Bộ lọc usage">
+      <div class="filters">
+        <label>Project<select id="project-filter" aria-label="Lọc theo project"></select></label>
+        <label>Model<select id="model-filter" aria-label="Lọc theo model"></select></label>
+        <label>Nguồn<select id="source-filter" aria-label="Lọc theo nguồn"></select></label>
+      </div>
+      <div class="range-control" role="group" aria-label="Khoảng thời gian">
+        <button type="button" data-range="today" aria-pressed="true">Hôm nay</button>
+        <button type="button" data-range="yesterday" aria-pressed="false">Hôm qua</button>
+        <button type="button" data-range="7d" aria-pressed="false">7 ngày</button>
+        <button type="button" data-range="30d" aria-pressed="false">30 ngày</button>
+      </div>
+    </section>
+
+    <section class="kpi-grid" id="kpis" aria-label="Tổng quan usage"></section>
+
+    <section class="insights-section" aria-labelledby="insights-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">USAGE INSIGHTS</p><h2 id="insights-title">Nhịp sử dụng</h2></div>
+        <div class="metric-switch" role="group" aria-label="Chỉ số biểu đồ">
+          <button type="button" data-metric="tokens" aria-pressed="true">Tokens</button>
+          <button type="button" data-metric="cost" aria-pressed="false">Chi phí ước tính</button>
+          <button type="button" data-metric="turns" aria-pressed="false">Turns</button>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <article class="panel primary-panel">
+          <div class="panel-heading">
+            <div><h3 id="primary-title">Usage theo giờ</h3><p id="primary-subtitle"></p></div>
+            <span class="chart-unit" id="chart-unit">tokens</span>
+          </div>
+          <div id="primary-chart" class="chart-wrap"></div>
+          <div id="primary-legend" class="chart-legend"></div>
+          <p id="primary-note" class="panel-note"></p>
+        </article>
+
+        <aside class="analysis-column">
+          <article class="panel secondary-panel">
+            <div class="panel-heading">
+              <div><h3 id="secondary-title">Project share</h3><p id="secondary-subtitle"></p></div>
+              <div id="distribution-toggle" class="distribution-toggle" hidden role="group" aria-label="Cách xem phân bổ">
+                <button type="button" data-distribution="project" aria-pressed="true">Project</button>
+                <button type="button" data-distribution="model" aria-pressed="false">Model</button>
+              </div>
+            </div>
+            <div id="secondary-chart" class="secondary-chart"></div>
+            <div id="secondary-legend" class="distribution-legend"></div>
+          </article>
+        </aside>
+      </div>
+      <article class="panel composition-panel">
+        <div class="panel-heading compact-heading">
+          <div><h3>Cơ cấu token</h3><p>Input đã cache + input chưa cache + output</p></div>
+          <label class="check-label"><input id="hide-cache" type="checkbox"> Ẩn cache</label>
+        </div>
+        <div id="composition-chart" class="composition-content"></div>
+      </article>
+      <div id="chart-tooltip" class="chart-tooltip" role="status" aria-live="polite">Rê chuột hoặc chạm vào biểu đồ để xem chi tiết.</div>
+      <p class="data-disclaimer">Dữ liệu và đơn giá trong prototype đều được tạo để minh họa. Chi phí API tương đương không phải khoản bị trừ từ gói ChatGPT.</p>
+    </section>
+
+    <section class="detail-grid" aria-label="Chi tiết theo project, model và hoạt động">
+      <article class="panel detail-panel"><div class="panel-heading"><div><h3>Theo project</h3><p>Phân bổ trong khoảng đang chọn</p></div></div><div id="project-table" class="table-wrap"></div></article>
+      <article class="panel detail-panel"><div class="panel-heading"><div><h3>Theo model</h3><p>Turns có usage và chi phí ước tính</p></div></div><div id="model-table" class="table-wrap"></div></article>
+      <article class="panel detail-panel"><div class="panel-heading"><div><h3>Hoạt động gần đây</h3><p>Bucket theo thời điểm phát sinh usage</p></div></div><div id="timeline-table" class="table-wrap"></div></article>
+      <article class="panel detail-panel"><div class="panel-heading"><div><h3>Sessions</h3><p>Usage thiếu hiển thị là chưa biết</p></div></div><div id="session-table" class="table-wrap"></div></article>
+    </section>
+
+    <footer><span>CODEX LOCAL SERVER <i>·</i> UI EXPLORATION</span><span>Không kết nối API · Không ghi dữ liệu</span></footer>
+  </main>
+</body>
+</html>

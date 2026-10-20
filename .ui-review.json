@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "project": "Codex Local Server",
+  "baseUrl": "http://codex-server.localhost",
+  "matchOrigins": [
+    "http://127.0.0.1:15600",
+    "http://localhost:15600"
+  ],
+  "outputDir": "artifacts/ui-review",
+  "viewports": {
+    "desktop": {
+      "width": 1440,
+      "height": 1000
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844
+    },
+    "small-mobile": {
+      "width": 320,
+      "height": 740
+    }
+  },
+  "capture": {
+    "reducedMotion": true,
+    "timeoutMs": 30000
+  },
+  "targets": [
+    {
+      "id": "dashboard",
+      "name": "Dashboard · Codex usage",
+      "route": "/dashboard",
+      "viewports": [
+        "desktop",
+        "mobile",
+        "small-mobile"
+      ],
+      "captureMode": "fullPage",
+      "pdf": true,
+      "waitUntil": "load",
+      "settleMs": 300,
+      "actions": [
+        {
+          "type": "waitFor",
+          "selector": "main h1",
+          "state": "visible"
+        }
+      ]
+    },
+    {
+      "id": "stats",
+      "name": "Thống kê",
+      "route": "/dashboard",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "captureMode": "fullPage",
+      "pdf": false,
+      "waitUntil": "load",
+      "settleMs": 300,
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[data-view=\"stats\"]"
+        },
+        {
+          "type": "waitFor",
+          "selector": "#view-stats",
+          "state": "visible"
+        }
+      ]
+    },
+    {
+      "id": "performance-lab",
+      "name": "Performance Lab",
+      "route": "/dashboard",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "captureMode": "fullPage",
+      "pdf": false,
+      "waitUntil": "load",
+      "settleMs": 300,
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[data-view=\"lab\"]"
+        },
+        {
+          "type": "waitFor",
+          "selector": "#view-lab",
+          "state": "visible"
+        }
+      ]
+    },
+    {
+      "id": "video-builds",
+      "name": "Video builds",
+      "route": "/dashboard",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "captureMode": "fullPage",
+      "pdf": false,
+      "waitUntil": "load",
+      "settleMs": 300,
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[data-view=\"videos\"]"
+        },
+        {
+          "type": "waitFor",
+          "selector": "#view-videos",
+          "state": "visible"
+        }
+      ]
+    },
+    {
+      "id": "model-catalog",
+      "name": "Model và giá",
+      "route": "/dashboard",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "captureMode": "fullPage",
+      "pdf": false,
+      "waitUntil": "load",
+      "settleMs": 300,
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[data-view=\"catalog\"]"
+        },
+        {
+          "type": "waitFor",
+          "selector": "#view-catalog",
+          "state": "visible"
+        }
+      ]
+    }
+  ],
+  "presets": {
+    "product-review": {
+      "targets": [
+        "dashboard",
+        "stats",
+        "performance-lab",
+        "video-builds",
+        "model-catalog"
+      ],
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "diagnostics": true
+    }
+  }
+}
