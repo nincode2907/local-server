@@ -72,12 +72,13 @@
           <li><b>File</b><span><code>DATA_DIR/sessions.json</code></span></li><li><b>Nội dung</b><span>Messages, model, reasoning, thread ID, thời gian cập nhật</span></li><li><b>Lifecycle</b><span>TTL mặc định 24h; lỗi/timeout sẽ xóa session để không resume history dang dở</span></li><li><b>Riêng tư</b><span>Có lưu prompt/response trong messages</span></li>
         </ul></article>
         <article class="panel data-panel native"><div class="data-kicker"><h3>Native Codex usage</h3><span class="tag">READ-ONLY SOURCE</span></div><p>Dashboard tổng hợp lịch sử Codex App/CLI cục bộ trên máy server.</p><ul>
-          <li><b>Nguồn</b><span><code>NATIVE_CODEX_HOME</code> → <code>CODEX_HOME</code> → <code>~/.codex</code></span></li><li><b>Đọc</b><span><code>state_5.sqlite</code> và rollout JSONL</span></li><li><b>Lưu kết quả</b><span>Các bảng native trong <code>DATA_DIR/stats.sqlite</code></span></li><li><b>Riêng tư</b><span>Giữ ID/project/model/time/usage; không giữ transcript text</span></li>
+          <li><b>Nguồn</b><span><code>NATIVE_CODEX_HOME</code> → <code>CODEX_HOME</code> → <code>~/.codex</code></span></li><li><b>Đọc</b><span><code>state_5.sqlite</code> và rollout JSONL</span></li><li><b>Lưu kết quả</b><span>Các bảng native trong <code>DATA_DIR/stats.sqlite</code></span></li><li><b>Riêng tư</b><span>Usage không giữ transcript; notification mặc định tắt</span></li>
         </ul></article>
       </div>
       <div class="separation"><span>Không tự sync giữa Mac và Windows</span></div>
       <p class="callout"><strong>Video builds:</strong> <code>video_builds</code> + <code>video_stages</code> giữ metadata, scores và manifest version 1 trong SQLite hiện có. Session/turn scopes nối native events/turns, không sao chép token/cost/time. Transaction ngăn scopes chồng nhau; approved preview cắt usage tại thời điểm duyệt. Native session detail hiển thị tag Video/Stage. Đường dẫn preview/final chỉ là metadata.</p>
       <p class="callout"><strong>Playground:</strong> nội dung chat chỉ giữ trong bộ nhớ tab; gửi lại context mỗi lượt và dùng Codex `--ephemeral`. Vì vậy native rollout collector không thấy usage của các thread này.</p>
+      <p class="callout"><strong>Completion notifications:</strong> tùy chọn local trong dashboard, mặc định tắt. Server chỉ xét lượt terminal kể từ lúc process khởi động và ghi delivery theo session/turn để deduplicate. Private mode chỉ gửi project/trạng thái; Preview mới kèm title đã lọc. Gửi qua macOS `osascript`, tôn trọng quyền hệ thống/Focus; nút test không gọi model.</p>
     </section>
 
     <section id="api" aria-labelledby="api-title">
@@ -100,7 +101,7 @@
       <div class="section-head"><div><p class="eyebrow">05 / Code map</p><h2 id="files-title">Mở file nào để tìm phần nào?</h2></div><span class="section-index">SOURCE</span></div>
       <div class="file-map">
         <div class="file"><code>src/index.ts</code><span>Khởi động server, listen, shutdown.</span></div><div class="file"><code>src/config.ts</code><span>Parse và validate cấu hình.</span></div><div class="file"><code>src/server.ts</code><span>Routes, auth, session và orchestration.</span></div>
-        <div class="file"><code>src/provider.ts</code><span>Spawn Codex CLI và parse JSONL.</span></div><div class="file"><code>src/schema.ts</code><span>Zod request schemas, transcript validation.</span></div><div class="file"><code>src/protocol.ts</code><span>Prompt, structured output và tool call mapping.</span></div>
+        <div class="file"><code>src/provider.ts</code><span>Spawn Codex CLI và parse JSONL.</span></div><div class="file"><code>src/native-notifications.ts</code><span>Settings, dedupe và gửi macOS notification.</span></div><div class="file"><code>src/schema.ts</code><span>Zod request schemas, transcript validation.</span></div><div class="file"><code>src/protocol.ts</code><span>Prompt, structured output và tool call mapping.</span></div>
         <div class="file"><code>src/sessions.ts</code><span>Gateway sessions và atomic JSON writes.</span></div><div class="file"><code>src/metrics.ts</code><span>Gateway usage, costs và SQLite.</span></div><div class="file"><code>src/native-usage.ts</code><span>Native rollout collector và parser.</span></div>
         <div class="file"><code>src/dashboard.ts</code><span>Phục vụ dashboard assets và API.</span></div><div class="file"><code>public/dashboard.*</code><span>HTML, CSS, JS của UI hiện tại.</span></div><div class="file"><code>data/models.json</code><span>Model catalog và snapshot giá tham khảo.</span></div>
         <div class="file"><code>src/video-builds.ts</code><span>Metadata/manifest video; nối native usage, approval cutoff và so sánh.</span></div>

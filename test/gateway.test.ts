@@ -88,6 +88,22 @@ test('host/origin guards and optional bearer token', async () => {
     assert.equal((await f.app.inject({ url: '/health', headers: { origin: 'https://attacker.test', authorization: 'Bearer secret' } })).statusCode, 403);
   } finally { await f.close(); }
 });
+test('notification settings require the admin key, same-origin marker, and valid settings schema',async()=>{
+  const f=await fixture({LOCAL_API_KEY:'secret'});
+  const auth={authorization:'Bearer secret','host':'codex-server.localhost','origin':'http://codex-server.localhost'};
+  const settings={enabled:false,notify_completed:true,notify_errors:false,play_sound:true,sound:'Glass',privacy_mode:'private',excluded_projects:['private-project']};
+  try{
+    assert.equal((await f.app.inject({url:'/api/native/notifications/settings'})).statusCode,401);
+    assert.equal((await f.app.inject({url:'/api/native/notifications/settings',headers:auth})).statusCode,200);
+    assert.equal((await f.app.inject({method:'PUT',url:'/api/native/notifications/settings',headers:{...auth,'content-type':'application/json'},payload:settings})).statusCode,403);
+    assert.equal((await f.app.inject({method:'PUT',url:'/api/native/notifications/settings',headers:{...auth,origin:'http://attacker.test','content-type':'application/json','x-codex-notifications':'1'},payload:settings})).statusCode,403);
+    const saved=await f.app.inject({method:'PUT',url:'/api/native/notifications/settings',headers:{...auth,'content-type':'application/json','x-codex-notifications':'1'},payload:settings});
+    assert.equal(saved.statusCode,200);assert.equal(saved.json().enabled,false);assert.deepEqual(saved.json().excluded_projects,['private-project']);
+    const invalid=await f.app.inject({method:'PUT',url:'/api/native/notifications/settings',headers:{...auth,'content-type':'application/json','x-codex-notifications':'1'},payload:{...settings,sound:'arbitrary'}});
+    assert.equal(invalid.statusCode,400);
+    assert.equal((await f.app.inject({method:'POST',url:'/api/native/notifications/test',headers:{...auth,'content-type':'application/json'},payload:{}})).statusCode,403);
+  }finally{await f.close();}
+});
 test('busy sessions and global concurrency reject competing requests; timeout cancels', async () => {
   let entered!: () => void; const ready = new Promise<void>(r => { entered = r; });
   const f = await fixture({ REQUEST_TIMEOUT_MS: '80', MAX_CONCURRENT: '1' }, async (_prompt, options) => {

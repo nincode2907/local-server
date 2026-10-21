@@ -4,11 +4,12 @@ import { readdir, stat } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { join, basename } from 'node:path';
 import { estimateCost, periodKey } from './catalog.js';
+import { NativeNotifications, safeTaskTitle, type NotificationRunner, type NotificationSettings } from './native-notifications.js';
 
 type Usage = { input_tokens: number; cached_input_tokens: number; cache_known: boolean; output_tokens: number; reasoning_output_tokens: number };
-type Turn = { id: string; model: string; reasoning: string; started_at: number; finished_at: number | null; status: string };
+type Turn = { id: string; model: string; reasoning: string; started_at: number; finished_at: number | null; status: string; task_title?:string|null };
 type Event = Usage & { id: string; turn_id: string; model: string; timestamp: number; basis: string };
-type Metadata = { id: string; cwd: string; source: string; model: string; created_at: number; updated_at: number };
+type Metadata = { id: string; cwd: string; source: string; model: string; created_at: number; updated_at: number; title?:string };
 const keys = ['input_tokens','cached_input_tokens','output_tokens','reasoning_output_tokens'] as const;
 function usage(value: any): Usage | null {
   if (!value || !['input_tokens','output_tokens'].every(k => Number.isSafeInteger(value[k]) && value[k] >= 0)) return null;
@@ -24,8 +25,16 @@ function sourceName(source: unknown, cwd: string) {
 /** Only metadata/usage is retained; transcript text is never returned or persisted. */
 export async function parseRollout(lines: AsyncIterable<string>, fallback?: Metadata) {
   let meta: Metadata | undefined = fallback && { ...fallback }, active: Turn | undefined, previous: Usage | null = null;
+  let lastRequestTitle:string|null=null;
   let lineNumber = 0, malformed = 0, resets = 0, fork = false, historyStart = 0;
-  const turns = new Map<string,Turn>(), events: Event[] = [], seen = new Set<string>(), canonical = new Set<string>();
+  const turns = new Map<string,Turn>(), events: Event[] = [], seen = new Set<string>(), canonical = new Set<string>(), failedTurns=new Set<string>();
+  const requestText=(value:any):string=>{
+    if(typeof value==='string')return value;
+    if(Array.isArray(value))return value.map(requestText).filter(Boolean).join(' ');
+    if(value&&typeof value==='object')return requestText(value.text??value.message??value.content);
+    return '';
+  };
+  const saveUserTitle=(value:any)=>{const title=safeTaskTitle(requestText(value));if(title){lastRequestTitle=title;if(active)active.task_title=title;}};
   const ensureTurn = (id: string, timestamp: number) => {
     let t = turns.get(id);
     if (!t) { t = { id, model: active?.model ?? meta?.model ?? 'unknown', reasoning: active?.reasoning ?? 'unknown', started_at: timestamp, finished_at: null, status: 'observed' }; turns.set(id,t); }
@@ -37,9 +46,9 @@ export async function parseRollout(lines: AsyncIterable<string>, fallback?: Meta
     if (!r || typeof r !== 'object' || !r.payload || typeof r.payload !== 'object') continue;
     const p = r.payload, timestamp = Date.parse(r.timestamp);
     if (r.type === 'session_meta' && typeof p.id === 'string') {
-      if (meta && meta.id !== p.id) { turns.clear(); events.length=0; seen.clear(); canonical.clear(); active=undefined; previous=null; }
+      if (meta && meta.id !== p.id) { turns.clear(); events.length=0; seen.clear(); canonical.clear(); failedTurns.clear();active=undefined; previous=null;lastRequestTitle=null; }
       const cwd = typeof p.cwd === 'string' ? p.cwd : meta?.cwd ?? 'unknown';
-      meta = { id: p.id, cwd, source: sourceName(p.source ?? meta?.source,cwd), model: meta?.model ?? 'unknown', created_at: Date.parse(p.timestamp ?? r.timestamp), updated_at: meta?.updated_at ?? timestamp };
+      meta = { id: p.id, cwd, source: sourceName(p.source ?? meta?.source,cwd), model: meta?.model ?? 'unknown', created_at: Date.parse(p.timestamp ?? r.timestamp), updated_at: meta?.updated_at ?? timestamp,title:typeof p.title==='string'?p.title:meta?.title };
       fork = Boolean(p.forked_from_id || p.parent_thread_id || typeof p.source === 'object' && p.source?.subagent);
       historyStart = Number.isSafeInteger(p.subagent_history_start_ordinal) ? p.subagent_history_start_ordinal : 0; continue;
     }
@@ -47,14 +56,20 @@ export async function parseRollout(lines: AsyncIterable<string>, fallback?: Meta
     meta.updated_at = Math.max(meta.updated_at || 0,timestamp);
     if (r.type === 'event_msg' && p.type === 'task_started') {
       active = ensureTurn(typeof p.turn_id === 'string' ? p.turn_id : `turn-${lineNumber}`,timestamp);
-      active.started_at = timestamp; active.status = 'started';
+      active.started_at = timestamp; active.status = 'started';active.task_title=lastRequestTitle??safeTaskTitle(meta.title);
+    } else if(r.type==='event_msg'&&p.type==='user_message'){
+      saveUserTitle(p.message??p.content);
+    } else if(r.type==='response_item'&&p.type==='message'&&p.role==='user'){
+      saveUserTitle(p.content);
     } else if (r.type === 'turn_context') {
       active = ensureTurn(typeof p.turn_id === 'string' ? p.turn_id : active?.id ?? `turn-${lineNumber}`,timestamp);
       if (typeof p.model === 'string') active.model = meta.model = p.model;
       if (typeof p.effort === 'string') active.reasoning = p.effort;
-    } else if (r.type === 'event_msg' && ['task_complete','turn_aborted'].includes(p.type)) {
+    } else if(r.type==='event_msg'&&p.type==='error'&&p.codex_error_info?.affects_turn_status===true){
+      const id=typeof p.turn_id==='string'?p.turn_id:active?.id;if(id)failedTurns.add(id);
+    } else if (r.type === 'event_msg' && ['task_complete','turn_complete','turn_aborted','turn_failed','task_failed'].includes(p.type)) {
       const t = typeof p.turn_id === 'string' ? turns.get(p.turn_id) : active;
-      if (t) { t.finished_at = timestamp; t.status = p.type === 'task_complete' ? 'completed' : 'aborted'; }
+      if (t) { t.finished_at = timestamp;t.status=['task_complete','turn_complete'].includes(p.type)?failedTurns.has(t.id)||p.error?'failed':'completed':['turn_aborted'].includes(p.type)?'cancelled':'failed'; }
     } else if (r.type === 'token_usage_record') {
       if (p.thread_id && p.thread_id !== meta.id) continue;
       const u = usage(p.usage); if (!u) continue;
@@ -121,12 +136,13 @@ function nativeWindow(range: NativeRange, now = Date.now()) {
 }
 export class NativeUsage {
   private db: DatabaseSync;
+  readonly notifications:NativeNotifications;
   private timer?: NodeJS.Timeout;
   private syncing?: Promise<void>;
   private stopped = false;
   private lastSync: number | null = null;
   private issues: string[] = [];
-  constructor(path: string, private home: string, private interval = 30_000) {
+  constructor(path: string, private home: string, private interval = 30_000, notificationStartedAt=Date.now(), notificationRunner?:NotificationRunner) {
     this.db = new DatabaseSync(path);
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;
       CREATE TABLE IF NOT EXISTS native_sessions(id TEXT PRIMARY KEY,cwd TEXT NOT NULL,source TEXT NOT NULL,model TEXT NOT NULL,created_at INTEGER,updated_at INTEGER,rollout_path TEXT,malformed INTEGER DEFAULT 0,resets INTEGER DEFAULT 0);
@@ -141,13 +157,14 @@ export class NativeUsage {
       CREATE TABLE IF NOT EXISTS native_settings(key TEXT PRIMARY KEY,value TEXT);
 
     `);
-    const parserVersion = '3';
+    const parserVersion = '4';
     if (this.db.prepare("SELECT value FROM native_settings WHERE key='parser_version'").get()?.value !== parserVersion) {
       this.db.exec('DELETE FROM native_files');
       this.db.exec('DELETE FROM native_event_cache');
       this.db.exec('UPDATE native_events SET cost_usd=NULL');
       this.db.prepare("INSERT OR REPLACE INTO native_settings VALUES('parser_version',?)").run(parserVersion);
     }
+    this.notifications=new NativeNotifications(this.db,notificationStartedAt,notificationRunner);
   }
   start() {
     void this.sync(); this.timer = setInterval(() => void this.sync(),this.interval); this.timer.unref();
@@ -167,11 +184,11 @@ export class NativeUsage {
       const state = new DatabaseSync(statePath,{readOnly:true});
       try {
         const columns = new Set(state.prepare('PRAGMA table_info(threads)').all().map(r => r.name));
-        const selected = ['id','cwd','source','model','created_at','updated_at'].filter(k => columns.has(k));
+        const selected = ['id','cwd','source','model','created_at','updated_at','title'].filter(k => columns.has(k));
         if (!selected.includes('id')) throw new Error('unsupported schema');
         for (const r of state.prepare(`SELECT ${selected.join(',')} FROM threads`).all()) {
           const cwd = String(r.cwd ?? 'unknown');
-          metadata.set(String(r.id),{id:String(r.id),cwd,source:sourceName(r.source,cwd),model:String(r.model ?? 'unknown'),created_at:Number(r.created_at ?? 0)*1000,updated_at:Number(r.updated_at ?? 0)*1000});
+          metadata.set(String(r.id),{id:String(r.id),cwd,source:sourceName(r.source,cwd),model:String(r.model ?? 'unknown'),created_at:Number(r.created_at ?? 0)*1000,updated_at:Number(r.updated_at ?? 0)*1000,title:typeof r.title==='string'?r.title:undefined});
         }
       } finally { state.close(); }
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.issues.push('Không đọc được state_5.sqlite; tiếp tục đọc rollout JSONL.'); }
@@ -194,6 +211,7 @@ export class NativeUsage {
             let parsed; try { parsed = await parseRollout(lines,hint ? metadata.get(hint) : undefined); } finally { lines.close(); stream.destroy(); }
             const m = parsed.meta; if (!m || !Number.isFinite(m.created_at)) continue;
             const after = await stat(path);
+            let hasPendingNotification=false;
             this.db.exec('BEGIN');
             try {
               upsert.run(m.id,m.cwd,m.source,m.model,m.created_at,m.updated_at);
@@ -203,7 +221,10 @@ export class NativeUsage {
               this.db.prepare('DELETE FROM native_event_cache WHERE event_id IN (SELECT id FROM native_events WHERE session_id=?)').run(m.id);
               this.db.prepare('DELETE FROM native_events WHERE session_id=?').run(m.id);
               this.db.prepare('DELETE FROM native_turns WHERE session_id=?').run(m.id);
-              for (const t of parsed.turns) this.db.prepare('INSERT INTO native_turns VALUES(?,?,?,?,?,?,?)').run(`${m.id}:${t.id}`,m.id,t.model,t.reasoning,t.started_at,t.finished_at,t.status);
+              for (const t of parsed.turns) {
+                this.db.prepare('INSERT INTO native_turns VALUES(?,?,?,?,?,?,?)').run(`${m.id}:${t.id}`,m.id,t.model,t.reasoning,t.started_at,t.finished_at,t.status);
+                if(t.finished_at!==null&&['completed','failed','cancelled'].includes(t.status))hasPendingNotification=this.notifications.record({id:t.id,session_id:m.id,project:m.cwd,model:t.model,status:t.status as 'completed'|'failed'|'cancelled',terminal_at:t.finished_at,duration_ms:t.finished_at>=t.started_at?t.finished_at-t.started_at:null,task_title:safeTaskTitle(t.task_title)})||hasPendingNotification;
+              }
               for (const e of parsed.events) {
                 const id = `${m.id}:${e.id}`, existing = prices.get(id);
                 let cost = e.cache_known ? estimateCost(e.model,e.input_tokens,e.output_tokens,e.cached_input_tokens) : null;
@@ -221,6 +242,7 @@ export class NativeUsage {
               }
               if (before.size === after.size && before.mtimeMs === after.mtimeMs && !parsed.malformed) this.db.prepare('INSERT OR REPLACE INTO native_files VALUES(?,?,?)').run(path,after.size,after.mtimeMs);
               this.db.exec('COMMIT');
+              if(hasPendingNotification)void this.notifications.dispatchPending().catch(()=>{});
             } catch (error) { this.db.exec('ROLLBACK'); throw error; }
           } catch { this.issues.push('Một rollout không đọc được; giữ thống kê lần trước.'); }
         }
@@ -411,5 +433,9 @@ export class NativeUsage {
     const spikes = contextSpikes(samples.map(e => ({id:String(e.id),session_id:id,turn_id:String(e.turn_id),model:String(e.model),timestamp:Number(e.timestamp),input_tokens:Number(e.input_tokens)})));
     return {session,spikes,turns:this.db.prepare(`SELECT t.*,COUNT(e.id) AS calls,SUM(e.input_tokens) AS input_tokens,CASE WHEN SUM(CASE WHEN e.id IS NOT NULL AND c.cache_known IS NOT 1 THEN 1 ELSE 0 END)>0 THEN NULL ELSE SUM(e.cached_tokens) END AS cached_tokens,SUM(e.output_tokens) AS output_tokens,SUM(e.reasoning_tokens) AS reasoning_tokens,SUM(e.cost_usd) AS cost_usd FROM native_turns t LEFT JOIN native_events e ON e.turn_id=t.id LEFT JOIN native_event_cache c ON c.event_id=e.id WHERE t.session_id=? GROUP BY t.id ORDER BY t.started_at`).all(id),events:this.db.prepare('SELECT e.*,c.cache_known FROM native_events e LEFT JOIN native_event_cache c ON c.event_id=e.id WHERE e.session_id=? ORDER BY e.timestamp DESC LIMIT 200').all(id)};
   }
-  async close() { this.stopped=true; clearInterval(this.timer); await this.syncing; this.db.close(); }
+  notificationSettings(){return this.notifications.settings();}
+  saveNotificationSettings(settings:NotificationSettings){return this.notifications.saveSettings(settings);}
+  testNotification(){return this.notifications.test();}
+  recentNotifications(limit=12){return this.notifications.recent(limit);}
+  async close() { this.stopped=true; clearInterval(this.timer); await this.syncing; await this.notifications.close(); this.db.close(); }
 }

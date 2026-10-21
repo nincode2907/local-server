@@ -72,12 +72,15 @@ export async function buildServer(config: Config, provider: Provider) {
     const playground = req.method === 'POST' && path === '/api/playground/chat';
     const videoWrite=['POST','PUT'].includes(req.method)&&/^\/api\/videos(?:\/[^/]{1,128})?$/.test(path);
     const inspectorWrite = req.method === 'DELETE' && (/^\/api\/stats\/calls\/[a-f0-9-]{36}\/inspector$/.test(path) || path === '/api/stats/inspector');
+    const notificationWrite=['POST','PUT'].includes(req.method)&&/^\/api\/native\/notifications\/(settings|test)$/.test(path);
+    if(notificationWrite&&(req.headers['x-codex-notifications']!=='1'||!req.headers['content-type']?.startsWith('application/json')||req.headers.origin&&req.headers.origin!==`http://${host}`))
+      throw new ApiError(403,'notification_origin_denied','Notification settings require same-origin JSON and X-Codex-Notifications: 1.');
     if (inspectorWrite && (req.headers['x-codex-inspector'] !== '1' || !req.headers['content-type']?.startsWith('application/json') || req.headers.origin && req.headers.origin !== `http://${host}`))
       throw new ApiError(403, 'inspector_origin_denied', 'Inspector deletion requires same-origin JSON and X-Codex-Inspector: 1.');
     if(videoWrite&&(!req.headers['content-type']?.startsWith('application/json')||req.headers['x-codex-video']!=='1'||req.headers.origin&&req.headers.origin!==`http://${host}`))
       throw new ApiError(403,'video_origin_denied','Video metadata cần JSON, cùng origin và X-Codex-Video: 1.');
     if (playground && (req.headers.origin !== `http://${host}` || req.headers['x-codex-playground'] !== '1' || !req.headers['content-type']?.startsWith('application/json'))) throw new ApiError(403, 'browser_origin_denied', 'Playground requires same-origin JSON requests.');
-    if (req.headers.origin && !((req.method === 'GET' && dashboardRead(path) || playground || videoWrite || inspectorWrite || runWrite || labWrite) && req.headers.origin === `http://${host}`)) {
+    if (req.headers.origin && !((req.method === 'GET' && dashboardRead(path) || playground || videoWrite || inspectorWrite || runWrite || labWrite || notificationWrite) && req.headers.origin === `http://${host}`)) {
       throw new ApiError(403, 'browser_origin_denied', 'Only same-origin dashboard reads are allowed.');
     }
     // App credentials authorize only owned runs and stateless inference; dashboard and sessions remain admin-only.

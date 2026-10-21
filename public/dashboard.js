@@ -469,6 +469,7 @@ document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click'
 let nativePage = 1, nativeController, nativeLoading = false;
 let nativeProjects = [], nativeProjectTotal = 0;
 let nativeProjectSort = { key: 'tokens', direction: 'desc' };
+let nativeNotificationLoad=null;
 function sortedNativeProjects(list) {
   const value = row => nativeProjectSort.key === 'tokens' ? row.input_tokens + row.output_tokens : row.calls > row.unpriced_events ? row.cost_usd : null;
   return [...list].sort((a,b) => {
@@ -519,6 +520,7 @@ function nativeOptions(id,values,label) {
 function nativeGrouped(list,total,project=false) { return list.map(r=>`<tr><td class="${project ? 'native-path' : 'model-name'}">${project ? `<strong>${escape(r.key.split('/').filter(Boolean).pop() ?? r.key)}</strong><small>${escape(r.key)}</small>` : escape(r.key)}<div class="native-meter"><span data-native-width="${total ? (r.input_tokens+r.output_tokens)/total*100 : 0}"></span></div></td>${project ? '' : `<td class="number">${number(r.sessions)}</td>`}<td class="number">${number(r.input_tokens+r.output_tokens)}</td><td class="number">${r.tokens_per_turn === null ? '—' : number(Math.round(r.tokens_per_turn))}<small class="native-stat-note">${number(r.usage_turns)} turn có usage</small></td>${project ? `<td class="number">${money(r.cost_per_session)}<small class="native-stat-note">${number(r.priced_sessions)}/${number(r.sessions)} session đủ giá${r.unpriced_sessions ? ' · tổng có thể thiếu' : ''}</small></td>` : ''}<td class="number">${nativeCost(r)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty-table">Chưa có usage trong bộ lọc</td></tr>'; }
 async function loadNative({quiet=false}={}) {
   if (quiet && nativeLoading) return;
+  void loadNativeNotificationSettings();
   nativeController?.abort(); const controller = nativeController = new AbortController(); nativeLoading=true;
   $('native-refresh').disabled=true;
   const params = new URLSearchParams({range:$('native-range').value,group:$('native-group').value,page:nativePage});
@@ -571,6 +573,38 @@ async function loadNative({quiet=false}={}) {
     $('native-sync').textContent=error.message;if(error.auth)$('auth-form').hidden=false;
   } finally {if(controller===nativeController){nativeLoading=false;$('native-refresh').disabled=false;}}
 }
+function notificationWrite(path,body,method='POST'){
+  return fetch(path,{method,cache:'no-store',headers:{'Content-Type':'application/json','X-Codex-Notifications':'1',...(apiKey?{Authorization:`Bearer ${apiKey}`}:{})},body:JSON.stringify(body)}).then(async response=>{
+    const data=await response.json();if(!response.ok){const error=new Error(data.error==='unsupported_platform'?'Thông báo native chỉ hỗ trợ macOS.':data.error==='osascript_unavailable'?'Không tìm thấy osascript trên máy này.':'macOS không gửi được thông báo. Hãy kiểm tra quyền Notifications của tiến trình server.');error.auth=response.status===401;throw error;}return data;
+  });
+}
+function renderRecentNotifications(events){
+  const names={completed:'Hoàn tất',failed:'Lỗi',cancelled:'Đã hủy'},delivery={pending:'Đang gửi',sending:'Đang gửi',delivered:'Đã gửi',failed:'Gửi lỗi',filtered:'Đã lọc',disabled:'Đang tắt',interrupted:'Bị ngắt'};
+  $('notifications-recent').innerHTML=events.length?events.map(e=>`<li><span><strong>${escape(e.project)}</strong> · ${escape(names[e.status]??e.status)}<small>${escape(delivery[e.delivery_state]??e.delivery_state)}${e.task_title?` · ${escape(e.task_title)}`:''}</small></span><time>${escape(date(e.terminal_at))} ${escape(time(e.terminal_at))}</time></li>`).join(''):'<li class="empty-table">Chưa có lượt mới được theo dõi.</li>';
+}
+function loadNativeNotificationSettings(){
+  if(nativeNotificationLoad)return nativeNotificationLoad;
+  nativeNotificationLoad=Promise.all([get('/api/native/notifications/settings'),get('/api/native/notifications/recent?limit=12')]).then(([settings,recent])=>{
+    $('notifications-enabled').checked=settings.enabled;$('notifications-completed').checked=settings.notify_completed;$('notifications-errors').checked=settings.notify_errors;$('notifications-sound-enabled').checked=settings.play_sound;
+    $('notifications-sound').innerHTML=settings.sounds.map(s=>`<option value="${escape(s)}">${escape(s)}</option>`).join('');$('notifications-sound').value=settings.sound;
+    $('notifications-privacy').value=settings.privacy_mode;$('notifications-excluded').value=settings.excluded_projects.join('\n');
+    $('notification-summary-status').textContent=settings.enabled?'Đang bật':'Đang tắt';renderRecentNotifications(recent.events);
+  }).catch(error=>{if(error.auth)$('auth-form').hidden=false;else $('notifications-status').textContent=error.message;nativeNotificationLoad=null;});
+  return nativeNotificationLoad;
+}
+$('notifications-save').addEventListener('click',async()=>{
+  const button=$('notifications-save');button.disabled=true;$('notifications-status').textContent='Đang lưu…';
+  const settings={enabled:$('notifications-enabled').checked,notify_completed:$('notifications-completed').checked,notify_errors:$('notifications-errors').checked,play_sound:$('notifications-sound-enabled').checked,sound:$('notifications-sound').value,privacy_mode:$('notifications-privacy').value,excluded_projects:$('notifications-excluded').value.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean)};
+  try{const saved=await notificationWrite('/api/native/notifications/settings',settings,'PUT');$('notification-summary-status').textContent=saved.enabled?'Đang bật':'Đang tắt';$('notifications-status').textContent='Đã lưu trên máy này.';nativeNotificationLoad=null;await loadNativeNotificationSettings();}
+  catch(error){$('notifications-status').textContent=error.message;if(error.auth)$('auth-form').hidden=false;}
+  finally{button.disabled=false;}
+});
+$('notifications-test').addEventListener('click',async()=>{
+  const button=$('notifications-test');button.disabled=true;$('notifications-status').textContent='Đang gửi thông báo thử…';
+  try{await notificationWrite('/api/native/notifications/test',{});$('notifications-status').textContent='Đã gửi thông báo thử. macOS có thể ẩn thông báo theo Focus hoặc quyền hệ thống.';}
+  catch(error){$('notifications-status').textContent=error.message;if(error.auth)$('auth-form').hidden=false;}
+  finally{button.disabled=false;}
+});
 async function nativeDetail(id) {
   try {
     const d=await get(`/api/native/sessions/${encodeURIComponent(id)}`), s=d.session;

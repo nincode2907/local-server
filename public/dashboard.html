@@ -94,6 +94,23 @@
           <article id="insight-heatmap-card" class="insights-card heatmap-card" hidden><div class="insights-card-head"><div><h3>Hoạt động theo giờ · 7 ngày</h3><p>Ô trống = không hoạt động; dấu ? = turn có activity nhưng chưa có usage.</p></div><span id="insight-heatmap-note"></span></div><div id="insight-heatmap" class="insight-heatmap-scroll"></div></article>
         </div>
       </section>
+      <details id="native-notification-settings" class="panel native-notifications">
+        <summary><span><strong>Thông báo khi Codex hoàn tất lượt</strong><small>Native macOS · hoạt động cả khi dashboard đóng</small></span><span id="notification-summary-status" class="notification-summary-status">Đang tải cài đặt…</span></summary>
+        <div class="notification-settings-body">
+          <p class="usage-note">Thông báo dựa trên terminal event trong rollout local. Server cần đang chạy; quyền thông báo và Focus do macOS quản lý.</p>
+          <div class="notification-options">
+            <label><input id="notifications-enabled" type="checkbox"> Bật thông báo native</label>
+            <label><input id="notifications-completed" type="checkbox"> Khi lượt hoàn tất</label>
+            <label><input id="notifications-errors" type="checkbox"> Khi lượt lỗi hoặc bị hủy</label>
+            <label><input id="notifications-sound-enabled" type="checkbox"> Phát âm thanh</label>
+            <label>Âm thanh<select id="notifications-sound"></select></label>
+            <label>Quyền riêng tư<select id="notifications-privacy"><option value="private">Riêng tư · project và trạng thái</option><option value="preview">Xem trước · kèm tiêu đề yêu cầu</option></select></label>
+          </div>
+          <label class="notification-exclusions">Bỏ qua project · mỗi dòng một tên project<textarea id="notifications-excluded" rows="2" maxlength="2000" placeholder="Ví dụ: private-project&#10;client-a"></textarea></label>
+          <div class="notification-actions"><button id="notifications-save" class="primary" type="button">Lưu cài đặt</button><button id="notifications-test" class="quiet" type="button">Test notification</button><p id="notifications-status" role="status" aria-live="polite"></p></div>
+          <div class="notification-recent"><h3>Lượt gần đây</h3><ul id="notifications-recent" aria-live="polite"><li class="empty-table">Chưa có lượt mới được theo dõi.</li></ul></div>
+        </div>
+      </details>
       <section class="panel spike-panel"><div class="panel-heading"><div><h2>Context spikes <span id="native-spike-count" class="badge rejected">0</span></h2><p id="native-spike-note">Input của record tăng &gt;2× và đạt ≥50k, cùng session và model. Chỉ báo cần kiểm tra, không kết luận lãng phí.</p></div></div><div class="table-scroll"><table><thead><tr><th>Session / project</th><th>Model / thời điểm</th><th>Input gần nhất</th><th class="number">Tăng</th><th>Chi tiết</th></tr></thead><tbody id="native-spikes"></tbody></table></div></section>
       <div class="native-grid"><section class="panel"><div class="panel-heading"><div><h2>Theo project</h2><p>Token/turn theo turn có usage · cost/session theo session có đủ giá trong bộ lọc</p></div></div><div class="table-scroll"><table><thead><tr><th>Project / cwd</th><th class="number" aria-sort="descending"><button type="button" class="table-sort" data-project-sort="tokens" aria-label="Token: giảm dần. Bấm để sắp xếp tăng dần">Token <span aria-hidden="true">↓</span></button></th><th class="number">Token / turn</th><th class="number">USD / session</th><th class="number" aria-sort="none"><button type="button" class="table-sort" data-project-sort="cost" aria-label="Sắp xếp USD ước tính giảm dần">USD ước tính <span aria-hidden="true">↕</span></button></th></tr></thead><tbody id="native-projects"></tbody></table></div></section><section class="panel"><div class="panel-heading"><div><h2>Theo model</h2><p>Session và turn có usage trong bộ lọc</p></div></div><div class="table-scroll"><table><thead><tr><th>Model</th><th class="number">Session</th><th class="number">Token</th><th class="number">Avg token / turn</th><th class="number">USD ước tính</th></tr></thead><tbody id="native-models"></tbody></table></div></section></div>
       <section class="panel native-periods"><div class="panel-heading"><div><h2>Usage theo thời gian</h2><p>UTC+7 · tính theo thời điểm usage được ghi vào log</p></div></div><div class="table-scroll cost-scroll"><table><thead><tr><th>Kỳ</th><th class="number">Usage records</th><th class="number">Input</th><th class="number">Cache</th><th class="number">Output</th><th class="number">USD ước tính</th></tr></thead><tbody id="native-periods"></tbody></table></div></section>

@@ -85,6 +85,9 @@ Sandbox giới hạn khả năng ghi và network của agent nhưng không cô l
 | `GET` | `/dashboard` | Dashboard thống kê, Codex usage, playground, model catalog |
 | `GET` | `/api/stats/*` | Gateway calls, overview và costs |
 | `GET` | `/api/native/overview`, `/api/native/sessions/:id` | Usage từ Codex local của máy server |
+| `GET` | `/api/native/notifications/settings`, `/api/native/notifications/recent` | Settings và lịch sử thông báo terminal local |
+| `PUT` | `/api/native/notifications/settings` | Lưu lựa chọn thông báo, admin + same-origin marker |
+| `POST` | `/api/native/notifications/test` | Gửi notification thử qua macOS, không gọi model |
 
 Function calling được mô phỏng bằng structured output: model đề xuất `tool_calls`, server kiểm tra JSON Schema draft-07, client tự thực thi rồi gửi lại `role=tool`. Không có lệnh/hàm do caller cung cấp được gateway thực thi.
 
@@ -111,6 +114,8 @@ Quyền riêng tư: `sessions.json` có chứa nội dung messages để tiếp 
 Chi phí là ước lượng dựa vào `data/models.json`, không phải hóa đơn ChatGPT Plus. Giá được đóng băng theo call; usage hoặc giá thiếu được thể hiện là chưa biết, không suy đoán từ văn bản.
 
 Native parser ưu tiên response usage record, khử trùng theo response ID và xử lý log cũ bằng delta bộ đếm tích lũy. Context spike là chỉ báo input cùng session/model tăng hơn 2 lần và đạt ít nhất 50k; nó không tự kết luận lãng phí.
+
+Native completion notifications dùng cùng rollout parser để nhận `task_complete`/`turn_complete`, `turn_aborted` và lỗi ảnh hưởng trạng thái turn. Bảng `native_notification_settings` giữ cấu hình local; `native_notification_events` lưu terminal event theo session/turn ID để deduplicate và ghi trạng thái delivery. Mặc định tắt, chỉ xét event kết thúc sau lúc process hiện tại khởi động, không phát lại event `pending/sending` sau crash. Project exclusion so theo basename. Privacy `private` chỉ gửi project/trạng thái và xóa title đã lưu; `preview` có thể kèm title đã lọc trong notification thành công. Sender gọi `/usr/bin/osascript` bằng đối số riêng, âm thanh theo allowlist; không bypass quyền Notifications/Focus. Nếu hệ thống không nhận được lời gọi, delivery giữ mã lỗi bounded, không làm lỗi collector.
 
 `src/video-builds.ts` tạo additive hai bảng STRICT `video_builds` và `video_stages` trong cùng database. Lưu metadata, scores, manifest version 1 và session/turn scopes; không lưu token/cost/time hoặc transcript. Đọc một SQLite snapshot để nối `native_events` / `native_turns`; ghi manifest và các stages trong transaction, kiểm tra scope không chồng nhau toàn cục. Không đặt FK vào native sessions để experiment có thể được nhập trước collector. Approved preview có cutoff `approved_at`; số liệu thiếu giữ null. Định dạng và công thức nằm ở mục Video builds trong README.
 

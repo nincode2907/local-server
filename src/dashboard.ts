@@ -8,6 +8,7 @@ import type { Config } from './config.js';
 import type { Metrics } from './metrics.js';
 import { VideoBuilds } from './video-builds.js';
 import type { Inspector } from './inspector.js';
+import { notificationSounds } from './native-notifications.js';
 
 export function dashboardAsset(path: string) {
   if (/^\/dashboard\/requests\/[a-f0-9-]{36}$/.test(path)) return true;
@@ -16,7 +17,7 @@ export function dashboardAsset(path: string) {
 export function dashboardRead(path: string) {
   if(path==='/api/resources'||path==='/v1/providers'||path==='/v1/models'||/^\/api\/lab(?:\/batches(?:\/[a-f0-9-]{36}(?:\/(?:events|export))?)?)?$/.test(path))return true;
   if (['/api/runs','/api/runs/events','/api/runs/latency'].includes(path) || /^\/v1\/runs\/[a-f0-9-]{36}(?:\/events)?$/.test(path)) return true;
-  return /^\/api\/videos(?:\/[^/]{1,128})?$/.test(path) || /^\/api\/native\/(overview|insights|sessions\/[^/]{1,128})$/.test(path) || dashboardAsset(path) || ['/api/models', '/api/stats/costs', '/api/stats/overview', '/api/stats/calls'].includes(path) || /^\/api\/stats\/calls\/[a-f0-9-]{36}(?:\/inspector)?$/.test(path);
+  return /^\/api\/videos(?:\/[^/]{1,128})?$/.test(path) || /^\/api\/native\/(overview|insights|sessions\/[^/]{1,128}|notifications\/(settings|recent))$/.test(path) || dashboardAsset(path) || ['/api/models', '/api/stats/costs', '/api/stats/overview', '/api/stats/calls'].includes(path) || /^\/api\/stats\/calls\/[a-f0-9-]{36}(?:\/inspector)?$/.test(path);
 }
 export async function registerDashboard(app: FastifyInstance, metrics: Metrics, config: Config, active: () => number, native: NativeUsage, inspector: Inspector) {
   const html = await readFile(new URL('../public/dashboard.html', import.meta.url), 'utf8');
@@ -70,6 +71,20 @@ export async function registerDashboard(app: FastifyInstance, metrics: Metrics, 
   app.get('/api/native/insights', async (req, reply) => {
     const input = z.object({range:z.enum(['today','yesterday','7d','30d','all','24h']).default('today'),model:z.string().max(128).optional(),source:z.string().max(128).optional(),project:z.string().max(4096).optional()}).strict().parse(req.query);
     return reply.headers(security).send(native.insights(input));
+  });
+  app.get('/api/native/notifications/settings',async(_req,reply)=>reply.headers(security).send({...native.notificationSettings(),sounds:notificationSounds}));
+  app.put('/api/native/notifications/settings',async(req,reply)=>{
+    const input=z.object({enabled:z.boolean(),notify_completed:z.boolean(),notify_errors:z.boolean(),play_sound:z.boolean(),sound:z.enum(notificationSounds),privacy_mode:z.enum(['private','preview']),excluded_projects:z.array(z.string().trim().min(1).max(120)).max(50)}).strict().parse(req.body);
+    const settings={...input,excluded_projects:[...new Set(input.excluded_projects.map(v=>v.trim()).filter(Boolean))]};
+    return reply.headers(security).send({...native.saveNotificationSettings(settings),sounds:notificationSounds});
+  });
+  app.get('/api/native/notifications/recent',async(req,reply)=>{
+    const input=z.object({limit:z.coerce.number().int().min(1).max(50).default(12)}).strict().parse(req.query);
+    return reply.headers(security).send({events:native.recentNotifications(input.limit)});
+  });
+  app.post('/api/native/notifications/test',async(_req,reply)=>{
+    const result=await native.testNotification();
+    return result.ok?reply.headers(security).send({ok:true}):reply.headers(security).code(503).send({ok:false,error:result.code});
   });
   app.get<{ Params: { id: string } }>('/api/native/sessions/:id', async (req, reply) => {
     const result = native.detail(z.string().min(1).max(128).parse(req.params.id));
