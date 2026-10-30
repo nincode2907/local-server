@@ -211,7 +211,7 @@ known/unknown sample counts, method. Tối đa 100.000 run mới nhất; `total_
 `truncated` công khai nếu bị cắt. Không trộn native usage; call cũ chưa có gateway_run
 không được backfill thành sample 0. Dashboard có cùng bộ lọc và sample counts.
 
-Codex run snapshot còn có `metrics.cli_lifecycle`, với mốc monotonic tính từ lúc
+Codex run dùng transport exec còn có `metrics.cli_lifecycle`, với mốc monotonic tính từ lúc
 provider bắt đầu: yêu cầu spawn, process spawn, stdin finish/close, event stdout
 đầu tiên, `turn.completed` nhận và được gateway xử lý, số event stdout sau mốc đó,
 iterator kết thúc, stdout/stderr end/close, process exit/close, observer response,
@@ -264,12 +264,26 @@ workflow state và event/payload hash dedup; không lưu label/message.
 Không lưu prompt, response, tool arguments, reasoning hoặc event body vào SQLite.
 Inspector opt-in vẫn có retention/redaction riêng; native usage tiếp tục tách dataset.
 
-SDK 0.160.0 đã được chạy spike bằng executable giả, không dùng account.
-`runStreamed()` phát event nhưng đường spawn thiếu `--ignore-user-config`,
-`--ignore-rules`, `--ephemeral`. Vì chưa đạt policy parity, implementation giữ
-CLI JSONL đã cô lập và bổ sung public item callbacks. Capability
-`item_updates_when_available` không cam kết token delta: CLI có thể chỉ phát text
-khi item hoàn tất. Không cắt text cuối thành chunk để giả lập tốc độ sinh.
+Mặc định `CODEX_TRANSPORT=app-server`: process thường trú, JSON-RPC qua stdio,
+nhận `item/agentMessage/delta` và ghép text theo item trước khi trích public content.
+Events được định tuyến theo threadId + turnId; chỉ public text được chuyển ra SSE.
+Tool proposals vẫn chờ schema validation cuối. Usage là chênh lệch total tích lũy
+so với mốc trước turn; không dùng last vì nó chỉ chứa lần gọi model cuối. Khi
+resume sau restart mà chưa có baseline, usage giữ unknown; TTFT/generation duration
+vẫn unknown.
+Capability là `app-server-stdio` / `content_deltas`; không xem mỗi delta là token.
+
+`metrics.app_server_lifecycle` ghi connection_reused, connection_ready_ms,
+thread_ready_ms, turn_started_ms, first_delta_ms, turn_completed_ms và
+provider_returned_ms từ provider.run. first_delta là delta raw đầu tiên,
+có thể chỉ chứa JSON envelope; TTFO vẫn là public content đầu tiên của gateway.
+Shared process được ghi rõ, không quy CPU/RAM thành inference của một request.
+
+`CODEX_TRANSPORT=exec` giữ CLI JSONL cô lập với capability
+`item_updates_when_available`; CLI có thể chỉ phát text khi item hoàn tất.
+SDK runStreamed spike vẫn thiếu ignore-config/rules/ephemeral flags.
+Không cắt kết quả cuối thành chunk để giả lập streaming. Xem
+[TECHNICAL.md](TECHNICAL.md#provider) cho auth, isolation, migration và hủy request.
 
 ## App keys, browser và Docker
 

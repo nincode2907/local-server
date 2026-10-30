@@ -5,6 +5,7 @@ import { buildServer } from './server.js';
 const config = readConfig();
 const provider = await createProvider(config);
 try {
+  await provider.warmup?.();
   const app = await buildServer(config, provider);
   await app.listen({ host: config.host, port: config.port });
   const shutdown = () => { void app.close().catch(() => { process.exitCode = 1; }); };

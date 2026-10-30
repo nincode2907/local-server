@@ -5,7 +5,7 @@ import { ApiError } from './errors.js';
 import type { Config } from './config.js';
 import { Workflows } from './workflows.js';
 
-import {codexCapabilities,providerCapabilities,type ProviderId,type ProviderTiming,type CliLifecycleTiming} from './provider-types.js';
+import {codexCapabilities,providerCapabilities,type ProviderId,type ProviderTiming,type CliLifecycleTiming,type AppServerLifecycleTiming} from './provider-types.js';
 export const capabilities=codexCapabilities;
 export interface BenchmarkTag {batch_id:string;phase:'warmup'|'measured';iteration:number;scenario:string}
 export interface ActivityEvent {
@@ -43,6 +43,7 @@ export class ActivityRun {
   usage: Usage | null = null;
   timing:ProviderTiming={};
   cliLifecycle:CliLifecycleTiming|null=null;
+  appServerLifecycle:AppServerLifecycleTiming|null=null;
   error: string | null = null;
   cancelReason: 'explicit' | 'disconnect' | 'timeout' | 'shutdown' | null = null;
   constructor(readonly id: string, readonly owner: string, readonly model: string,
@@ -60,7 +61,7 @@ export class ActivityRun {
     const metric = (input: number | null, unit: string, source: string, reason: string | null = null) => {const value=input!==null&&Number.isFinite(input)?input:null;return {value,unit,source,reason:value===null?reason??'Metric unavailable.':null};};
     return { run_id: this.id, call_id: this.id, model: this.model, provider: this.provider, status: this.status,...(this.benchmark?{benchmark:this.benchmark}:{}),
       workflow:this.store.workflows.snapshot(this.id),history:{samples:[...this.samples],sample_count:this.sampleCount,truncated:this.sampleCount>this.samples.length,available:true},
-      created_at: this.createdAt, seq: this.seq, ephemeral: this.ephemeral, error_code: this.error, capabilities:providerCapabilities(this.provider),
+      created_at: this.createdAt, seq: this.seq, ephemeral: this.ephemeral, error_code: this.error, capabilities:providerCapabilities(this.provider,this.store.codexTransport),
       timeline: { received: 0, enqueued:this.queuedAt,dequeued:this.dequeuedAt, provider_started: this.providerStarted, first_output: this.firstOutput,
         last_output: this.lastOutput, provider_finished: this.providerFinished, first_content_sent: this.firstSent, finished: this.duration, response_finished: this.responseFinished },
       metrics: {
@@ -80,6 +81,7 @@ export class ActivityRun {
           'tokens/s', 'derived', 'Requires final usage and elapsed duration; includes reasoning.'),
         output_tokens: metric(this.usage?.output_tokens ?? null, 'tokens', 'provider_reported', 'Final usage not reported yet.'),
         cli_lifecycle:this.cliLifecycle?{...this.cliLifecycle,unit:'ms',origin:'provider.run start',source:'gateway_observed'}:null,
+        app_server_lifecycle:this.appServerLifecycle?{...this.appServerLifecycle,unit:'ms',origin:'provider.run start',source:'gateway_observed'}:null,
         output_bytes: metric(this.outputBytes, 'bytes', 'gateway_observed'),
         output_characters: metric(this.outputChars, 'characters', 'gateway_observed'),
         output_updates: metric(this.outputUpdates, 'updates', 'gateway_observed'),
@@ -134,7 +136,9 @@ export class Activities {
   readonly workflows:Workflows;
   private subscribers=new Map<string,Set<Listener>>();
   private workflowLogs=new Map<string,{events:ActivityEvent[];bytes:number;updated:number}>();
+  readonly codexTransport:Config['codexTransport'];
   constructor(config: Config) {
+    this.codexTransport=config.codexTransport;
     this.db = new DatabaseSync(config.statsDbPath);
     this.db.exec(`PRAGMA busy_timeout=3000;
       CREATE TABLE IF NOT EXISTS gateway_runs (
@@ -168,7 +172,7 @@ export class Activities {
     const run = new ActivityRun(id, owner, model, ephemeral, this, acceptedAt,queued,provider,benchmark);
     this.db.prepare('INSERT INTO gateway_runs(id,owner,created_at,status,metadata,idempotency,request_hash) VALUES(?,?,?,?,?,?,?)')
       .run(id, owner, run.createdAt, run.status, JSON.stringify(run.snapshot()), key ? digest(key) : null, hash ?? null);
-    this.runs.set(id, run); run.emit('run.accepted', {model, capabilities});if(queued)run.emit('run.queued'); return run;
+    this.runs.set(id, run); run.emit('run.accepted', {model, capabilities:providerCapabilities(provider,this.codexTransport)});if(queued)run.emit('run.queued'); return run;
   }
   duplicate(owner: string, key: string, hash: string) {
     const row = this.db.prepare('SELECT id,request_hash FROM gateway_runs WHERE owner=? AND idempotency=?').get(owner, digest(key));

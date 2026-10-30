@@ -24,7 +24,7 @@ Browser → Dashboard API ────────────→ metrics SQLite
 | Fastify 5 | HTTP routes, hooks, giới hạn body, error handler |
 | Zod | Xác thực request, session và query |
 | Ajv | Kiểm tra function arguments theo JSON Schema |
-| `@openai/codex-sdk` / Codex CLI | Giao thức JSONL và thực thi Codex |
+| `@openai/codex-sdk` / Codex CLI 0.160.0 | Kiểu dữ liệu, app-server JSON-RPC qua stdio; adapter exec tùy chọn |
 | SQLite | Gateway metrics và native usage đã tổng hợp |
 | HTML/CSS/JavaScript thuần | Dashboard; không cần frontend bundler |
 
@@ -33,7 +33,8 @@ Browser → Dashboard API ────────────→ metrics SQLite
 ```text
 src/index.ts
   ├─ src/config.ts   → đọc/validate biến môi trường
-  ├─ src/provider.ts → chạy Codex CLI, đọc JSONL
+  ├─ src/provider.ts → chọn transport; adapter exec tương thích
+  ├─ src/app-server-provider.ts → process thường trú, RPC và delta
   └─ src/server.ts   → HTTP, session, metrics và dashboard
 ```
 
@@ -44,9 +45,9 @@ src/index.ts
 3. Zod xác thực messages, model, reasoning và tool definitions. Transcript được kiểm tra để mọi function call có kết quả tool tương ứng.
 4. Gateway áp dụng giới hạn concurrency, timeout, session lock và `AbortController`.
 5. `promptFor()` tạo hướng dẫn cho Codex. Function call là JSON đầu ra; server không thực thi function đó.
-6. Provider gọi CLI bằng `child_process.spawn()` với args riêng biệt, đọc JSONL từ stdout. CLI dùng sandbox `read-only`, approval `never`, network của sandbox tắt; shell, web, apps, plugins và multi-agent bị tắt.
+6. Provider mặc định tái sử dụng process `codex app-server --listen stdio://`, gọi `thread/start` hoặc `thread/resume`, rồi `turn/start`. JSON-RPC và notifications đi qua stdin/stdout. Sandbox `read-only`, approval `never`, network của sandbox tắt; shell, web, apps, plugins và multi-agent bị tắt. `CODEX_TRANSPORT=exec` chọn adapter spawn từng lượt.
 7. Server kiểm tra structured output và arguments, chặn event tool execution ngoài dự kiến, ghi usage rồi trả response.
-8. Client disconnect hoặc timeout sẽ hủy lượt CLI. Session lỗi bị xóa khỏi gateway để tránh resume transcript có thể đã ghi dở.
+8. Client disconnect hoặc timeout gửi `turn/interrupt` cho đúng thread/turn và đợi terminal event. Nếu không dừng trong 5 giây, process dùng chung bị chấm dứt để tránh tiếp tục inference sau hủy; các lượt cùng process cũng lỗi. Session lỗi bị xóa khỏi gateway để tránh resume transcript có thể đã ghi dở.
 
 ```text
 HTTP request
@@ -57,16 +58,24 @@ Zod + transcript + tool-schema checks
     ↓
 concurrency + timeout + cancellation
     ↓
-Codex CLI (`exec --experimental-json`)
+Codex app-server thường trú (`thread/start` → `turn/start`)
     ↓
-JSONL events → structured response validation
+agentMessage delta → public content SSE → structured response validation
     ├─ usage/status/duration → stats.sqlite
     └─ Chat Completions JSON → client
 ```
 
 ### Provider
 
-`src/provider.ts` không chạy shell wrapper: nó gọi executable cùng danh sách đối số. Mặc định executable là Node hiện tại cộng với CLI từ package `@openai/codex`; `CODEX_BIN` thay executable nếu cần. Provider chỉ chuyển một whitelist biến môi trường, gồm `CODEX_HOME` và các biến runtime cần cho Windows; API keys và phần lớn caller environment không được truyền.
+`src/provider.ts` chọn transport; `src/app-server-provider.ts` gọi native binary từ package Codex đã pin, không qua shell/Node launcher. `CODEX_BIN` có thể thay native executable hoặc Node script (.js/.mjs/.cjs) trong chế độ app-server. Provider chỉ chuyển whitelist environment; API keys, proxy endpoints và phần lớn caller environment không được truyền.
+
+App-server 0.160.0 chưa có cờ ignore-config/rules của exec. Gateway dùng `DATA_DIR/codex-app-server` làm Codex home riêng, cwd tạm `codex-gateway-*`, không nạp config/rules/instruction của home cá nhân. Nếu có config, rules, hooks, skills tùy chỉnh, plugins hoặc environments trong home riêng, startup bị từ chối. Chỉ cho phép `skills/.system` do Codex tự tạo; tính năng skills vẫn tắt. Thread admission kiểm tra sandbox/network/approval và instructionSources trước khi gọi inference; turn ghi đè readOnly/networkAccess=false.
+
+ChatGPT access token/account ID chỉ được đọc từ `CODEX_HOME/auth.json` (mặc định `~/.codex/auth.json`) rồi gửi qua RPC `account/login/start` kiểu `chatgptAuthTokens`, giữ trong bộ nhớ. Không sao chép refresh token hoặc sửa auth/config/database/rollout nguồn. Refresh RPC chỉ nhận token mới nếu CLI gốc đã cập nhật cho cùng account; nếu không, trả `codex_auth_refresh_required` và yêu cầu chạy `codex login` rồi thử lại. Keyring-only auth chưa được hỗ trợ bởi bridge này. Đổi account yêu cầu restart gateway.
+
+Thread bền vững của adapter mới nằm trong Codex home riêng; gateway lưu ID dạng `app-server:<native-id>`. Khi đổi transport, session được tái tạo từ `sessions.json`, không sửa thread nguồn. Playground gửi ephemeral=true. Kết thúc lượt unsubscribe; shutdown đóng process. Process lỗi không replay inference; lượt tiếp theo tạo process mới. Không fallback ngầm sang exec/API key. Native observer vẫn chỉ đọc NATIVE_CODEX_HOME đã cấu hình và không tự cộng home mới vào totals.
+
+Usage mỗi turn lấy chênh lệch cumulative tokenUsage.total với baseline đã biết, bao gồm nhiều lần gọi model trong cùng lượt. tokenUsage.last không đại diện toàn bộ turn. Nếu resume sau restart mà không nhận được baseline trước turn, usage giữ unknown. Cache baseline chỉ giữ metadata số của tối đa 512 thread trong bộ nhớ.
 
 Sandbox giới hạn khả năng ghi và network của agent nhưng không cô lập quyền đọc khỏi dữ liệu người dùng trên máy. Gateway nên nhận prompt từ caller tin cậy và không nên được mở trực tiếp ra Internet.
 
@@ -150,6 +159,7 @@ Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `PO
 | `NATIVE_CODEX_HOME` | `CODEX_HOME` hoặc `~/.codex` | Thư mục Codex local đọc usage |
 | `NATIVE_USAGE_INTERVAL_MS` | `30000` | Chu kỳ đọc; tối thiểu 5000 ms |
 | `CODEX_BIN` | CLI đi cùng package | Executable CLI thay thế |
+| `CODEX_TRANSPORT` | `app-server` | Process thường trú qua stdio; `exec` chọn adapter cũ |
 
 ## 9. Bản đồ mã nguồn
 
@@ -158,7 +168,8 @@ Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `PO
 | `src/index.ts` | Bootstrap, listen, shutdown |
 | `src/config.ts` | Parse/validate cấu hình |
 | `src/server.ts` | Routes, auth, orchestration, timeout |
-| `src/provider.ts` | Spawn CLI, JSONL parser, provider policy |
+| `src/provider.ts` | Chọn transport; adapter exec/JSONL tương thích |
+| `src/app-server-provider.ts` | App-server thường trú, RPC/delta, auth bridge và turn isolation |
 | `src/schema.ts` | Zod schema và transcript validation |
 | `src/protocol.ts` | Prompt, structured output, tool calls, response format |
 | `src/sessions.ts` | Gateway session lifecycle, atomic JSON write |
@@ -210,8 +221,8 @@ job cleanup. `public/live.js` dùng unified feed metadata và stream từng run.
 
 App keys chỉ có quyền stateless inference và run của chính app; dashboard/native,
 inspector, video và legacy sessions vẫn admin-only. Docker HOST/Host allowlist
-là opt-in có auth; provider CLI vẫn giữ isolation flags cũ. SDK policy spike
-không đạt ignore-config/rules/ephemeral parity, nên chưa thay runtime sang SDK.
+là opt-in có auth. App-server dùng home riêng và kiểm tra policy tại thread admission;
+adapter exec vẫn giữ isolation flags cũ. SDK policy spike chưa đạt parity.
 API, giới hạn lưu trữ và caveat nằm tại [STREAMING.md](STREAMING.md), bản trực quan
 [STREAMING.html](STREAMING.html). Không nhập output/event body vào SQLite.
 

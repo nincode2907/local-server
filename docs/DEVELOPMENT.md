@@ -69,6 +69,33 @@ routes. Không tự dừng listener đang chạy; xác định PID, command và 
 hạn mức hoặc quyền model của tài khoản. Nếu bật `LOCAL_API_KEY`, health cũng
 cần Bearer token; không đưa token vào tài liệu hay URL.
 
+## Codex app-server thường trú
+
+`CODEX_TRANSPORT=app-server` mặc định; `exec` chọn adapter cũ. `npm start`/dev
+khởi tạo app-server trước HTTP listen, không gọi model trong warmup. Restart
+sau build để chạy provider mới. Không đổi port hay tự restart listener đang dùng.
+
+Process native dùng stdio riêng, không mở WebSocket/TCP port. Auth source là
+CODEX_HOME/auth.json (mặc định ~/.codex/auth.json); home runtime riêng là
+DATA_DIR/codex-app-server. Không trỏ native observer vào home mới để thay totals
+hiện tại. Không đặt config/rules/hooks/plugins hoặc skills tùy chỉnh trong home runtime; gateway sẽ từ chối. `skills/.system` do Codex tự tạo được phép tồn tại, nhưng tính năng skills vẫn tắt.
+
+Access token được giữ trong bộ nhớ; gateway không tự refresh hay sửa auth gốc.
+Nếu nhận codex_auth_required/codex_auth_refresh_required, đăng nhập lại bằng CLI
+gốc rồi thử lại; keyring-only auth cần luồng hỗ trợ riêng. Đổi account cần restart.
+Rollback bằng CODEX_TRANSPORT=exec rồi restart; session tự khôi phục từ lịch sử
+messages trong gateway. Không xóa DATA_DIR để đổi transport.
+
+Kiểm tra không tiêu thụ quota: npm run check, npm run build và npm test.
+Test app-server dùng subprocess synthetic và native initialize/thread/start
+trong thư mục tạm; không gửi turn/start tới model thật. Benchmark/live inference
+vẫn cần được cho phép vì tiêu thụ quota. TTFO và app_server_lifecycle cho biết
+phần chờ public content và thời gian setup; TTFT token vẫn unknown.
+
+Ngày 30/10/2026: check/build và 97 test qua; server đã restart sau khi xác nhận
+idle, health HTTP 200, /v1/providers báo app-server-stdio/content_deltas.
+Không gọi inference thật; health không chứng minh token còn hiệu lực ở backend.
+
 ## Port và Dev Hub
 
 | Nguồn | Trạng thái kiểm tra ngày 06/10/2026 |

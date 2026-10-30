@@ -135,7 +135,7 @@ test('expiry, deletion races, cap and I/O failure are fail-safe',async()=>{
   finally {await f.close();}
 });
 test('real CLI boundary exposes only safe gateway settings before spawn; no account call',async()=>{
-  const provider=await createProvider(readConfig({}));let observed:any;
+  const provider=await createProvider(readConfig({CODEX_TRANSPORT:'exec'}));let observed:any;
   try {
     await assert.rejects(provider.start('model-test','low').run('exact stdin',{outputSchema:{type:'object'},observe:async context=>{observed=context;throw new Error('stop-before-spawn');}}),/stop-before-spawn/);
     assert.equal(observed.stdin,'exact stdin');assert.equal(observed.instructions,gatewayInstructions);assert.equal(observed.model,'model-test');
@@ -151,7 +151,7 @@ test('CLI public partial output and turn.failed are observable; reasoning and st
     {type:'item.completed',item:{id:'public',type:'agent_message',text:'Public partial answer'}},
     {type:'error',message:'Observable public error'}, {type:'turn.failed',error:{message:'Observable failure'}}];
   await writeFile(join(directory,'exec'),`process.stdout.write(${JSON.stringify(events.map(e=>JSON.stringify(e)).join('\n')+'\n')});process.stderr.write('STDERR_PRIVATE_SENTINEL');setTimeout(()=>process.exit(1),30);`);
-  const provider=await createProvider(readConfig({CODEX_BIN:process.execPath}));
+  const provider=await createProvider(readConfig({CODEX_TRANSPORT:'exec',CODEX_BIN:process.execPath}));
   try {
     process.chdir(directory);
     await assert.rejects(provider.start('fake-model').run('fixture',{observeResponse:async response=>{observed=response;}}));
@@ -169,7 +169,7 @@ test('CLI lifecycle separates turn.completed delivery from iterator, exit, stdio
     {type:'item.completed',item:{id:'answer',type:'agent_message',text:'{"content":"OK","tool_calls":[]}'}},
     {type:'turn.completed',usage}];
   await writeFile(join(directory,'exec'),`for(const event of ${JSON.stringify(cliEvents)})console.log(JSON.stringify(event));setTimeout(()=>process.exit(1),160);`);
-  const provider=await createProvider(readConfig({CODEX_BIN:process.execPath}));
+  const provider=await createProvider(readConfig({CODEX_TRANSPORT:'exec',CODEX_BIN:process.execPath}));
   try {
     process.chdir(directory);
     await assert.rejects(provider.start('fixture').run('synthetic',{outputSchema:{type:'object'},

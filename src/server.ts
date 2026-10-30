@@ -177,17 +177,18 @@ export async function buildServer(config: Config, provider: Provider) {
           message_mapping:req?.url.split('?')[0] === '/chat' ? 'Gateway generated user role from client prompt' : (req?.body as {message?:unknown}|undefined)?.message ? 'Gateway generated user role from client message' : 'Original client messages'});
 
         if (call) { metrics.context(call.id, model, effort,selected.id); metrics.running(call.id); }
-        const thread = session?.threadId ? selected.adapter.resume(session.threadId, model, effort) : selected.adapter.start(model, effort, req?.url.split('?')[0] === '/api/playground/chat');
-        const forwardedMessages = session?.threadId ? request.messages : history;
+        const resumeId = session?.threadId && (selected.adapter as Provider).canResume?.(session.threadId) !== false ? session.threadId : undefined;
+        const thread = resumeId ? selected.adapter.resume(resumeId, model, effort) : selected.adapter.start(model, effort, req?.url.split('?')[0] === '/api/playground/chat');
+        const forwardedMessages = resumeId ? request.messages : history;
         const prompt = promptFor(forwardedMessages, request);
         await captureStep('gateway', 'Gateway generated', { prompt, output_schema: outputSchema, effective_parameters: { model, reasoning_effort: effort },
           validated_request: request, session_id: session?.id ?? null, thread_id_before: thread.id,
           forwarded_messages: forwardedMessages.map((message, index) => {
-            const restored = !session?.threadId && index < (session?.messages.length ?? 0);
+            const restored = !resumeId && index < (session?.messages.length ?? 0);
             return { message, provenance: restored ? 'Gateway generated' : 'Client supplied', restored_by_gateway: restored,
               ...(restored && { original_source: { provenance: 'Internal / unavailable', reason: 'Legacy saved session messages do not independently track client versus Codex authorship.' } }) };
           }),
-          context: session?.threadId ? { provenance: 'Internal / unavailable', reason: 'Resumed CLI history is managed by Codex; only new messages are forwarded. Gateway session history is not a reconstruction of the internal prompt.' } : { provenance: 'Gateway generated', reason: session ? 'Gateway prepends its saved session messages for the initial CLI turn.' : 'New stateless CLI thread.' } });
+          context: resumeId ? { provenance: 'Internal / unavailable', reason: 'Resumed history is managed by Codex; only new messages are forwarded. Gateway session history is not a reconstruction of the internal prompt.' } : { provenance: 'Gateway generated', reason: session ? 'Gateway prepends its saved session messages for the initial turn or a transport change.' : 'New stateless thread.' } });
         if(controller.signal.aborted)throw new ApiError(499,'request_cancelled','Request cancelled before provider start.');
         run.providerStarted = run.elapsed(); run.emit('provider.started');
         let responseObserved = false;
@@ -201,6 +202,7 @@ export async function buildServer(config: Config, provider: Provider) {
             } else if(event.type==='usage'){ run.reportUsage(event.usage); metrics.usage(run.id,event.usage); }else run.reportTiming(event.timing);
           },
           onLifecycle: timing => { run.cliLifecycle=timing; },
+          onAppServerLifecycle: timing => { run.appServerLifecycle=timing; },
           observe: async context => captureStep('cli_boundary', 'Gateway generated', context),
           observeResponse: async response => { responseObserved = true; await captureStep('codex_response', 'SDK observable', response); } });
         run.providerFinished = run.elapsed(); run.emit('provider.finished');

@@ -215,3 +215,19 @@ Ollama/LM Studio đang listen tại11434/1234 lúc kiểm tra, nên chưa smoke 
   Inspector của call cũ200. Codex Lab thực tế vẫn disabled; .env thật giữ nguyên.
 - Không gọi inference/benchmark account thật, không tải model. Không có daemon
   Ollama/LM Studio ở11434/1234 để smoke model/hardware thật. Preview/fixture được dọn.
+
+## Transport app-server (30/10/2026)
+
+Codex mặc định dùng process app-server thường trú. Lab vẫn đi qua cùng execution
+path; LAB_ALLOW_CODEX mặc định false. metrics.app_server_lifecycle phân biệt
+connection reuse, thread admission, delta đầu và turn completion; first_delta
+có thể là JSON envelope nên không thay thế TTFO. Không có số đo tăng tốc trên
+account thật. Native initialize/thread/start và các fixture chỉ chứng minh
+protocol/isolation, streaming, concurrency/cancel/restart; không đo model latency.
+Không tối ưu model, reasoning hay cache khi chưa có baseline cùng điều kiện.
+
+Kiểm chứng triển khai: Node 24.21.0/npm 11.19.0, check/build và 97/97 test qua.
+Listener cũ được kiểm tra idle trước restart; health HTTP 200 và /v1/providers
+báo app-server-stdio/content_deltas, native process thường trú đã khởi tạo.
+Auth source có đủ trường cho bridge; chưa kiểm inference hay token validity với
+backend. Không thay .env, model/reasoning, port hoặc totals native.

@@ -237,34 +237,36 @@ test('Docker config requires admin auth, exact trusted hosts and independent app
   } finally {await f.close();}
 });
 
-test('SDK runStreamed policy spike uses fake executable only: required isolation flags are absent, so CLI stays',async()=>{
-  const dir = await mkdtemp(join(tmpdir(),'codex-sdk-spike-')), exe=join(dir,'fake-codex'), args=join(dir,'args.json');
+test('SDK runStreamed policy spike uses fake executable only: required isolation flags are absent',async()=>{
+  const dir = await mkdtemp(join(tmpdir(),'codex-sdk-spike-')), exe=join(dir,'exec'), args=join(dir,'args.json'), originalCwd=process.cwd();
   try {
     await writeFile(exe,`#!/usr/bin/env node\nrequire('fs').writeFileSync(${JSON.stringify(args)},JSON.stringify(process.argv.slice(2)));console.log(JSON.stringify({type:'turn.completed',usage:${JSON.stringify(usage)}}));`,{mode:0o700});
-    const sdk = new Codex({codexPathOverride:exe,env:{PATH:process.env.PATH ?? '',HOME:dir}});
+    process.chdir(dir);
+    const sdk = new Codex({codexPathOverride:process.execPath,env:{PATH:process.env.PATH ?? '',HOME:dir}});
     const streamed = await sdk.startThread({sandboxMode:'read-only',approvalPolicy:'never',networkAccessEnabled:false,webSearchMode:'disabled',skipGitRepoCheck:true,workingDirectory:dir}).runStreamed('synthetic fixture');
     const events=[]; for await (const event of streamed.events) events.push(event);
     assert.equal(events[0]?.type,'turn.completed');
     const observed = JSON.parse(await readFile(args,'utf8'));
     assert.ok(!observed.includes('--ignore-user-config')); assert.ok(!observed.includes('--ignore-rules')); assert.ok(!observed.includes('--ephemeral'));
-  } finally {await rm(dir,{recursive:true,force:true});}
+  } finally {process.chdir(originalCwd);await rm(dir,{recursive:true,force:true});}
 });
 
 test('isolated CLI forwards public item updates only and rejects unexpected tools before completion',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'codex-cli-stream-')), exe=join(dir,'fake-codex');
+  const dir=await mkdtemp(join(tmpdir(),'codex-cli-stream-')), exe=join(dir,'exec'), originalCwd=process.cwd();
   const run = async(events:unknown[]) => {
     await writeFile(exe,`#!/usr/bin/env node\nfor(const event of ${JSON.stringify(events)}) console.log(JSON.stringify(event));`,{mode:0o700});
-    const provider=await createProvider(readConfig({CODEX_BIN:exe})), observed:unknown[]=[];
+    const provider=await createProvider(readConfig({CODEX_TRANSPORT:'exec',CODEX_BIN:process.execPath})), observed:unknown[]=[];
     try {const result=await provider.start('fixture').run('synthetic',{onEvent:e=>observed.push(e)});return {result,observed};}
     finally {await provider.close();}
   };
   try {
+    process.chdir(dir);
     const events=[{type:'item.updated',item:{type:'reasoning',id:'hidden',text:'PRIVATE_SENTINEL'}},
       {type:'item.updated',item:{type:'agent_message',id:'public',text:'{"content":"Hi'}},
       {type:'item.completed',item:{type:'agent_message',id:'public',text:'{"content":"Hi","tool_calls":[]}'}},{type:'turn.completed',usage}];
     const result=await run(events); assert.equal(result.observed.length,3); assert.ok(!JSON.stringify(result.observed).includes('PRIVATE_SENTINEL'));
     await assert.rejects(run([{type:'item.started',item:{type:'command_execution',id:'bad',command:'never executed'}}]),/agent tool/);
-  } finally {await rm(dir,{recursive:true,force:true});}
+  } finally {process.chdir(originalCwd);await rm(dir,{recursive:true,force:true});}
 });
 
 

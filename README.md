@@ -8,7 +8,18 @@ Phase 3: [Ollama / LM Studio / Performance Lab](docs/PERFORMANCE.md)
 ([bản trực quan](docs/PERFORMANCE.html)) với benchmark có giới hạn và resource scope rõ ràng.
 
 
-Local HTTP gateway bằng Node.js + TypeScript + `@openai/codex-sdk`, dùng Codex đã đăng nhập bằng ChatGPT. Mặc định lắng nghe tại `http://127.0.0.1:15600`.
+Local HTTP gateway bằng Node.js + TypeScript + Codex CLI, dùng Codex đã đăng nhập bằng ChatGPT. Mặc định dùng `codex app-server` thường trú qua stdio và lắng nghe tại `http://127.0.0.1:15600`.
+
+`CODEX_TRANSPORT=app-server` là mặc định mới: khởi tạo process trước khi HTTP listen,
+tái sử dụng cho nhiều lượt và chuyển delta thật ra SSE khi `stream:true`.
+`CODEX_TRANSPORT=exec` chọn adapter cũ; không có fallback ngầm. App-server dùng
+Codex home riêng dưới `DATA_DIR/codex-app-server`, đọc access token từ login CLI
+gốc và giữ trong bộ nhớ; không sao chép refresh token. Nếu token cần gia hạn mà
+CLI gốc chưa cập nhật, chạy `codex login` rồi thử lại. Bridge cần auth.json,
+chưa hỗ trợ keyring-only login. Session được khôi phục từ lịch sử gateway khi đổi
+transport; Playground vẫn ephemeral. Chi tiết: [Provider](docs/TECHNICAL.md#provider).
+Đã kiểm chứng bằng fixture và native protocol không inference; chưa đo latency
+trên tài khoản thật, không cam kết phản hồi dưới 1 giây.
 
 ```text
 Python / app / agent → HTTP → Fastify → isolated Codex CLI → ChatGPT account
@@ -360,7 +371,7 @@ Query `model` là tùy chọn; thêm header `Authorization: Bearer ...` nếu b�
 
 - Bind cứng `127.0.0.1`; từ chối Host không phải localhost; browser chỉ được đọc dashboard và thống kê từ cùng origin, không bật CORS.
 - Tùy chọn `LOCAL_API_KEY`: API chat, session, health, models và thống kê yêu cầu `Authorization: Bearer <token>`. Dashboard shell có thể tải để nhập token. Token này bảo vệ gateway local, không phải API key OpenAI.
-- SDK chạy trong thư mục tạm riêng, bỏ user config và exec rules, thay agent instructions, không nạp AGENTS.md, tắt shell/unified exec, apps/plugins, multi-agent, computer use và web search.
+- Provider chạy trong thư mục tạm riêng, thay agent instructions, không nạp AGENTS.md, tắt shell/unified exec, apps/plugins, multi-agent, computer use và web search. App-server dùng Codex home riêng để loại config/rules cá nhân; exec dùng ignore-user-config/ignore-rules.
 - Sandbox `read-only`, approvals `never`, command networking tắt. HTTP request không được chọn working directory, Codex home, executable hoặc nâng quyền.
 - Gateway không thực thi tool do caller cung cấp. Không kế thừa biến môi trường bí mật của app; dùng auth store Codex hiện có để tiếp tục refresh login như CLI.
 - Read-only bảo vệ việc ghi file; **không phải sandbox bảo mật đầy đủ để cô lập quyền đọc dữ liệu**. Chỉ dùng cho app local tin cậy. Không expose ra internet; nếu cần chạy prompt không tin cậy, dùng user/container riêng với dữ liệu và auth tách biệt.

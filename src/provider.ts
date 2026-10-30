@@ -9,7 +9,7 @@ import { tmpdir, homedir } from 'node:os';
 import { ApiError } from './errors.js';
 import type { Config } from './config.js';
 import type { ChatRequest } from './schema.js';
-import type {ProviderUsage as Usage,ProviderTiming,CliLifecycleTiming} from './provider-types.js';
+import type {ProviderUsage as Usage,ProviderTiming,CliLifecycleTiming,AppServerLifecycleTiming} from './provider-types.js';
 
 export interface ProviderTurn {
   timing?:ProviderTiming;
@@ -22,13 +22,15 @@ export interface ProviderTurn {
 
 export const gatewayInstructions = 'You are a text assistant for a local chat gateway. Respond to the provided conversation using the requested JSON schema. Do not use local tools, read files, modify files, run shell commands, search the web, or contact integrations. Function calls in your final JSON are proposals for the caller to execute.';
 export type PublicProviderEvent = {type:'output'; item_id:string; text:string} | {type:'usage'; usage:Usage} | {type:'timing';timing:ProviderTiming};
-export type ObservedTurnOptions = TurnOptions & { observe?: (context: unknown) => Promise<void>; observeResponse?: (response: unknown) => Promise<void>; onEvent?: (event:PublicProviderEvent) => void; onLifecycle?:(timing:CliLifecycleTiming)=>void; request?:ChatRequest; onProcess?:(pid:number,active:boolean,scope?:string)=>void };
+export type ObservedTurnOptions = TurnOptions & { observe?: (context: unknown) => Promise<void>; observeResponse?: (response: unknown) => Promise<void>; onEvent?: (event:PublicProviderEvent) => void; onLifecycle?:(timing:CliLifecycleTiming)=>void; onAppServerLifecycle?:(timing:AppServerLifecycleTiming)=>void; request?:ChatRequest; onProcess?:(pid:number,active:boolean,scope?:string)=>void };
 export interface ProviderThread {
   readonly id: string | null;
   run(input: string, options?: ObservedTurnOptions): Promise<ProviderTurn>;
 }
 
 export interface Provider {
+  canResume?(id: string): boolean;
+  warmup?(): Promise<void>;
   start(model: string, effort?: ChatRequest['reasoning_effort'], ephemeral?: boolean): ProviderThread;
   resume(id: string, model: string, effort?: ChatRequest['reasoning_effort']): ProviderThread;
   close(): Promise<void>;
@@ -194,6 +196,10 @@ class CliThread implements ProviderThread {
 }
 
 export async function createProvider(config: Config): Promise<Provider> {
+  if (config.codexTransport === 'app-server') {
+    const { createAppServerProvider } = await import('./app-server-provider.js');
+    return createAppServerProvider(config);
+  }
   const runtime = await mkdtemp(join(tmpdir(), 'codex-gateway-'));
   const require = createRequire(import.meta.url);
   const bundledCli = require.resolve('@openai/codex/bin/codex.js');
@@ -209,6 +215,7 @@ export async function createProvider(config: Config): Promise<Provider> {
   const make = (model: string, effort?: ChatRequest['reasoning_effort'], id: string | null = null, ephemeral = false) =>
     new CliThread(command, commandPrefix, env, runtime, instructions, model, effort, id, ephemeral);
   return {
+    canResume: id => !id.startsWith('app-server:'),
     start: (model, effort, ephemeral) => make(model, effort, null, ephemeral),
     resume: (id, model, effort) => make(model, effort, id),
     close: () => rm(runtime, { recursive: true, force: true }),
