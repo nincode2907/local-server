@@ -1,5 +1,10 @@
 'use strict';
 const $ = id => document.getElementById(id);
+function setRefreshLoading(button, loading) {
+  if (!button) return;
+  button.classList.toggle('is-refreshing', loading);
+  button.setAttribute('aria-busy', String(loading));
+}
 const nf = new Intl.NumberFormat('vi-VN');
 const timezone = 'Asia/Ho_Chi_Minh';
 const time = value => new Intl.DateTimeFormat('vi-VN', { timeZone: timezone, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(value);
@@ -168,7 +173,7 @@ function renderInspector() {
     (gateway?.data ? inspectorCard('Tham số hiệu lực, session và thread', 'Gateway generated · thread_id_after: SDK observable', {effective_parameters: gateway.data.effective_parameters, normalized_parameters:Object.fromEntries(Object.entries(gateway.data.validated_request).filter(([key])=>key!=='messages')), session_id: gateway.data.session_id, thread_id_before: gateway.data.thread_id_before, thread_id_after:segment('codex_response')?.data?.thread_id ?? null}, true) : '') +
     inspectorCard('Thời điểm capture & retention', 'Gateway generated', {created_at: data.snapshot?.created_at ?? null, expires_at: data.snapshot?.expires_at ?? null, capture_points: segments.map(({key,provenance,captured_at,unavailable}) => ({key,provenance,captured_at,unavailable}))}, true) +
     inspectorCard('Token accounting', 'SDK observable', record.input_tokens === null ? 'Chưa có usage thực tế. Không ước tính token hoặc phân bổ theo context.' : 'Input/output/cache/reasoning token ở metadata là usage thực tế. Cache thuộc input, reasoning thuộc output. Không có token accounting cho từng message/context; không tính phần dư để suy ra context nội bộ.');
-  $('request-inspector').innerHTML = `<div class="inspector-heading"><h3>AI Request Inspector</h3><button type="button" class="quiet" data-inspector-refresh>Làm mới</button><button type="button" class="quiet" data-inspector-delete ${data.snapshot ? '' : 'disabled'}>Xóa snapshot này</button><button type="button" class="quiet" data-inspector-delete-all>Xóa toàn bộ snapshot</button></div><p class="usage-note">Bản ghi đã áp dụng redaction; credentials và secret đã biết được che. Không ghi headers xác thực hoặc private reasoning. Retention: ${escape(data.retention_ms ? `${number(data.retention_ms / 3600000)} giờ` : '—')}.</p>${data.status !== 'captured' ? `<p class="notice">${escape(reasons[data.status] ?? reasons.unavailable)}</p>` : ''}<p class="usage-note">Đây là context gateway quan sát được, không phải toàn bộ provider-internal prompt.</p><div class="inspector-tools"><label>Tìm trong tab hiện tại <input id="inspector-search" type="search" placeholder="Nội dung, role, tham số…"></label><span id="inspector-search-status" role="status" aria-live="polite"></span></div><div class="inspector-tabs" role="tablist" aria-label="AI Request Inspector">${['Messages','Full Prompt','Response','Metadata'].map((title,i)=>`<button type="button" role="tab" id="inspector-tab-${i}" data-inspector-tab="${i}" aria-controls="inspector-panel-${i}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}">${title}</button>`).join('')}</div>${[messages, fullPrompt || missing, response || missing, metadata].map((content,i)=>`<div role="tabpanel" id="inspector-panel-${i}" aria-labelledby="inspector-tab-${i}" tabindex="0" ${i ? 'hidden' : ''}>${content}</div>`).join('')}<p id="inspector-action-status" class="usage-note" role="status" aria-live="polite"></p>`;
+  $('request-inspector').innerHTML = `<div class="inspector-heading"><h3>AI Request Inspector</h3><button type="button" class="quiet refresh-button" data-inspector-refresh>Làm mới <span class="refresh-glyph" aria-hidden="true">↻</span></button><button type="button" class="quiet" data-inspector-delete ${data.snapshot ? '' : 'disabled'}>Xóa snapshot này</button><button type="button" class="quiet" data-inspector-delete-all>Xóa toàn bộ snapshot</button></div><p class="usage-note">Bản ghi đã áp dụng redaction; credentials và secret đã biết được che. Không ghi headers xác thực hoặc private reasoning. Retention: ${escape(data.retention_ms ? `${number(data.retention_ms / 3600000)} giờ` : '—')}.</p>${data.status !== 'captured' ? `<p class="notice">${escape(reasons[data.status] ?? reasons.unavailable)}</p>` : ''}<p class="usage-note">Đây là context gateway quan sát được, không phải toàn bộ provider-internal prompt.</p><div class="inspector-tools"><label>Tìm trong tab hiện tại <input id="inspector-search" type="search" placeholder="Nội dung, role, tham số…"></label><span id="inspector-search-status" role="status" aria-live="polite"></span></div><div class="inspector-tabs" role="tablist" aria-label="AI Request Inspector">${['Messages','Full Prompt','Response','Metadata'].map((title,i)=>`<button type="button" role="tab" id="inspector-tab-${i}" data-inspector-tab="${i}" aria-controls="inspector-panel-${i}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}">${title}</button>`).join('')}</div>${[messages, fullPrompt || missing, response || missing, metadata].map((content,i)=>`<div role="tabpanel" id="inspector-panel-${i}" aria-labelledby="inspector-tab-${i}" tabindex="0" ${i ? 'hidden' : ''}>${content}</div>`).join('')}<p id="inspector-action-status" class="usage-note" role="status" aria-live="polite"></p>`;
 }
 function selectInspectorTab(index) {
   document.querySelectorAll('[data-inspector-tab]').forEach(button => { const selected = Number(button.dataset.inspectorTab) === index; button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1; });
@@ -192,7 +197,7 @@ document.addEventListener('click', async event => {
   if(!event.target.closest('#request-inspector'))return;
   const button = event.target.closest('button'); if (!button) return;
   if (button.hasAttribute('data-inspector-tab')) return selectInspectorTab(Number(button.dataset.inspectorTab));
-  if (button.hasAttribute('data-inspector-refresh') || button.hasAttribute('data-inspector-retry')) { const id = $('request-inspector')?.dataset.id; const record = inspectorView?.id === id ? inspectorView.record : rows.find(r => r.id === id); if (record) await loadInspector(id, record); return; }
+  if (button.hasAttribute('data-inspector-refresh') || button.hasAttribute('data-inspector-retry')) { const id = $('request-inspector')?.dataset.id; const record = inspectorView?.id === id ? inspectorView.record : rows.find(r => r.id === id); setRefreshLoading(button, true); button.disabled = true; try { if (record) await loadInspector(id, record); } finally { setRefreshLoading(button, false); button.disabled = false; } return; }
   const status = $('inspector-action-status');
   if (button.hasAttribute('data-inspector-copy')) {
     try { await navigator.clipboard.writeText(button.closest('.inspector-segment').querySelector('pre').textContent); if (status) status.textContent = 'Đã sao chép nội dung đã redact.'; }
@@ -215,6 +220,7 @@ async function load({ quiet = false } = {}) {
   const current = controller;
   loading = true;
   $('refresh').disabled = true;
+  setRefreshLoading($('refresh'), true);
   const params = new URLSearchParams({ range: $('range').value });
   if ($('model').value) params.set('model', $('model').value);
   const callParams = new URLSearchParams(params); callParams.set('page', page);
@@ -235,7 +241,7 @@ async function load({ quiet = false } = {}) {
     $('error').textContent = error.auth ? 'Token chưa hợp lệ. Kiểm tra LOCAL_API_KEY và thử lại.' : error.message === 'Failed to fetch' ? 'Không kết nối được server. Kiểm tra server đang chạy và bấm Làm mới.' : `Không cập nhật được dữ liệu: ${error.message}`;
     $('updated').textContent = lastOverview ? 'Đang hiển thị dữ liệu lần cập nhật trước' : 'Chưa cập nhật';
   } finally {
-    if (current === controller) { loading = false; $('refresh').disabled = false; }
+    if (current === controller) { loading = false; $('refresh').disabled = false; setRefreshLoading($('refresh'), false); }
   }
 }
 ['range', 'model', 'status'].forEach(id => $(id).addEventListener('change', () => { page = 1; load(); }));
@@ -250,6 +256,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && $(
 window.addEventListener('resize', () => { if (lastOverview) chart(lastOverview.timeline, lastOverview.range); });
 
 const money = value => value === null || value === undefined ? '—' : '$' + Number(value).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+const usdToVnd = value => value === null || value === undefined ? '—' : `~ ₫${nf.format(Math.round(Number(value) * 26000))}`;
 let modelCatalog, chats = [], activeChat;
 async function loadCosts() {
   const params = new URLSearchParams({ group: $('cost-group').value });
@@ -496,7 +503,13 @@ document.querySelectorAll('[data-project-sort]').forEach(button => button.addEve
   renderNativeProjects();
 }));
 const sourceLabels = { 'gateway-log':'Gateway · từ rollout', exec:'Codex exec', cli:'Codex CLI', vscode:'VS Code / App (vscode)', subagent:'Subagent', unknown:'Chưa xác định' };
-const compact = value => value >= 1000000 ? new Intl.NumberFormat('vi-VN',{notation:'compact',maximumFractionDigits:2}).format(value) : number(value);
+const compact = value => {
+  if (value === null || value === undefined) return '—';
+  const amount = Number(value), abs = Math.abs(amount);
+  if (abs >= 1e9) return `${new Intl.NumberFormat('vi-VN',{maximumFractionDigits:2}).format(amount/1e9)} B`;
+  if (abs >= 1e6) return `${new Intl.NumberFormat('vi-VN',{maximumFractionDigits:2}).format(amount/1e6)} M`;
+  return number(value);
+};
 const nativeCost = row => `${row.calls > row.unpriced_events ? money(row.cost_usd) : '—'}${row.unpriced_events ? `<small class="native-cost-unknown">${number(row.unpriced_events)} record chưa có giá</small>` : ''}`;
 const nativeValue = (value,kind) => kind === 'cost' ? money(value) : new Intl.NumberFormat('vi-VN',{maximumFractionDigits:1}).format(value);
 function nativePeriodNote(data,key,current,kind='number') {
@@ -523,6 +536,7 @@ async function loadNative({quiet=false}={}) {
   void loadNativeNotificationSettings();
   nativeController?.abort(); const controller = nativeController = new AbortController(); nativeLoading=true;
   $('native-refresh').disabled=true;
+  setRefreshLoading($('native-refresh'), true);
   const params = new URLSearchParams({range:$('native-range').value,group:$('native-group').value,page:nativePage});
   for (const key of ['model','source','project']) if ($(`native-${key}`).value) params.set(key,$(`native-${key}`).value);
   if ($('native-range').value === 'all') {
@@ -538,7 +552,7 @@ async function loadNative({quiet=false}={}) {
   try {
     const d = await get(`/api/native/overview?${params}`,controller.signal);
     if (controller !== nativeController) return;
-    if (nativePage>1 && !d.data.length) {nativePage=Math.max(1,Math.ceil(d.total/d.page_size));return loadNative();}
+    if (nativePage>1 && !d.data.length) {nativePage=Math.max(1,Math.ceil(d.display_total/d.page_size));return loadNative();}
     const s=d.summary, total=s.input_tokens+s.output_tokens;
     $('native-sync').textContent = `${d.collector.syncing ? 'Đang đồng bộ…' : 'Đồng bộ mỗi '+d.collector.interval_ms/1000+'s'} · ${d.collector.last_sync ? 'Lần cuối '+date(d.collector.last_sync)+' '+time(d.collector.last_sync) : 'Đang nhập lịch sử lần đầu'} · ${d.collector.home}${d.collector.issues.length ? ' · '+d.collector.issues.join(' ') : ''}`;
     const cards = [
@@ -553,7 +567,7 @@ async function loadNative({quiet=false}={}) {
     ];
     $('native-cards').innerHTML=cards.map(([label,value,note,key,kind])=>{
       const periodNote=nativePeriodNote(d,key,value,kind);
-      return `<article class="metric"><div class="metric-label">${label}</div><div class="metric-value" title="${escape(number(value))}">${kind==='cost' ? money(value) : compact(value)}</div><p>${periodNote ? `${periodNote}<span class="metric-period-note">${escape(note)}</span>` : escape(note)}</p></article>`;
+      return `<article class="metric"><div class="metric-label">${label}</div><div class="metric-value" title="${escape(number(value))}">${kind==='cost' ? `${money(value)}<span class="metric-value-secondary">${usdToVnd(value)}</span>` : compact(value)}</div><p>${periodNote ? `${periodNote}<span class="metric-period-note">${escape(note)}</span>` : escape(note)}</p></article>`;
     }).join('');
     $('native-note').textContent=`${d.range.label}: ${date(d.range.since)} ${time(d.range.since)} → ${date(d.range.until)} ${time(d.range.until)} (UTC+7). Giá API tham khảo, không phải hóa đơn Plus. Nguồn lấy từ metadata; vscode có thể là App hoặc VS Code. Gateway trong rollout chỉ là dữ liệu quan sát, không cộng vào thống kê server. Log cũ dùng chênh lệch token_count; record response được ưu tiên. Tổng token là usage đã ghi nhận; ${number(s.usage_unavailable_sessions)} session chưa có usage. Cache để — nếu ${number(s.cache_unknown_events)} usage record thiếu trường cached_input_tokens.`;
 
@@ -563,15 +577,15 @@ async function loadNative({quiet=false}={}) {
     nativeProjects=d.projects;nativeProjectTotal=total;renderNativeProjects();$('native-models').innerHTML=nativeGrouped(d.models,total);
     document.querySelectorAll('[data-native-width]').forEach(e=>{e.style.width=e.dataset.nativeWidth+'%';});
     $('native-periods').innerHTML=d.periods.map(r=>`<tr><td>${escape(r.period)}</td><td class="number">${number(r.calls)}</td><td class="number">${number(r.input_tokens)}</td><td class="number">${number(r.cached_tokens)}</td><td class="number">${number(r.output_tokens)}</td><td class="number">${nativeCost(r)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty-table">Chưa có usage</td></tr>';
-    $('native-sessions').innerHTML=d.data.map(r=>`<tr><td class="native-path"><strong>${escape(r.cwd.split('/').filter(Boolean).pop() ?? r.cwd)}</strong><small>${escape(r.cwd)}<br>${escape(r.id)}<br>${r.updated_at ? escape(date(r.updated_at)+' '+time(r.updated_at)) : '—'}</small></td><td><span class="badge success">${escape(sourceLabels[r.source] ?? r.source)}</span><div class="endpoint">${escape(r.model)}</div>${r.context_spikes ? `<small class="native-cost-unknown">${number(r.context_spikes)} context spike</small>` : ''}${r.malformed || r.resets ? '<small class="native-cost-unknown">Log có dòng lỗi / bộ đếm reset</small>' : ''}</td><td class="number">${number(r.turns)}</td><td class="number">${r.usage_available ? number(r.input_tokens+r.output_tokens) : '—'}</td><td class="number">${r.tokens_per_turn === null ? '—' : number(Math.round(r.tokens_per_turn))}</td><td class="number">${seconds(r.duration_ms)}</td><td class="number">${nativeCost(r)}</td><td><button class="quiet" data-native-session="${escape(r.id)}">Chi tiết ↗</button></td></tr>`).join('') || '<tr><td colspan="8" class="empty-table">Chưa tìm thấy session trong bộ lọc</td></tr>';
-    $('native-history-note').textContent=`${number(d.total)} session · token theo bộ lọc. Thời gian là tổng turn đã hoàn thành được chọn, không gồm thời gian chờ giữa các turn.`;
-    $('native-page-info').textContent=`${number(d.total)} session`; $('native-page-number').textContent=`Trang ${nativePage}`;
-    $('native-previous').disabled=nativePage<=1;$('native-next').disabled=nativePage*d.page_size>=d.total;
+    $('native-sessions').innerHTML=d.data.map(r=>{const grouped=Array.isArray(r.session_ids),modelLabel=grouped?r.models.join(', '):r.model;const details=grouped?`<details class="native-session-group"><summary>${number(r.session_ids.length)} session · chi tiết</summary><div>${r.session_ids.map(s=>`<button class="quiet" data-native-session="${escape(s.id)}">${escape(s.id)} · ${s.updated_at?escape(date(s.updated_at)+' '+time(s.updated_at)):'—'} ↗</button>`).join('')}</div></details>`:`<button class="quiet" data-native-session="${escape(r.id)}">Chi tiết ↗</button>`;return `<tr><td class="native-path"><strong>${escape(r.cwd.split('/').filter(Boolean).pop() ?? r.cwd)}</strong><small>${escape(r.cwd)}<br>${grouped?`${number(r.session_ids.length)} session trong runtime<br>`:''}${r.updated_at ? escape(date(r.updated_at)+' '+time(r.updated_at)) : '—'}</small></td><td><span class="badge success">${escape(sourceLabels[r.source] ?? r.source)}</span><div class="endpoint">${escape(modelLabel)}</div>${r.context_spikes ? `<small class="native-cost-unknown">${number(r.context_spikes)} context spike</small>` : ''}${r.malformed || r.resets ? '<small class="native-cost-unknown">Log có dòng lỗi / bộ đếm reset</small>' : ''}</td><td class="number">${number(r.turns)}</td><td class="number">${r.usage_available ? number(r.input_tokens+r.output_tokens) : '—'}</td><td class="number">${r.tokens_per_turn === null ? '—' : number(Math.round(r.tokens_per_turn))}</td><td class="number">${seconds(r.duration_ms)}</td><td class="number">${nativeCost(r)}</td><td>${details}</td></tr>`;}).join('') || '<tr><td colspan="8" class="empty-table">Chưa tìm thấy session trong bộ lọc</td></tr>';
+    $('native-history-note').textContent=`${number(d.total)} session · ${number(d.display_total)} dòng, đã gom session Gateway theo runtime. Token theo bộ lọc; thời gian là tổng turn đã hoàn thành, không gồm thời gian chờ giữa các turn.`;
+    $('native-page-info').textContent=`${number(d.total)} session · ${number(d.display_total)} dòng`; $('native-page-number').textContent=`Trang ${nativePage}/${Math.max(1,Math.ceil(d.display_total/d.page_size))}`;
+    $('native-previous').disabled=nativePage<=1;$('native-next').disabled=nativePage*d.page_size>=d.display_total;
     nativeOptions('native-model',d.filters.models,'Tất cả model');nativeOptions('native-project',d.filters.projects,'Tất cả project');nativeOptions('native-source',d.filters.sources,'Tất cả nguồn');
   } catch(error) {
     if(error.name==='AbortError')return;
     $('native-sync').textContent=error.message;if(error.auth)$('auth-form').hidden=false;
-  } finally {if(controller===nativeController){nativeLoading=false;$('native-refresh').disabled=false;}}
+  } finally {if(controller===nativeController){nativeLoading=false;$('native-refresh').disabled=false;setRefreshLoading($('native-refresh'), false);}}
 }
 function notificationWrite(path,body,method='POST'){
   return fetch(path,{method,cache:'no-store',headers:{'Content-Type':'application/json','X-Codex-Notifications':'1',...(apiKey?{Authorization:`Bearer ${apiKey}`}:{})},body:JSON.stringify(body)}).then(async response=>{
@@ -647,6 +661,7 @@ async function writeVideo(path,manifest,method='POST') {
 }
 async function loadVideos() {
   const generation=++videoGeneration;$('video-refresh').disabled=true;
+  setRefreshLoading($('video-refresh'), true);
   try {
     const data=await get('/api/videos');if(generation!==videoGeneration)return;videoData=data;const s=data.summary;
     const cards=[['Builds',number(s.builds),'Tất cả thử nghiệm'],['Approved first pass',number(s.approved_first_pass),`${s.first_pass_rate===null?'—':(s.first_pass_rate*100).toFixed(1)+'%'} / ${number(s.approved_previews)} preview đã duyệt`],['Avg revisions',videoDecimal(s.avg_revisions),'Số lần chỉnh sửa / build'],['Avg overall',videoDecimal(s.avg_overall),'Score được nhập · 0–10'],['Avg wow',videoDecimal(s.avg_wow),'Score được nhập · 0–10'],['Avg cost → approved',money(s.avg_cost_to_approved),`${s.cost_samples}/${s.approved_previews} preview đủ dữ liệu giá`],['Avg time → approved',seconds(s.avg_time_to_approved_ms),`${s.time_samples}/${s.approved_previews} preview đủ thời gian turn`]];
@@ -655,7 +670,7 @@ async function loadVideos() {
     $('video-list-note').textContent=`${s.builds} build · mở tiêu đề để xem timeline, sửa metadata và export manifest. Giá API tham khảo; — nghĩa là dữ liệu chưa đầy đủ.`;
     renderVideoComparisons();$('video-error').hidden=true;
   }catch(error){$('video-error').hidden=false;$('video-error').textContent=error.message;if(error.auth)$('auth-form').hidden=false;}
-  finally{if(generation===videoGeneration)$('video-refresh').disabled=false;}
+  finally{if(generation===videoGeneration){$('video-refresh').disabled=false;setRefreshLoading($('video-refresh'), false);}}
 }
 function renderVideoComparisons() {
   if(!videoData)return;

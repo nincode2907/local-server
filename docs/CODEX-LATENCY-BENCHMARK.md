@@ -89,3 +89,13 @@ No latency optimization is applied. The only runtime behavior change is explicit
 - Real benchmark used 10 matched short requests, one longer gateway request and one minimal direct diagnostic, plus one post-change direct close validation. It did not modify `.local`, Codex Usage source data or the user's running server.
 - The 5+5 paired timing sample was collected immediately before adding an explicit wait for the child `close` event. A separate post-change minimal run verified `child_process_closed_ms` is present and precedes provider return; the paired p50/p95 table is therefore the pre-hardening sample.
 - p95 is unstable with five samples; provider/cache state is uncontrolled. Provider usage does not expose prompt-internal attribution or model-phase timing. The benchmark cannot support claims about reasoning duration, token decode duration, or remote service phases.
+
+## Cập nhật 2026-10-30: độ trễ do CLI reconnect
+
+Run thật hôm nay (`gpt-6-luna` low, prompt "Xin chào", ~9,3k token vào) mất 26–29 s lúc 10:50, 55–116 s lúc 13:40 và 102 s lúc 15:29; token vào không đổi. Gateway không xếp hàng (hai lượt song song cùng bắt đầu ở 0 ms, `MAX_CONCURRENT=2`).
+
+Tám lần gọi CLI trực tiếp, tuần tự, cùng cờ như gateway (lúc 16:00–16:16): 59–204 s, và CLI phát `Reconnecting... n/5 (request timed out)` hoặc `workspace routing discovery timed out`. `--ephemeral` không tạo khác biệt (59–204 s ở cả hai nhánh). `gpt-6.1-terra` chạy được (118 s, có phản hồi); hai lần lỗi `workspace routing discovery` không phụ thuộc model. Log của Codex trên máy cho thấy các request khác tới `chatgpt.com/backend-api` (danh sách model, plugin) cũng timeout theo từng đợt (28/10 11h, 30/10 14h và 16h), nên đây là kết nối từ máy tới ChatGPT, không phải gateway. Curl/DNS tới `chatgpt.com` vẫn nhanh (~0,2 s), nên chưa phân biệt được lỗi mạng cục bộ với độ trễ upstream.
+
+Gateway nay ghi `reconnect_count`, `first_reconnect_ms`, `last_reconnect_message` vào `metrics.cli_lifecycle` và thêm gợi ý vào lỗi 504. Khi benchmark: chạy tuần tự, đặt timeout client lớn hơn `REQUEST_TIMEOUT_MS`, loại hoặc đánh dấu các lượt có `reconnect_count > 0`, và nhớ ~9,3k token nền là của CLI.
+
+Baseline đo lại 16:46–16:55 (6 lần tuần tự, luna low, trần 200 s): 2/6 chạm trần với 7–8 reconnect, 1/6 mất 107 s (3 reconnect), 3/6 sạch 47–54 s tới `turn.completed` rồi 11–14 s tới khi CLI thoát; p50 tới turn xong 54,1 s, p95 204 s; tổng 18 reconnect. Ngay cả lượt sạch cũng chậm hơn ~2x so với 16/10. Request stateless nay trả lời tại `turn.completed` (xem STREAMING.md) nên bỏ được đuôi thoát; không giải quyết reconnect.

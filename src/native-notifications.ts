@@ -67,6 +67,7 @@ export class NativeNotifications {
     // Old rollouts are imported for metrics, but only a terminal event observed after process start can notify.
     if(!Number.isFinite(turn.terminal_at)||turn.terminal_at<=this.startedAt)return false;
     const settings=this.settings(),project=basename(turn.project.trim())||'Codex';
+    if(isGatewayProject(turn.project))return false;
     const excluded=settings.excluded_projects.some(v=>v.trim().toLowerCase()===project.toLowerCase());
     const enabled=settings.enabled&&(turn.status==='completed'?settings.notify_completed:settings.notify_errors);
     const state=excluded?'filtered':enabled?'pending':'disabled';
@@ -79,7 +80,7 @@ export class NativeNotifications {
   }
   recent(limit=12){
     const privacy=this.settings().privacy_mode;
-    return this.db.prepare('SELECT id,project,model,status,terminal_at,duration_ms,task_title,delivery_state,error_code FROM native_notification_events ORDER BY terminal_at DESC,id DESC LIMIT ?').all(Math.max(1,Math.min(50,limit))).map((row:any)=>({...row,task_title:privacy==='preview'?row.task_title:null}));
+    return this.db.prepare("SELECT id,project,model,status,terminal_at,duration_ms,task_title,delivery_state,error_code FROM native_notification_events WHERE project NOT LIKE 'codex-gateway-%' ORDER BY terminal_at DESC,id DESC LIMIT ?").all(Math.max(1,Math.min(50,limit))).map((row:any)=>({...row,task_title:privacy==='preview'?row.task_title:null}));
   }
   async test():Promise<DeliveryResult>{const s=this.settings();try{return await this.runner('Codex Server','Thưa sếp, hệ thống thông báo đã sẵn sàng!',s.play_sound?s.sound:undefined);}catch{return {ok:false,code:'delivery_failed'};}}
   dispatchPending():Promise<void>{
@@ -100,8 +101,9 @@ export class NativeNotifications {
       if(!Number(claim.changes))continue;
       const s=this.settings();
       const excluded=s.excluded_projects.some(v=>v.trim().toLowerCase()===row.project.toLowerCase());
-      if(!s.enabled||row.status==='completed'&&!s.notify_completed||row.status!=='completed'&&!s.notify_errors||excluded){
-        this.db.prepare("UPDATE native_notification_events SET delivery_state=? WHERE id=?").run(excluded?'filtered':'disabled',row.id);continue;
+      const gateway=isGatewayProject(row.project);
+      if(gateway||!s.enabled||row.status==='completed'&&!s.notify_completed||row.status!=='completed'&&!s.notify_errors||excluded){
+        this.db.prepare("UPDATE native_notification_events SET delivery_state=? WHERE id=?").run(gateway||excluded?'filtered':'disabled',row.id);continue;
       }
       const payload=notificationPayload(row,s);
       if(s.play_sound&&this.lastSoundAt){const wait=Math.max(0,1200-(Date.now()-this.lastSoundAt));if(wait)await new Promise(resolve=>setTimeout(resolve,wait));}
@@ -112,6 +114,8 @@ export class NativeNotifications {
   }
   async close(){this.closed=true;await this.dispatching;}
 }
+
+function isGatewayProject(project:string){return basename(project.trim()).startsWith('codex-gateway-');}
 
 export function safeTaskTitle(value:unknown):string|null{
   if(typeof value!=='string')return null;

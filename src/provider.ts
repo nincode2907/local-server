@@ -22,7 +22,11 @@ export interface ProviderTurn {
 
 export const gatewayInstructions = 'You are a text assistant for a local chat gateway. Respond to the provided conversation using the requested JSON schema. Do not use local tools, read files, modify files, run shell commands, search the web, or contact integrations. Function calls in your final JSON are proposals for the caller to execute.';
 export type PublicProviderEvent = {type:'output'; item_id:string; text:string} | {type:'usage'; usage:Usage} | {type:'timing';timing:ProviderTiming};
-export type ObservedTurnOptions = TurnOptions & { observe?: (context: unknown) => Promise<void>; observeResponse?: (response: unknown) => Promise<void>; onEvent?: (event:PublicProviderEvent) => void; onLifecycle?:(timing:CliLifecycleTiming)=>void; onAppServerLifecycle?:(timing:AppServerLifecycleTiming)=>void; request?:ChatRequest; onProcess?:(pid:number,active:boolean,scope?:string)=>void };
+export type ObservedTurnOptions = TurnOptions & { observe?: (context: unknown) => Promise<void>; observeResponse?: (response: unknown) => Promise<void>; onEvent?: (event:PublicProviderEvent) => void; onLifecycle?:(timing:CliLifecycleTiming)=>void; onAppServerLifecycle?:(timing:AppServerLifecycleTiming)=>void; request?:ChatRequest; onProcess?:(pid:number,active:boolean,scope?:string)=>void;
+  /** Return at `turn.completed` once the final answer and usage are in hand; the CLI is reaped in the background. Only for turns that are never resumed. */
+  returnOnTurnCompleted?:boolean;
+  /** Called when a CLI that was already answered from exits non-zero or by signal. stderr is never passed. */
+  onLateExit?:(exit:{code:number|null;signal:string|null})=>void };
 export interface ProviderThread {
   readonly id: string | null;
   run(input: string, options?: ObservedTurnOptions): Promise<ProviderTurn>;
@@ -66,10 +70,12 @@ class CliThread implements ProviderThread {
     const lifecycle:CliLifecycleTiming={spawn_requested_ms:null,process_spawned_ms:null,stdin_finished_ms:null,stdin_closed_ms:null,
       first_stdout_event_ms:null,turn_completed_event_received_ms:null,turn_completed_event_delivered_ms:null,stdout_iterator_completed_ms:null,
       stdout_ended_ms:null,stdout_closed_ms:null,stderr_ended_ms:null,stderr_closed_ms:null,child_process_exited_ms:null,child_process_closed_ms:null,
+      child_process_exit_code:null,child_process_signal:null,
       response_observer_started_ms:null,response_observer_finished_ms:null,schema_cleanup_started_ms:null,schema_cleanup_finished_ms:null,provider_returned_ms:null,
-      stdout_event_count:0,events_after_turn_completed_count:0,last_post_turn_event_type:null,last_post_turn_event_ms:null};
+      stdout_event_count:0,events_after_turn_completed_count:0,last_post_turn_event_type:null,last_post_turn_event_ms:null,
+      reconnect_count:0,first_reconnect_ms:null,last_reconnect_message:null,returned_before_exit:false};
     const lifecycleStarted=performance.now();
-    const mark=(point:Exclude<keyof CliLifecycleTiming,'stdout_event_count'|'events_after_turn_completed_count'|'last_post_turn_event_type'|'last_post_turn_event_ms'>)=>{lifecycle[point]=performance.now()-lifecycleStarted;options.onLifecycle?.({...lifecycle});};
+    const mark=(point:Exclude<keyof CliLifecycleTiming,'stdout_event_count'|'events_after_turn_completed_count'|'last_post_turn_event_type'|'last_post_turn_event_ms'|'child_process_exit_code'|'child_process_signal'|'reconnect_count'|'first_reconnect_ms'|'last_reconnect_message'|'returned_before_exit'>)=>{lifecycle[point]=performance.now()-lifecycleStarted;options.onLifecycle?.({...lifecycle});};
     const schemaPath = options.outputSchema ? join(this.runtime, `schema-${randomUUID()}.json`) : undefined;
     if (schemaPath) await writeFile(schemaPath, JSON.stringify(options.outputSchema), 'utf8');
     const config = (key: string, value: unknown) => ['--config', `${key}=${JSON.stringify(value)}`];
@@ -115,8 +121,18 @@ class CliThread implements ProviderThread {
       child.stdout.once('close',()=>mark('stdout_closed_ms'));
       child.stderr.once('end',()=>mark('stderr_ended_ms'));
       child.stderr.once('close',()=>mark('stderr_closed_ms'));
-      child.once('exit',()=>mark('child_process_exited_ms'));
+      child.once('exit',(code,signal)=>{lifecycle.child_process_exit_code=code;lifecycle.child_process_signal=signal;mark('child_process_exited_ms');});
       const processClosed=new Promise<void>(resolveClose=>child.once('close',()=>{mark('child_process_closed_ms');resolveClose();}));
+      let forceKillTimer:ReturnType<typeof setTimeout>|undefined;
+      const terminateCancelledProcess=()=>{
+        if(child.exitCode!==null||child.signalCode!==null)return;
+        child.kill('SIGTERM');
+        forceKillTimer=setTimeout(()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');},2_000);
+        forceKillTimer.unref();
+      };
+      options.signal?.addEventListener('abort',terminateCancelledProcess,{once:true});
+      child.once('close',()=>{if(forceKillTimer)clearTimeout(forceKillTimer);options.signal?.removeEventListener('abort',terminateCancelledProcess);});
+      if(options.signal?.aborted)terminateCancelledProcess();
       if(child.pid)options.onProcess?.(child.pid,true,this.commandPrefix.length?'codex_cli_launcher_process':'codex_cli_process');
       child.once('close',()=>{if(child.pid)options.onProcess?.(child.pid,false,this.commandPrefix.length?'codex_cli_launcher_process':'codex_cli_process');});
       const stderr: Buffer[] = [];
@@ -135,14 +151,17 @@ class CliThread implements ProviderThread {
       let finalResponse = '';
       let usage: Usage | null = null;
       let failure: string | undefined;
+      let turnCompleted=false;
       const publicErrors: { type: string; message: string }[] = [];
       let exitedSuccessfully = false;
+      let earlyReturn=false;
+      let stdoutCompleted=false;
       const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
       try {
         for await (const line of lines) {
-          if(lifecycle.first_stdout_event_ms===null)mark('first_stdout_event_ms');
           if (Buffer.byteLength(line) > 2_097_152) throw new ApiError(502, 'provider_event_limit', 'Provider event exceeds limit.');
           const event = JSON.parse(line) as CliEvent;
+          if(lifecycle.first_stdout_event_ms===null)mark('first_stdout_event_ms');
           lifecycle.stdout_event_count++;
           if(lifecycle.turn_completed_event_received_ms!==null){
             lifecycle.events_after_turn_completed_count++;
@@ -159,25 +178,43 @@ class CliThread implements ProviderThread {
             items.push(event.item);
             if (event.item.type === 'agent_message') finalResponse = event.item.text;
           } else if (event.type === 'turn.completed') {
+            turnCompleted=true;
             mark('turn_completed_event_received_ms');
             if(event.usage){event.usage.cache_write_input_tokens ??= 0;usage = event.usage;options.onEvent?.({type:'usage',usage});}
             mark('turn_completed_event_delivered_ms');
+            if(options.returnOnTurnCompleted&&usage&&finalResponse&&!failure){earlyReturn=true;break;}
           }
           else if (event.type === 'turn.failed') failure = event.error?.message ?? 'Codex turn failed.';
-          else if (event.type === 'error' && typeof event.message === 'string') publicErrors.push({type:'error',message:event.message});
+          else if (event.type === 'error' && typeof event.message === 'string') {
+            publicErrors.push({type:'error',message:event.message});
+            // The CLI retries upstream timeouts itself and reports them as "Reconnecting... n/5 (reason)"; keep a bounded, content-free trace.
+            if(/^Reconnecting\b/.test(event.message)){lifecycle.reconnect_count++;lifecycle.first_reconnect_ms??=performance.now()-lifecycleStarted;lifecycle.last_reconnect_message=event.message.slice(0,160);options.onLifecycle?.({...lifecycle});}
+          }
         }
         mark('stdout_iterator_completed_ms');
-        await exited;
-        exitedSuccessfully = true;
+        stdoutCompleted=true;
+        if(earlyReturn){
+          lifecycle.returned_before_exit=true;exitedSuccessfully=true;
+          child.stdout.resume();
+          // Bounded background reap: late stdout is discarded, a hung child is terminated, a failed exit is reported but never changes the answer.
+          const reapTimer=setTimeout(terminateCancelledProcess,30_000);reapTimer.unref();
+          void processClosed.then(()=>clearTimeout(reapTimer));
+          const lateExit=(code:number|null,signal:NodeJS.Signals|null)=>{if(code!==0||signal)options.onLateExit?.({code,signal});};
+          if(child.exitCode!==null||child.signalCode!==null)lateExit(child.exitCode,child.signalCode);else child.once('exit',lateExit);
+        }else{
+          await exited;
+          exitedSuccessfully = true;
+          if(!turnCompleted)failure='Codex exited without a terminal turn event.';
+        }
       } finally {
         lines.close();
-        if (!child.killed) child.kill();
-        await processClosed;
+        if ((options.signal?.aborted||!stdoutCompleted)&&child.exitCode===null&&child.signalCode===null) terminateCancelledProcess();
+        if(!earlyReturn)await processClosed;
         mark('response_observer_started_ms');
         await options.observeResponse?.({ final_response: finalResponse, assistant_messages: items.filter(item => item.type === 'agent_message'),
-          usage, thread_id: this.#id, complete: exitedSuccessfully && !failure, turn_error: failure ?? null,
+          usage, thread_id: this.#id, complete: exitedSuccessfully && turnCompleted && !failure, turn_error: failure ?? null,
           errors: publicErrors,
-          error_code: !exitedSuccessfully ? 'cli_incomplete' : failure ? 'turn_failed' : null,
+          error_code: !exitedSuccessfully ? 'cli_incomplete' : !turnCompleted ? 'cli_missing_terminal' : failure ? 'turn_failed' : null,
           internal_reasoning: { provenance: 'Internal / unavailable', available: false, reason: 'Private reasoning and stderr are never recorded.' } });
         mark('response_observer_finished_ms');
       }

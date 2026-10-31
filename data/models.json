@@ -315,9 +315,291 @@
       "publisher": "Artificial Analysis",
       "kind": "api",
       "checked_on": "2026-10-02"
+    },
+    {
+      "id": "spec-gpt-6.1-terra",
+      "name": "GPT-6.1 Terra API specifications",
+      "url": "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+      "publisher": "OpenAI",
+      "kind": "official",
+      "checked_on": "2026-10-30"
+    },
+    {
+      "id": "aa-gpt-6-1-terra",
+      "name": "GPT-6.1 Terra (Max) trên Artificial Analysis",
+      "url": "https://artificialanalysis.ai/models/gpt-6-1-terra",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-30"
+    },
+    {
+      "id": "aa-gpt-6-1-terra-release",
+      "name": "GPT-6.1 Terra release (các effort)",
+      "url": "https://artificialanalysis.ai/models/releases/gpt-6-1-terra",
+      "publisher": "Artificial Analysis",
+      "kind": "benchmark",
+      "checked_on": "2026-10-30"
+    },
+    {
+      "id": "codex-local-models-cache",
+      "name": "Codex CLI 0.166.0 models_cache.json (máy này)",
+      "url": "",
+      "publisher": "Codex CLI",
+      "kind": "local",
+      "checked_on": "2026-10-30"
     }
   ],
   "models": [
+    {
+      "id": "gpt-6.1-terra",
+      "name": "GPT-6.1 Terra",
+      "provider": "OpenAI",
+      "status": "active",
+      "tagline": "Terra thế hệ 6.1: giá thấp, context 1M, nhiều mức reasoning",
+      "checked_on": "2026-10-30",
+      "default_effort": "medium",
+      "availability": {
+        "chat_plus": "not_available",
+        "codex_plus": "included",
+        "api": "available",
+        "source_ids": [
+          "spec-gpt-6.1-terra",
+          "codex-local-models-cache"
+        ],
+        "note": "Codex CLI 0.166.0 trên máy này liệt kê gpt-6.1-terra (visibility list, low–ultra). Quyền dùng thực tế phụ thuộc tài khoản; Chat Plus chưa xác minh."
+      },
+      "reasoning": {
+        "api": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "codex": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max",
+          "ultra"
+        ],
+        "chat_plus": [],
+        "source_ids": [
+          "spec-gpt-6.1-terra",
+          "codex-local-models-cache"
+        ]
+      },
+      "specs": {
+        "context_tokens": 1050000,
+        "context_scope": "API combined context",
+        "max_output_tokens": 128000,
+        "chat_context_tokens": null,
+        "source_id": "spec-gpt-6.1-terra",
+        "api_price": {
+          "input_per_million": 1,
+          "output_per_million": 5,
+          "cached_input_per_million": 0.05,
+          "source_id": "spec-gpt-6.1-terra",
+          "scope": "USD / 1M tokens, Standard; prompt trên 272K input token tính 2x input/cache và 1.5x output cho cả request; cache write $1.25 (30 phút) / $2.50 (12 giờ) không được tính trong ước lượng."
+        },
+        "price_tiers": {
+          "standard": {
+            "input_per_million": 1,
+            "cached_input_per_million": 0.05,
+            "output_per_million": 5
+          },
+          "batch_flex": {
+            "input_per_million": 0.5,
+            "cached_input_per_million": 0.025,
+            "output_per_million": 2.5
+          },
+          "fast": {
+            "input_per_million": 2,
+            "cached_input_per_million": 0.1,
+            "output_per_million": 10
+          }
+        }
+      },
+      "benchmarks": [
+        {
+          "effort": "max",
+          "aa": {
+            "intelligence": 51,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.96,
+            "speed_tps": 90.9,
+            "ttft_seconds": 233.43,
+            "first_token_seconds": 233.43,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "5.0",
+            "index_precision": "integer",
+            "source_id": "aa-gpt-6-1-terra",
+            "checked_on": "2026-10-30",
+            "data_source": "aa-public-page",
+            "scope": "Điểm AA Intelligence Index v5.0 lấy từ trang public (Artificial Analysis), không phải API v2 index 4.3 của các model khác — không so trực tiếp. Cost/speed/TTFT chỉ có cho variant trang ghi rõ.",
+            "missing_reason": "Null = trang public không công bố cho variant này; không nội suy.",
+            "api_pricing": {
+              "input_per_million": 1,
+              "output_per_million": 5,
+              "cached_input_per_million": 0.05
+            },
+            "context_window_tokens": 1000000
+          }
+        },
+        {
+          "effort": "xhigh",
+          "aa": {
+            "intelligence": 45,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": null,
+            "speed_tps": null,
+            "ttft_seconds": null,
+            "first_token_seconds": null,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "5.0",
+            "index_precision": "integer",
+            "source_id": "aa-gpt-6-1-terra-release",
+            "checked_on": "2026-10-30",
+            "data_source": "aa-public-page",
+            "scope": "Điểm AA Intelligence Index v5.0 lấy từ trang public (Artificial Analysis), không phải API v2 index 4.3 của các model khác — không so trực tiếp. Cost/speed/TTFT chỉ có cho variant trang ghi rõ.",
+            "missing_reason": "Null = trang public không công bố cho variant này; không nội suy.",
+            "api_pricing": {
+              "input_per_million": 1,
+              "output_per_million": 5,
+              "cached_input_per_million": 0.05
+            },
+            "context_window_tokens": 1000000
+          }
+        },
+        {
+          "effort": "high",
+          "aa": {
+            "intelligence": 42,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": null,
+            "speed_tps": null,
+            "ttft_seconds": null,
+            "first_token_seconds": null,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "5.0",
+            "index_precision": "integer",
+            "source_id": "aa-gpt-6-1-terra-release",
+            "checked_on": "2026-10-30",
+            "data_source": "aa-public-page",
+            "scope": "Điểm AA Intelligence Index v5.0 lấy từ trang public (Artificial Analysis), không phải API v2 index 4.3 của các model khác — không so trực tiếp. Cost/speed/TTFT chỉ có cho variant trang ghi rõ.",
+            "missing_reason": "Null = trang public không công bố cho variant này; không nội suy.",
+            "api_pricing": {
+              "input_per_million": 1,
+              "output_per_million": 5,
+              "cached_input_per_million": 0.05
+            },
+            "context_window_tokens": 1000000
+          }
+        },
+        {
+          "effort": "medium",
+          "aa": {
+            "intelligence": 38,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": null,
+            "speed_tps": null,
+            "ttft_seconds": null,
+            "first_token_seconds": null,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "5.0",
+            "index_precision": "integer",
+            "source_id": "aa-gpt-6-1-terra-release",
+            "checked_on": "2026-10-30",
+            "data_source": "aa-public-page",
+            "scope": "Điểm AA Intelligence Index v5.0 lấy từ trang public (Artificial Analysis), không phải API v2 index 4.3 của các model khác — không so trực tiếp. Cost/speed/TTFT chỉ có cho variant trang ghi rõ.",
+            "missing_reason": "Null = trang public không công bố cho variant này; không nội suy.",
+            "api_pricing": {
+              "input_per_million": 1,
+              "output_per_million": 5,
+              "cached_input_per_million": 0.05
+            },
+            "context_window_tokens": 1000000
+          }
+        },
+        {
+          "effort": "none",
+          "aa": {
+            "intelligence": 30,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": null,
+            "speed_tps": null,
+            "ttft_seconds": 0.96,
+            "first_token_seconds": 0.96,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "5.0",
+            "index_precision": "integer",
+            "source_id": "aa-gpt-6-1-terra-release",
+            "checked_on": "2026-10-30",
+            "data_source": "aa-public-page",
+            "scope": "Điểm AA Intelligence Index v5.0 lấy từ trang public (Artificial Analysis), không phải API v2 index 4.3 của các model khác — không so trực tiếp. Cost/speed/TTFT chỉ có cho variant trang ghi rõ.",
+            "missing_reason": "Null = trang public không công bố cho variant này; không nội suy.",
+            "api_pricing": {
+              "input_per_million": 1,
+              "output_per_million": 5,
+              "cached_input_per_million": 0.05
+            },
+            "context_window_tokens": 1000000
+          }
+        },
+        {
+          "effort": "low",
+          "aa": {
+            "intelligence": 29,
+            "coding_index": null,
+            "agentic_index": null,
+            "cost_per_task_usd": 0.07,
+            "speed_tps": null,
+            "ttft_seconds": null,
+            "first_token_seconds": null,
+            "end_to_end_500_answer_tokens_seconds": null,
+            "output_tokens_per_task": null,
+            "answer_tokens_per_task": null,
+            "reasoning_tokens_per_task": null,
+            "index_version": "5.0",
+            "index_precision": "integer",
+            "source_id": "aa-gpt-6-1-terra-release",
+            "checked_on": "2026-10-30",
+            "data_source": "aa-public-page",
+            "scope": "Điểm AA Intelligence Index v5.0 lấy từ trang public (Artificial Analysis), không phải API v2 index 4.3 của các model khác — không so trực tiếp. Cost/speed/TTFT chỉ có cho variant trang ghi rõ.",
+            "missing_reason": "Null = trang public không công bố cho variant này; không nội suy.",
+            "api_pricing": {
+              "input_per_million": 1,
+              "output_per_million": 5,
+              "cached_input_per_million": 0.05
+            },
+            "context_window_tokens": 1000000
+          }
+        }
+      ],
+      "notes": "Knowledge cutoff 2026-06-01; input text/image, output text; max input 922K. AA Max có TTFT 233,43s (trang cũng ghi first chunk median 138,21s) — số phản ánh reasoning max, không dùng làm kỳ vọng cho effort thấp. Codex không hiển thị effort none trong cache cục bộ; API có none. Mức Fast hiển thị 1.5x speed trong Codex nhưng giá fast 2x theo trang OpenAI."
+    },
     {
       "id": "gpt-6.1-sol",
       "name": "GPT-6.1 Sol",

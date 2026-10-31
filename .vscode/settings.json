@@ -1,3 +1,7 @@
 {
-    "liveServer.settings.port": 5501
+    "liveServer.settings.port": 5501,
+    "workbench.colorCustomizations": {
+        "statusBarItem.warningBackground": "#2EB872",
+        "statusBarItem.warningForeground": "#EAFFF2"
+    }
 }

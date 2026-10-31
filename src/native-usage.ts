@@ -309,13 +309,43 @@ export class NativeUsage {
       .map(e => ({...e,cwd:String(sessions.find(s => s.id===e.session_id)!.cwd)})).reverse();
 
     const periods = [...new Set(events.map(e=>periodKey(Number(e.timestamp),filter.group)))].sort().map(period=>({period,...sum(events.filter(e=>periodKey(Number(e.timestamp),filter.group)===period))}));
-    const data = selected.map(s => {
+    const sessionData:any[] = selected.map((s:any) => {
       const rows = events.filter(e=>e.session_id===s.id), ts = turns.filter(t=>t.session_id===s.id), u = sum(rows);
       const duration = ts.reduce((n,t)=>n+(t.finished_at===null ? 0 : Math.max(0,Number(t.finished_at)-Number(t.started_at))),0);
       return {...s,...u,turns:ts.length,usage_available:rows.length>0,duration_ms:ts.some(t=>t.finished_at!==null)?duration:null,tokens_per_turn:ts.length&&rows.length?(u.input_tokens+u.output_tokens)/ts.length:null,cache_ratio:u.input_tokens&&!u.cache_unknown_events?u.cached_tokens!/u.input_tokens:null,context_spikes:spikes.filter(e=>e.session_id===s.id).length};
     });
+    const displayData:any[]=[], gatewayGroups=new Map<string,any>();
+    for(const row of sessionData){
+      if(row.source!=='gateway-log'||!basename(String(row.cwd)).startsWith('codex-gateway-')){displayData.push(row);continue;}
+      let group=gatewayGroups.get(String(row.cwd));
+      if(!group){
+        group={id:`gateway-group:${row.cwd}`,cwd:row.cwd,source:row.source,session_ids:[],models:new Set<string>(),updated_at:row.updated_at,
+          turns:0,input_tokens:0,cached_tokens:0,cache_known_events:0,cache_unknown_events:0,output_tokens:0,reasoning_tokens:0,cost_usd:0,unpriced_events:0,calls:0,
+          usage_available:false,duration_ms:0,has_duration:false,weighted_tokens_per_turn:0,usage_turns:0,context_spikes:0,malformed:0,resets:0};
+        gatewayGroups.set(String(row.cwd),group);displayData.push(group);
+      }
+      group.session_ids.push({id:String(row.id),updated_at:row.updated_at});
+      group.models.add(String(row.model));
+      if(Number(row.updated_at)>Number(group.updated_at))group.updated_at=row.updated_at;
+      for(const key of ['turns','input_tokens','output_tokens','reasoning_tokens','unpriced_events','calls','context_spikes','malformed','resets'] as const)group[key]+=Number(row[key]??0);
+      group.cache_known_events+=Number(row.cache_known_events??0);group.cache_unknown_events+=Number(row.cache_unknown_events??0);
+      if(row.cached_tokens!==null)group.cached_tokens+=Number(row.cached_tokens);
+      group.cost_usd+=Number(row.cost_usd??0);
+      group.usage_available=group.usage_available||Boolean(row.usage_available);
+      if(row.duration_ms!==null){group.duration_ms+=Number(row.duration_ms);group.has_duration=true;}
+      if(row.tokens_per_turn!==null){group.weighted_tokens_per_turn+=Number(row.tokens_per_turn)*Number(row.turns);group.usage_turns+=Number(row.turns);}
+    }
+    for(const group of gatewayGroups.values()){
+      group.models=[...group.models].sort();
+      group.session_ids.sort((a:any,b:any)=>Number(b.updated_at)-Number(a.updated_at));
+      group.cached_tokens=group.cache_unknown_events?null:group.cached_tokens;
+      group.duration_ms=group.has_duration?group.duration_ms:null;
+      group.tokens_per_turn=group.usage_turns?group.weighted_tokens_per_turn/group.usage_turns:null;
+      delete group.weighted_tokens_per_turn;delete group.usage_turns;delete group.has_duration;
+    }
+    const displayTotal=displayData.length;
     const totals = sum(events);
-    const summary = {...totals,...efficiency(events),cache_hit_rate:totals.cache_unknown_events||!totals.input_tokens ? null : totals.cached_tokens!/totals.input_tokens,context_spikes:spikes.length,sessions:selected.length,turns:turns.length,usage_unavailable_sessions:data.filter(s=>!s.usage_available).length};
+    const summary = {...totals,...efficiency(events),cache_hit_rate:totals.cache_unknown_events||!totals.input_tokens ? null : totals.cached_tokens!/totals.input_tokens,context_spikes:spikes.length,sessions:selected.length,turns:turns.length,usage_unavailable_sessions:sessionData.filter(s=>!s.usage_available).length};
     const comparison = window.key === 'today' ? { label:'Hôm qua', summary:scopedSummary(window.since-DAY,window.since) } : null;
     let averageDivisor: number | null = window.average_divisor;
     if (window.key === 'all' && events.length) {
@@ -327,7 +357,7 @@ export class NativeUsage {
       summary:Object.fromEntries(['sessions','turns','calls','input_tokens','cached_tokens','output_tokens','reasoning_tokens','cost_usd'].map(key=>[key,Number(summary[key as keyof typeof summary] ?? 0)/averageDivisor]))
     } : null;
     return {collector:this.status(),range:{key:window.key,label:window.label,since:window.since,until:window.until-1},summary,comparison,average,projects:aggregate('cwd'),models:aggregate('model'),sources:aggregate('source'),periods,spikes:spikes.slice(0,20),
-      data:data.slice((filter.page-1)*20,filter.page*20),total:data.length,page:filter.page,page_size:20,
+      data:displayData.slice((filter.page-1)*20,filter.page*20),total:sessionData.length,display_total:displayTotal,page:filter.page,page_size:20,
       filters:{models:this.db.prepare('SELECT DISTINCT model FROM native_events ORDER BY model').all().map(r=>r.model),projects:this.db.prepare('SELECT DISTINCT cwd FROM native_sessions ORDER BY cwd').all().map(r=>r.cwd),sources:this.db.prepare('SELECT DISTINCT source FROM native_sessions ORDER BY source').all().map(r=>r.source)} };
   }
   insights(filter:NativeInsightsFilter, now=Date.now()) {

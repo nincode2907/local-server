@@ -2,10 +2,10 @@
 (async () => {
   const {createActivityClient,outputChart}=await import('/dashboard/assets/activity-client.js');
   const client=createActivityClient({headers:()=>apiKey?{Authorization:`Bearer ${apiKey}`}:{}});
-  const runs=new Map(),labels={queued:'Chờ xử lý',running:'Đang chạy',completed:'Hoàn tất',failed:'Lỗi',cancelled:'Đã hủy',interrupted:'Gián đoạn',idle:'Chưa bắt đầu'};
+  const runs=new Map(),labels={queued:'Chờ xử lý',running:'Đang chạy',completed:'Hoàn tất',failed:'Lỗi',cancelled:'Đã hủy',interrupted:'Gián đoạn',idle:'App chưa báo tiến độ'};
   const active=r=>['queued','running'].includes(r.status),ms=v=>v===null||v===undefined?'—':seconds(v);
   let feedController,detailController,selected='',returnView='live',detailState=null,callRecord=null,connection='',runMissing=false,frame,latencyController;
-  const timelineLabels={received:'Nhận request',enqueued:'Vào queue',dequeued:'Rời queue',provider_started:'Bắt đầu provider',first_output:'Output đầu tiên',last_output:'Output cuối',provider_finished:'Provider hoàn tất',first_content_sent:'Ghi content ra HTTP',finished:'Kết thúc inference',response_finished:'Gửi xong HTTP response'};
+  const timelineLabels={received:'Nhận request',enqueued:'Vào queue',dequeued:'Rời queue',provider_started:'Bắt đầu provider',first_cli_event:'Event CLI đầu tiên',first_output:'Output công khai đầu tiên',cli_terminal_event:'CLI báo turn.completed',cli_process_exit:'CLI process thoát',last_output:'Output cuối',provider_finished:'Provider hoàn tất',first_content_sent:'Ghi content ra HTTP',client_disconnect:'Client ngắt kết nối',gateway_timeout:'Gateway timeout',finished:'Kết thúc inference',response_finished:'Gửi xong HTTP response'};
   function renderList() {
     const list=[...runs.values()].sort((a,b)=>Number(active(b))-Number(active(a))||b.created_at-a.created_at).slice(0,128),tbody=$('live-rows');
     const old=new Map([...tbody.querySelectorAll('tr[data-run]')].map(row=>[row.dataset.run,row]));
@@ -60,6 +60,9 @@
     $('request-state').textContent=`${r?(labels[r.status]??r.status):callRecord?(statusNames[callRecord.status]??callRecord.status):'Đang tải…'}${connection?' · '+connection:''}`;
     $('request-cancel').hidden=!r||!active(r);
     const notes=[];if(detailState?.replayUnavailable)notes.push('Replay body đã hết hạn hoặc không đầy đủ; phần output có thể chỉ là một phần. Sample số liệu vẫn còn.');if(detailState?.partial)notes.push('Output chưa hoàn chỉnh, không phải completion được xác nhận.');if(!r&&callRecord)notes.push('Call cũ chưa có run/timing samples. Không backfill TTFO hoặc dựng lại output từ usage.');
+    if(r?.diagnostics?.cancel)notes.push(`Hủy: ${r.diagnostics.cancel.reason} · lớp ${r.diagnostics.cancel.origin??'chưa xác định'}${callRecord?.http_status?` · HTTP ${callRecord.http_status}`:''}.`);
+    if(r?.diagnostics?.provider_failure)notes.push(`Provider: ${r.diagnostics.provider_failure.reason} · lớp ${r.diagnostics.provider_failure.origin}${callRecord?.http_status?` · HTTP ${callRecord.http_status}`:''}.`);
+    if(r?.diagnostics?.client_disconnect_at&&!r.diagnostics.cancel)notes.push(`Client đã ngắt sau khi inference kết thúc; trạng thái run được giữ nguyên${callRecord?.http_status?` · HTTP ${callRecord.http_status}`:''}.`);
     $('request-notice').hidden=!notes.length;$('request-notice').textContent=notes.join(' ');
     $('request-summary').innerHTML=[['duration','Duration'],['ttfo','TTFO · quan sát'],['queue_wait','Queue wait · quan sát'],['inter_chunk_p95','Inter-chunk p95']].map(([key,label])=>`<article class="metric"><div class="metric-label">${label}</div><div class="latency-value">${ms(r?.metrics[key]?.value??(key==='duration'?callRecord?.duration_ms:null))}</div></article>`).join('');
     const timeline=r?.timeline??{received:0,finished:callRecord?.duration_ms??null};

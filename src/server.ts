@@ -29,7 +29,7 @@ export async function buildServer(config: Config, provider: Provider) {
   await inspector.init();
   const native = new NativeUsage(config.statsDbPath, config.nativeCodexHome, config.nativeUsageInterval);
   native.start();
-  const running = new Set<AbortController>();
+  const running = new Map<AbortController,ActivityRun>();
   const activities = new Activities(config);
   const registry=new ProviderRegistry(config,provider),resources=new Resources();
   for(const id of ['ollama','lmstudio'] as const){const settings=config.localProviders[id];if(settings?.pid&&['127.0.0.1','localhost','[::1]'].includes(new URL(settings.url).hostname))resources.track(settings.pid,id,true,'configured_local_provider_process_shared');}
@@ -155,23 +155,27 @@ export async function buildServer(config: Config, provider: Provider) {
       if(req)tracked.set(req,call); reply?.header('X-Codex-Call-Id',id);
     }
     metrics.context(call.id,model,effort,selected.id);
-    const run = activities.create(call.id, identity.owner, model, call.ephemeral, call.start, idempotency, idempotency ? digest(JSON.stringify(request)) : undefined,queued,selected.id,benchmark);
+    const run = activities.create(call.id, identity.owner, model, call.ephemeral, call.start, idempotency, idempotency ? digest(JSON.stringify(request)) : undefined,queued,selected.id,benchmark,request.stream??false,call.createdAt);
     call.run = run; call.detached = detached;
     reply?.header('X-Codex-Run-Id',run.id);
     const controller = run.controller;
-    running.add(controller); if (session) sessions.busy.add(session.id);
+    running.set(controller,run); if (session) sessions.busy.add(session.id);
     const ticket=scheduler.acquire(controller.signal);
     let release:(()=>void)|undefined,providerInvoked=false;
     let timedOut = false;
     let timer:ReturnType<typeof setTimeout>|undefined;
-    const disconnect = () => { if (reply&&!reply.raw.writableEnded) run.cancel('disconnect'); };
-    if (!detached&&reply) reply.raw.on('close', disconnect);
-    if (!detached&&reply) reply.raw.once('finish', () => { run.responseFinished = run.elapsed(); activities.save(run); });
+    const disconnect = () => { if (reply&&!reply.raw.writableEnded) {run.noteClientDisconnect();run.cancel('disconnect','http_client_connection');} };
+    const cleanupDisconnect=()=>{reply?.raw.off('close',disconnect);reply?.raw.off('finish',cleanupDisconnect);reply?.raw.off('close',cleanupDisconnect);};
+    if (!detached&&reply) {
+      reply.raw.on('close',disconnect);
+      reply.raw.once('close',cleanupDisconnect);
+      reply.raw.once('finish', () => { run.responseFinished = run.elapsed(); activities.save(run);cleanupDisconnect(); });
+    }
     const resultPromise = (async () => {
       try {
         release=await ticket;run.dequeue();
         if(controller.signal.aborted)throw new ApiError(499,'request_cancelled','Request cancelled before provider start.');
-        timer=setTimeout(()=>{timedOut=true;run.cancel('timeout');},config.timeout);
+        timer=setTimeout(()=>{if(run.active){timedOut=true;run.noteGatewayTimeout();run.cancel('timeout','gateway_request_timer');}},config.timeout);
         await captureStep('incoming', 'Client supplied', {payload:req?.body,
           messages:(req?.body as {messages?:unknown}|undefined)?.messages ?? request.messages,
           message_mapping:req?.url.split('?')[0] === '/chat' ? 'Gateway generated user role from client prompt' : (req?.body as {message?:unknown}|undefined)?.message ? 'Gateway generated user role from client message' : 'Original client messages'});
@@ -203,6 +207,7 @@ export async function buildServer(config: Config, provider: Provider) {
           },
           onLifecycle: timing => { run.cliLifecycle=timing; },
           onAppServerLifecycle: timing => { run.appServerLifecycle=timing; },
+          ...(selected.id==='codex'&&!session ? { returnOnTurnCompleted: true, onLateExit: exit => app.log.warn({ code: 'codex_late_exit', run_id: run.id, exit_code: exit.code, signal: exit.signal }, 'Codex CLI exited abnormally after the answer was returned.') } : {}),
           observe: async context => captureStep('cli_boundary', 'Gateway generated', context),
           observeResponse: async response => { responseObserved = true; await captureStep('codex_response', 'SDK observable', response); } });
         run.providerFinished = run.elapsed(); run.emit('provider.finished');
@@ -238,14 +243,15 @@ export async function buildServer(config: Config, provider: Provider) {
         if (session && providerInvoked) await sessions.remove(session.id);
         const timeoutCode=selected.id==='codex'?'codex_timeout':'provider_timeout';
         const code = timedOut ? timeoutCode : controller.signal.aborted ? 'request_cancelled' : error instanceof ApiError ? error.code : 'codex_error';
+        if(!controller.signal.aborted)run.providerFailure={reason:code==='provider_timeout'||code==='codex_timeout'?'provider_timeout':error instanceof Error?'provider_error':'unknown',origin:'provider'};
         run.finish(controller.signal.aborted && !timedOut ? 'cancelled' : 'failed',code);
         metrics.error(run.id,code); metrics.finish(run.id,run.elapsed(),timedOut ? 504 : controller.signal.aborted ? 499 : error instanceof ApiError ? error.status : 502,controller.signal.aborted && !timedOut);
         if (controller.signal.aborted && !timedOut) throw new ApiError(499,'request_cancelled','Request cancelled.');
-        if (timedOut) throw new ApiError(504, timeoutCode, `Provider timed out.${session ? ' Session invalidated; create a new one.' : ''}`);
+        if (timedOut) throw new ApiError(504, timeoutCode, `Provider timed out.${(run.cliLifecycle?.reconnect_count??0)>0 ? ` Codex CLI reconnected ${run.cliLifecycle!.reconnect_count} time(s) to the upstream service (${run.cliLifecycle!.last_reconnect_message}); the connection to ChatGPT is slow or unstable.` : ''}${session ? ' Session invalidated; create a new one.' : ''}`);
         if (error instanceof ApiError) throw error;
         throw new ApiError(502, 'codex_error', `Codex failed. Check login, model availability and CLI compatibility.${session ? ' Session invalidated; create a new one.' : ''}`);
       } finally {
-        clearTimeout(timer); reply?.raw.off('close', disconnect);
+        clearTimeout(timer);
         running.delete(controller); if (session) sessions.busy.delete(session.id);release?.();
       }
     })();
@@ -299,7 +305,7 @@ export async function buildServer(config: Config, provider: Provider) {
   app.post('/v1/runs/:id/cancel',async(req,reply) => {
     z.object({}).strict().parse(req.body);
     const id = runId(req), who = identity(req), run = activities.live(id,who.owner,who.admin);
-    run?.cancel('explicit');
+    run?.cancel('explicit','gateway_cancel_endpoint');
     return reply.send({...activities.snapshot(id,who.owner,who.admin),cancel_requested:run?.active ?? false});
   });
   app.post('/v1/runs/:id/workflow-events',{bodyLimit:4096},async(req,reply)=>{
@@ -389,7 +395,7 @@ export async function buildServer(config: Config, provider: Provider) {
   app.addHook('preClose', async () => {
     const labClosed=lab.close();
     resources.close();scheduler.close();
-    for (const controller of running) controller.abort();
+    for (const [controller,run] of running) {run.cancel('shutdown','server_shutdown');controller.abort();}
     for (const stream of streams) stream.end();
     await Promise.allSettled([...jobs]);
     await labClosed;

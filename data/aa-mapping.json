@@ -39,6 +39,13 @@
       "expected_creator": "OpenAI"
     },
     {
+      "model_id": "gpt-6.1-terra",
+      "effort": "max",
+      "slug": "gpt-6-1-terra",
+      "expected_name": "GPT-6.1 Terra (Max)",
+      "expected_creator": "OpenAI"
+    },
+    {
       "model_id": "gpt-6-luna",
       "effort": "xhigh",
       "slug": "gpt-6-luna-xhigh",

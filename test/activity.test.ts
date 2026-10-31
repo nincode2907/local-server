@@ -29,6 +29,7 @@ async function fixture(extra:Record<string,string> = {}) {
     starts++;
     await options.observe?.({fixture:true});
     await delay(15,undefined,{signal:options.signal});
+    if(input.includes('before-output-gated'))await new Promise((_resolve,reject)=>{if(options.signal?.aborted){reject(new Error('fixture aborted'));return;}options.signal?.addEventListener('abort',()=>reject(new Error('fixture aborted')),{once:true});});
     const prefix = input.includes('credential-case') ? '{"content":"safe fixture-app-a-' : '{"content":"Xin';
     options.onEvent?.({type:'output',item_id:'answer',text:prefix});
     options.onEvent?.({type:'output',item_id:'answer',text:prefix}); // cumulative duplicate
@@ -75,6 +76,8 @@ test('streaming emits deduplicated public content, stable IDs, finish and option
     const id = r.headers['x-codex-run-id'];
     const run = (await f.app.inject({url:`/v1/runs/${id}`,headers:auth(a)})).json();
     assert.equal(run.status,'completed'); assert.equal(run.metrics.output_updates.value,2);
+    assert.equal(run.diagnostics.stream,true);assert.ok(run.diagnostics.request_accepted_at>0);assert.ok(run.diagnostics.first_public_output_at>0);
+    assert.ok(run.diagnostics.first_content_sent_at>=run.diagnostics.first_public_output_at);
     assert.ok(run.metrics.ttfo.value >= 0 && run.metrics.ttfo.value < run.metrics.duration.value);
     assert.ok(run.metrics.first_content_sent.value >= run.metrics.ttfo.value);
     assert.equal(run.metrics.ttft.value,null); assert.equal(run.metrics.output_tokens_per_second.value,null);
@@ -167,7 +170,7 @@ test('explicit cancellation and timeout are terminal and release concurrency; br
     assert.equal((await f.app.inject({method:'POST',url:'/v1/runs',headers:auth(a),payload:body()})).statusCode,429);
     assert.equal((await f.app.inject({method:'POST',url:`/v1/runs/${id}/cancel`,headers:{...auth(),host:'localhost',origin:'http://evil.test','x-codex-run':'1'},payload:{}})).statusCode,403);
     assert.equal((await f.app.inject({method:'POST',url:`/v1/runs/${id}/cancel`,headers:auth(a),payload:{}})).statusCode,200);
-    assert.equal((await terminal(f,id)).status,'cancelled');
+    const cancelled=await terminal(f,id);assert.equal(cancelled.status,'cancelled');assert.equal(cancelled.diagnostics.cancel.reason,'explicit_cancel');
     assert.equal((await f.app.inject({method:'POST',url:`/v1/runs/${id}/cancel`,headers:auth(a),payload:{}})).statusCode,200);
     assert.equal((await f.app.inject({method:'POST',url:'/chat',headers:auth(),payload:{prompt:'next'}})).statusCode,200);
   } finally {await f.close();}
@@ -175,6 +178,8 @@ test('explicit cancellation and timeout are terminal and release concurrency; br
   try {
     const r = await timeout.app.inject({method:'POST',url:'/v1/runs',headers:auth(),payload:body('slow')});
     const run = await terminal(timeout,r.json().run_id); assert.equal(run.status,'failed'); assert.equal(run.error_code,'codex_timeout');
+    assert.equal(run.diagnostics.stream,false);assert.equal(run.diagnostics.cancel.reason,'gateway_timeout');assert.equal(run.diagnostics.cancel.origin,'gateway_request_timer');assert.ok(run.diagnostics.gateway_timeout_at);
+    const call=(await timeout.app.inject({url:`/api/stats/calls/${run.call_id}`,headers:auth()})).json();assert.equal(call.http_status,504);
   } finally {await timeout.close();}
 });
 
@@ -182,13 +187,21 @@ test('real SSE delivers content before completion; viewer disconnect does not ca
   const f = await fixture();
   try {
     const base = await f.app.listen({host:'127.0.0.1',port:0});
+    const beforeOutputController=new AbortController();
+    const beforeOutput=await fetch(`${base}/v1/chat/completions`,{method:'POST',signal:beforeOutputController.signal,headers:{...auth(a),'Content-Type':'application/json'},body:JSON.stringify({...body('before-output-gated'),stream:true})});
+    const beforeOutputId=beforeOutput.headers.get('x-codex-run-id')!;beforeOutputController.abort();await beforeOutput.body?.cancel().catch(()=>{});
+    const cancelledBeforeOutput=await terminal(f,beforeOutputId);assert.equal(cancelledBeforeOutput.status,'cancelled');
+    assert.equal(cancelledBeforeOutput.metrics.output_updates.value,0);assert.equal(cancelledBeforeOutput.diagnostics.cancel.reason,'client_disconnect');
     const completionController=new AbortController();
     const r = await fetch(`${base}/v1/chat/completions`,{method:'POST',signal:completionController.signal,headers:{...auth(a),'Content-Type':'application/json'},body:JSON.stringify({...body('stream-gated'),stream:true})});
     const reader = r.body!.getReader(), decoder = new TextDecoder(); let text='';
     while (!text.includes('Xin')) text += decoder.decode((await reader.read()).value);
     assert.equal((await (await fetch(`${base}/v1/runs/${r.headers.get('x-codex-run-id')}`,{headers:auth(a)})).json()).status,'running');
     completionController.abort();await reader.cancel().catch(()=>{});
-    assert.equal((await terminal(f,r.headers.get('x-codex-run-id')!)).status,'cancelled');
+    const disconnected=await terminal(f,r.headers.get('x-codex-run-id')!);assert.equal(disconnected.status,'cancelled');
+    assert.equal(disconnected.diagnostics.cancel.reason,'client_disconnect');assert.equal(disconnected.diagnostics.cancel.origin,'http_client_connection');
+    assert.ok(disconnected.diagnostics.client_disconnect_at);assert.ok(disconnected.diagnostics.first_content_sent_at);
+    const disconnectedCall=(await f.app.inject({url:`/api/stats/calls/${disconnected.call_id}`,headers:auth()})).json();assert.equal(disconnectedCall.http_status,499);
     const create = (await f.app.inject({method:'POST',url:'/v1/runs',headers:auth(a),payload:body('slow')})).json();
     const controller = new AbortController();
     const view = await fetch(`${base}/v1/runs/${create.run_id}/events`,{headers:auth(a),signal:controller.signal});
@@ -198,6 +211,29 @@ test('real SSE delivers content before completion; viewer disconnect does not ca
     const response = await fetch(`${base}/api/runs/events`,{headers:auth(),signal:feed.signal});
     const first = new TextDecoder().decode((await response.body!.getReader().read()).value);
     assert.ok(!first.includes('Xin chào')); assert.ok(first.includes('snapshot')); feed.abort();
+  } finally {await f.close();}
+});
+
+test('two independent provider runs can complete concurrently without sharing cancellation diagnostics',async()=>{
+  const f=await fixture();
+  try {
+    const [left,right]=await Promise.all(['normal-a','normal-b'].map(prompt=>f.app.inject({method:'POST',url:'/v1/chat/completions',headers:auth(),payload:body(prompt)})));
+    assert.equal(left.statusCode,200);assert.equal(right.statusCode,200);assert.equal(f.starts,2);
+    const runs=await Promise.all([left,right].map(r=>f.app.inject({url:`/v1/runs/${r.headers['x-codex-run-id']}`,headers:auth()})));
+    assert.ok(runs.every(r=>r.json().status==='completed'&&r.json().diagnostics.cancel===null));
+  } finally {await f.close();}
+});
+
+test('disconnect racing with the HTTP completion does not turn a completed inference into a cancellation',async()=>{
+  const f=await fixture();
+  try {
+    const base=await f.app.listen({host:'127.0.0.1',port:0}),controller=new AbortController();
+    const response=await fetch(`${base}/v1/chat/completions`,{method:'POST',signal:controller.signal,headers:{...auth(a),'Content-Type':'application/json'},body:JSON.stringify({...body(),stream:true})});
+    const id=response.headers.get('x-codex-run-id')!,reader=response.body!.getReader();
+    let run:any;
+    for(let i=0;i<100;i++){run=(await (await fetch(`${base}/v1/runs/${id}`,{headers:auth(a)})).json());if(run.status==='completed')break;await delay(1);}
+    assert.equal(run.status,'completed');controller.abort();await reader.cancel().catch(()=>{});
+    const final=await terminal(f,id);assert.equal(final.status,'completed');assert.equal(final.diagnostics.cancel,null);
   } finally {await f.close();}
 });
 

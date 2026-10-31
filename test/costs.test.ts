@@ -58,7 +58,7 @@ test('playground requires same origin, uses ephemeral provider and exposes metad
     const detail = await app.inject({url:`/api/stats/calls/${id}`,headers});
     assert.equal(detail.statusCode,200); assert.equal(detail.json().status,'success'); assert.ok(detail.json().cost_usd > 0);
     assert.ok(!detail.body.includes('private prompt')); assert.equal(detail.json().session_id,null);
-    assert.equal((await app.inject({url:'/api/models',headers})).json().models.length,15);
+    assert.equal((await app.inject({url:'/api/models',headers})).json().models.length,16);
     assert.equal((await app.inject({url:'/api/stats/costs?group=invalid',headers})).statusCode,400);
     assert.equal((await app.inject({method:'POST',url:'/v1/chat/completions',payload,headers})).statusCode,403);
   } finally { await app.close(); await rm(dir,{recursive:true,force:true}); }

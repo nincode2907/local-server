@@ -46,8 +46,14 @@ export class ActivityRun {
   appServerLifecycle:AppServerLifecycleTiming|null=null;
   error: string | null = null;
   cancelReason: 'explicit' | 'disconnect' | 'timeout' | 'shutdown' | null = null;
+  cancelOrigin:string|null=null;
+  cancelAt:number|null=null;
+  clientDisconnectAt:number|null=null;
+  gatewayTimeoutAt:number|null=null;
+  providerFailure:{reason:'provider_timeout'|'provider_error'|'unknown';origin:'provider'}|null=null;
   constructor(readonly id: string, readonly owner: string, readonly model: string,
-    readonly ephemeral: boolean, readonly store: Activities, readonly acceptedAt: number, queued=false,readonly provider:ProviderId='codex',readonly benchmark?:BenchmarkTag) { if(queued){this.status='queued';this.queuedAt=this.elapsed();} }
+    readonly ephemeral: boolean, readonly store: Activities, readonly acceptedAt: number, queued=false,readonly provider:ProviderId='codex',readonly benchmark?:BenchmarkTag,
+    readonly stream:boolean|null=null,readonly acceptedAtWall=Date.now()) { if(queued){this.status='queued';this.queuedAt=this.elapsed();} }
   get active() {return this.status==='running'||this.status==='queued';}
   dequeue() {if(this.status==='queued'){this.status='running';this.dequeuedAt=this.elapsed();this.emit('run.dequeued');}}
   private sample(kind:'output'|'usage') {
@@ -62,7 +68,22 @@ export class ActivityRun {
     return { run_id: this.id, call_id: this.id, model: this.model, provider: this.provider, status: this.status,...(this.benchmark?{benchmark:this.benchmark}:{}),
       workflow:this.store.workflows.snapshot(this.id),history:{samples:[...this.samples],sample_count:this.sampleCount,truncated:this.sampleCount>this.samples.length,available:true},
       created_at: this.createdAt, seq: this.seq, ephemeral: this.ephemeral, error_code: this.error, capabilities:providerCapabilities(this.provider,this.store.codexTransport),
-      timeline: { received: 0, enqueued:this.queuedAt,dequeued:this.dequeuedAt, provider_started: this.providerStarted, first_output: this.firstOutput,
+      diagnostics:{stream:this.stream,request_accepted_at:this.acceptedAtWall,provider_started_at:this.providerStarted===null?null:this.acceptedAtWall+this.providerStarted,
+        first_public_output_at:this.firstOutput===null?null:this.acceptedAtWall+this.firstOutput,first_content_sent_at:this.firstSent===null?null:this.acceptedAtWall+this.firstSent,
+        client_disconnect_at:this.clientDisconnectAt,gateway_timeout_at:this.gatewayTimeoutAt,
+        cancel:this.cancelReason?{reason:this.cancelReason==='disconnect'?'client_disconnect':this.cancelReason==='timeout'?'gateway_timeout':this.cancelReason==='shutdown'?'server_shutdown':'explicit_cancel',origin:this.cancelOrigin,timestamp:this.cancelAt,elapsed_ms:this.cancelAt===null?null:this.cancelAt-this.acceptedAtWall}:null,
+        provider_failure:this.providerFailure,
+        cli:{first_lifecycle_event_at:this.cliLifecycle?.first_stdout_event_ms===null||this.cliLifecycle?.first_stdout_event_ms===undefined?null:this.acceptedAtWall+(this.providerStarted??0)+this.cliLifecycle.first_stdout_event_ms,
+          terminal_event_at:this.cliLifecycle?.turn_completed_event_received_ms===null||this.cliLifecycle?.turn_completed_event_received_ms===undefined?null:this.acceptedAtWall+(this.providerStarted??0)+this.cliLifecycle.turn_completed_event_received_ms,
+          child_exit_at:this.cliLifecycle?.child_process_exited_ms===null||this.cliLifecycle?.child_process_exited_ms===undefined?null:this.acceptedAtWall+(this.providerStarted??0)+this.cliLifecycle.child_process_exited_ms,
+          exit_code:this.cliLifecycle?.child_process_exit_code??null,signal:this.cliLifecycle?.child_process_signal??null}},
+      timeline: { received: 0, enqueued:this.queuedAt,dequeued:this.dequeuedAt, provider_started: this.providerStarted,
+        first_cli_event:this.cliLifecycle?.first_stdout_event_ms===null||this.cliLifecycle?.first_stdout_event_ms===undefined?null:(this.providerStarted??0)+this.cliLifecycle.first_stdout_event_ms,
+        cli_terminal_event:this.cliLifecycle?.turn_completed_event_received_ms===null||this.cliLifecycle?.turn_completed_event_received_ms===undefined?null:(this.providerStarted??0)+this.cliLifecycle.turn_completed_event_received_ms,
+        cli_process_exit:this.cliLifecycle?.child_process_exited_ms===null||this.cliLifecycle?.child_process_exited_ms===undefined?null:(this.providerStarted??0)+this.cliLifecycle.child_process_exited_ms,
+        client_disconnect:this.clientDisconnectAt===null?null:this.clientDisconnectAt-this.acceptedAtWall,
+        gateway_timeout:this.gatewayTimeoutAt===null?null:this.gatewayTimeoutAt-this.acceptedAtWall,
+        first_output: this.firstOutput,
         last_output: this.lastOutput, provider_finished: this.providerFinished, first_content_sent: this.firstSent, finished: this.duration, response_finished: this.responseFinished },
       metrics: {
         queue_wait:metric(this.queuedAt!==null&&this.dequeuedAt!==null?this.dequeuedAt-this.queuedAt:null,'ms','gateway_observed',this.queuedAt===null?'Request did not enter a queue.':'Request has not been dequeued.'),
@@ -112,10 +133,13 @@ export class ActivityRun {
     this.emit(append ? 'output.delta' : 'output.replaced', {...(append ? {delta} : {text}),sample:this.samples.at(-1),metrics:this.snapshot().metrics,timeline:this.snapshot().timeline});
   }
   sent() { this.firstSent ??= this.elapsed(); this.store.save(this); }
-  cancel(reason: NonNullable<ActivityRun['cancelReason']>) {
+  cancel(reason: NonNullable<ActivityRun['cancelReason']>,origin:string|null=null) {
     if (!this.active) return;
-    this.cancelReason ??= reason; this.controller.abort();
+    if(!this.cancelReason){this.cancelReason=reason;this.cancelOrigin=origin;this.cancelAt=Date.now();}
+    this.controller.abort();
   }
+  noteClientDisconnect(){this.clientDisconnectAt??=Date.now();this.store.save(this);}
+  noteGatewayTimeout(){this.gatewayTimeoutAt??=Date.now();this.store.save(this);}
   finish(status: Exclude<RunStatus, 'queued' | 'running' | 'interrupted'>, code: string | null = null, result?: unknown, validated = true) {
     if (!this.active) return;
     this.status = status; this.duration = this.elapsed(); this.error = code;
@@ -162,14 +186,14 @@ export class Activities {
       this.runs.delete(id);this.workflows.forget(id); run.events = []; run.output = ''; run.bytes = 0;
     }
   }
-  create(id: string, owner: string, model: string, ephemeral: boolean, acceptedAt: number, key?: string, hash?: string, queued=false,provider:ProviderId='codex',benchmark?:BenchmarkTag) {
+  create(id: string, owner: string, model: string, ephemeral: boolean, acceptedAt: number, key?: string, hash?: string, queued=false,provider:ProviderId='codex',benchmark?:BenchmarkTag,stream:boolean|null=null,acceptedAtWall=Date.now()) {
     this.purge();
     while (this.runs.size >= 128) {
       const old = [...this.runs.values()].find(r => !r.active);
       if (!old) throw new ApiError(429, 'run_limit', 'Too many active runs.');
       this.runs.delete(old.id);this.workflows.forget(old.id); old.events = []; old.output = '';
     }
-    const run = new ActivityRun(id, owner, model, ephemeral, this, acceptedAt,queued,provider,benchmark);
+    const run = new ActivityRun(id, owner, model, ephemeral, this, acceptedAt,queued,provider,benchmark,stream,acceptedAtWall);
     this.db.prepare('INSERT INTO gateway_runs(id,owner,created_at,status,metadata,idempotency,request_hash) VALUES(?,?,?,?,?,?,?)')
       .run(id, owner, run.createdAt, run.status, JSON.stringify(run.snapshot()), key ? digest(key) : null, hash ?? null);
     this.runs.set(id, run); run.emit('run.accepted', {model, capabilities:providerCapabilities(provider,this.codexTransport)});if(queued)run.emit('run.queued'); return run;

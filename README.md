@@ -123,7 +123,7 @@ curl http://localhost:15600/v1/chat/completions \
 }
 ```
 
-`usage` ánh xạ token của toàn bộ Codex turn, gồm prompt wrapper/structured output; không chỉ đo text bạn gửi. Chỉ có khi SDK cung cấp usage.
+`usage` ánh xạ token của toàn bộ Codex turn, gồm prompt wrapper/structured output; không chỉ đo text bạn gửi. Chỉ có khi SDK cung cấp usage. Gateway timeout mặc định là 180 giây, tính từ khi request được nhận lượt chạy sau queue; caller nên đặt timeout cao hơn ít nhất 30–60 giây (210–240 giây với mặc định) để chừa thời gian cleanup và trả response. Không tăng timeout gateway để bù timeout client.
 
 ```bash
 curl http://localhost:15600/chat \
@@ -143,7 +143,7 @@ from openai import OpenAI
 client = OpenAI(
     base_url="http://localhost:15600/v1",
     api_key="local",  # hoặc LOCAL_API_KEY nếu bạn cấu hình token gateway
-    timeout=200,
+    timeout=240,
     max_retries=0,
 )
 response = client.chat.completions.create(
@@ -165,7 +165,7 @@ Gateway dùng structured output của Codex để mô phỏng giao thức functi
 import json
 from openai import OpenAI
 
-client = OpenAI(base_url="http://localhost:15600/v1", api_key="local", timeout=200, max_retries=0)
+client = OpenAI(base_url="http://localhost:15600/v1", api_key="local", timeout=240, max_retries=0)
 tools = [{
     "type": "function",
     "function": {
@@ -226,7 +226,7 @@ sid = session.json()["session_id"]
 
 for text in ["Tôi tên Nin", "Tên tôi là gì?"]:
     response = requests.post(f"{base}/v1/sessions/{sid}/messages",
-                             json={"message": text}, timeout=200)
+                             json={"message": text}, timeout=240)
     response.raise_for_status()
     print(response.json()["choices"][0]["message"]["content"])
 
@@ -375,10 +375,14 @@ Query `model` là tùy chọn; thêm header `Authorization: Bearer ...` nếu b�
 - Sandbox `read-only`, approvals `never`, command networking tắt. HTTP request không được chọn working directory, Codex home, executable hoặc nâng quyền.
 - Gateway không thực thi tool do caller cung cấp. Không kế thừa biến môi trường bí mật của app; dùng auth store Codex hiện có để tiếp tục refresh login như CLI.
 - Read-only bảo vệ việc ghi file; **không phải sandbox bảo mật đầy đủ để cô lập quyền đọc dữ liệu**. Chỉ dùng cho app local tin cậy. Không expose ra internet; nếu cần chạy prompt không tin cậy, dùng user/container riêng với dữ liệu và auth tách biệt.
-- Giới hạn body 1 MiB, mặc định 2 lượt đồng thời, timeout 180 giây. Request vượt concurrency trả `429`, không xếp hàng; session đang chạy trả `409`.
+- Giới hạn body 1 MiB, mặc định 2 lượt đồng thời, timeout provider 180 giây sau khi request được nhận lượt chạy. Request vượt concurrency trả `429`, không xếp hàng; session đang chạy trả `409`.
 - V1 nhận text messages, tools kiểu function, `n=1`, JSON hoặc `stream=true` cho stateless API. Session routes chưa streaming; chưa có ảnh/audio, `response_format`, `max_tokens`, embeddings hoặc full OpenAI API. Tham số ngoài phạm vi trả `400`.
 
 Lỗi theo dạng `{"error":{"message":"...","type":"...","code":"..."}}`. Codex lỗi trả `502`, timeout `504`. Response không chứa raw CLI stderr hay credential. Kiểm tra `codex login status`, model và phiên bản CLI khi gặp `codex_error`. `CODEX_BIN` chỉ dùng khi bạn chủ động muốn thay CLI bundle tương thích.
+
+### Timeout phía client và streaming
+
+`/v1/chat/completions` giữ JSON response khi bỏ `stream` hoặc đặt `stream: false`; với `stream: true`, gateway gửi SSE, heartbeat mỗi 15 giây và content khi Codex cung cấp public item update. Đặt tổng timeout client cao hơn timeout gateway; với mặc định 180 giây, dùng khoảng 210–240 giây và tắt retry tự động nếu app không muốn request mới sau lỗi. Client streaming cũng cần tiếp tục đọc SSE comment heartbeat, không áp idle timeout thấp hơn 15 giây. `/api/playground/chat` dùng cùng giới hạn provider; Playground gửi streaming request và hủy khi người dùng dừng hoặc đóng kết nối. Gateway không thể biết hay sửa deadline 60/120 giây của caller ngoài repository.
 
 ## Kiểm tra
 
@@ -405,7 +409,7 @@ Endpoint dashboard: `GET /api/models`, `GET /api/stats/costs?group=day|week|mont
 
 Tab **Codex usage** đọc `state_5.sqlite` (chỉ đọc), `sessions/**/rollout-*.jsonl` và `archived_sessions/**/rollout-*.jsonl` trong `NATIVE_CODEX_HOME` (mặc định `CODEX_HOME` hoặc `~/.codex`). Collector chạy lúc khởi động và mỗi `NATIVE_USAGE_INTERVAL_MS` (mặc định 30000, tối thiểu 5000). Nó stream các file mới/đã thay đổi, replay vào bảng SQLite riêng theo ID để tránh đếm trùng, và giữ thống kê khi file gốc không còn. Nút Làm mới đọc số liệu đã đồng bộ; không quét bằng agent hay proxy network.
 
-Database gateway giữ thêm `native_sessions`, `native_turns`, `native_events`, `native_files` và các bảng notification. Usage chỉ lưu metadata/token/giá, không lưu transcript; notification mặc định tắt và chỉ lưu project, model, trạng thái, thời điểm, thời lượng, kết quả gửi. Tên yêu cầu chỉ được giữ khi bật rõ chế độ **Xem trước**, đã lọc đường dẫn/credential phổ biến; chế độ **Riêng tư** xóa tên đã lưu. Native events được giữ riêng với call gateway, không cộng hai datasource với nhau. Gateway trong rollout được nhận diện bằng tên thư mục runtime `codex-gateway-*`; đây là phân loại theo cwd. `vscode` có thể là VS Code hoặc App, không tự khẳng định phân biệt khi metadata không đủ. Các thread ephemeral không có rollout nên không thể lấy usage bằng observer này.
+Database gateway giữ thêm `native_sessions`, `native_turns`, `native_events`, `native_files` và các bảng notification. Usage chỉ lưu metadata/token/giá, không lưu transcript; notification mặc định tắt và chỉ lưu project, model, trạng thái, thời điểm, thời lượng, kết quả gửi. Tên yêu cầu chỉ được giữ khi bật rõ chế độ **Xem trước**, đã lọc đường dẫn/credential phổ biến; chế độ **Riêng tư** xóa tên đã lưu. Native events được giữ riêng với call gateway, không cộng hai datasource với nhau. Gateway trong rollout được nhận diện bằng tên thư mục runtime `codex-gateway-*`; đây là phân loại theo cwd. Các lượt từ runtime này không tạo hoặc gửi notification, và các mục cũ được ẩn khỏi danh sách thông báo gần đây. Trong bảng Sessions, session gateway cùng cwd runtime được gom thành một hàng tổng hợp, có thể mở danh sách session con để xem chi tiết. `vscode` có thể là VS Code hoặc App, không tự khẳng định phân biệt khi metadata không đủ. Các thread ephemeral không có rollout nên không thể lấy usage bằng observer này.
 
 Parser ưu tiên `token_usage_record.usage`, deduplicate response ID và bỏ `token_count` của cùng turn để tránh cộng hai lần. Với log cũ, dùng chênh lệch `total_token_usage`; record đầu/reset dùng `last_token_usage`, không gán usage kế thừa cho child/fork. Bản fork bỏ record trước thời điểm tạo và record có thread ID của parent. Usage chưa expose sẽ hiển thị **—**; không dùng `threads.tokens_used` hay suy token từ text. Bộ đếm reset và dòng malformed được ghi chú; dòng JSONL chưa hoàn chỉnh được đọc lại ở lần sync sau. Session không có rollout vẫn được nhập metadata từ state DB.
 

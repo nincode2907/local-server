@@ -45,6 +45,16 @@ trả JSON status 4xx. Sau headers, lỗi trả SSE `{error:{code,message}}`, kh
 success finish hoặc `[DONE]`; output trước lỗi là partial, chưa được xác nhận.
 Client ngắt streaming completion sẽ hủy inference, giải phóng concurrency sau cleanup.
 
+Gateway timeout mặc định 180 giây, bắt đầu sau khi request được nhận lượt chạy
+(sau queue nếu queue được bật). Client cho `/v1/chat/completions` nên đặt tổng
+timeout khoảng 210–240 giây để chừa 30–60 giây cleanup và trả response; timeout
+thấp hơn có thể đóng kết nối trước khi Codex CLI thoát. Non-streaming chờ provider
+xác nhận hoàn tất rồi mới trả JSON. Streaming gửi heartbeat mỗi 15 giây; client
+cần đọc SSE comment heartbeat và không đặt idle timeout ngắn hơn khoảng này.
+`/api/playground/chat` dùng cùng provider timeout và UI hủy request khi người dùng
+dừng hoặc đóng kết nối. Deadline 60/120 giây của caller bên ngoài không thuộc cấu
+hình gateway và chưa được xác nhận từ phía repository.
+
 Tool proposals chỉ được gửi sau khi output hoàn chỉnh qua validation; gateway
 không thực thi function. Nếu provider sửa lại phần content đã phát, OpenAI stream
 được kết thúc bằng `non_append_output`; unified stream bên dưới hỗ trợ replacement.
@@ -215,10 +225,24 @@ Codex run dùng transport exec còn có `metrics.cli_lifecycle`, với mốc mon
 provider bắt đầu: yêu cầu spawn, process spawn, stdin finish/close, event stdout
 đầu tiên, `turn.completed` nhận và được gateway xử lý, số event stdout sau mốc đó,
 iterator kết thúc, stdout/stderr end/close, process exit/close, observer response,
-xóa schema tạm và provider return. Đây là mốc ở ranh giới CLI/Node quan sát được;
-không suy diễn thời gian inference, reasoning hay decode nội bộ. Provider local
-giữ trường này null. Field mới chỉ bổ sung metadata; usage và thống kê call hiện
-có không đổi.
+xóa schema tạm và provider return, kèm exit code/signal thực tế. `reconnect_count`, `first_reconnect_ms` và `last_reconnect_message` đếm các thông báo "Reconnecting… n/5" mà Codex CLI tự phát khi request tới ChatGPT bị timeout (không lưu nội dung chat); lượt chậm có reconnect là do kết nối upstream, không phải gateway. Timeout 504 kèm gợi ý này.
+
+Request không có session (stateless) trả lời ngay khi nhận `turn.completed` có câu trả lời cuối và usage, không chờ CLI thoát (đuôi thoát ~11–14 s). Khi đó `returned_before_exit=true`; tiến trình CLI được dọn nền (kill sau 30 s nếu treo), exit lỗi/signal sau đó chỉ ghi log `codex_late_exit` và không đổi kết quả đã trả. Request thuộc session vẫn chờ CLI thoát để lịch sử resume được ghi xong. Snapshot bổ sung
+`diagnostics.stream`, mốc nhận request, provider start, lifecycle event đầu tiên,
+public output đầu tiên, lần ghi content SSE đầu tiên, terminal event, process exit,
+client disconnect, gateway timeout và cancel/failure reason với originating layer
+khi biết. Timestamp epoch và elapsed timeline được tách biệt. HTTP status tiếp tục
+nằm trong call metrics; `499` tự nó không được hiểu là application timeout.
+Đây là quan sát tại ranh giới CLI/Node; không lưu prompt/output/credential/reasoning
+trong diagnostics và không suy diễn thời gian inference, reasoning hay decode nội bộ.
+Metadata lưu trong JSON snapshot hiện có; không cần migration SQLite. Provider local
+không có CLI lifecycle, nên trường đó giữ null.
+
+Provider chỉ báo thành công sau terminal `turn.completed`, EOF stdout, child exit 0,
+observer/cleanup và validation của gateway. Không trả sớm ở `turn.completed`: test
+fake chứng minh CLI vẫn có thể thoát khác 0 sau event này. Nếu CLI treo sau terminal,
+gateway giữ run tới request timeout/cancel và dọn child; phản hồi chưa thể được xác
+nhận là thành công an toàn chỉ từ terminal event.
 
 Benchmark thật có thể chạy tuần tự bằng `npm run benchmark:latency -- --runs=5`.
 Script dùng provider/CLI thật, server HTTP trên cổng OS cấp tự động và thư mục

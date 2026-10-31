@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "checked_on": "2026-10-02",
+  "checked_on": "2026-10-30",
   "events": [
     {
       "id": "aa-api-import-2026-10-02",
@@ -353,6 +353,19 @@
       "body": "Official thay GPT-5.4 bằng6Sol, Mini bằng6Luna khi có quyền truy cập.",
       "source_ids": [
         "openai-models"
+      ]
+    },
+    {
+      "id": "gpt-6-1-terra-added",
+      "date": "2026-10-30",
+      "type": "coverage",
+      "title": "Thêm GPT-6.1 Terra vào catalog và gateway",
+      "body": "Nguồn OpenAI: context 1.05M, output 128K, giá $1/$5 (cache $0.05). Codex CLI cục bộ liệt kê model. AA public: Intelligence Index v5.0 Max 51, Xhigh 45, High 42, Medium 38, Non-reasoning 30, Low 29 (không so với index 4.3). Số AA chưa qua API v2.",
+      "source_ids": [
+        "spec-gpt-6.1-terra",
+        "aa-gpt-6-1-terra",
+        "aa-gpt-6-1-terra-release",
+        "codex-local-models-cache"
       ]
     }
   ]
