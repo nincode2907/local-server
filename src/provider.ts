@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { ApiError } from './errors.js';
 import type { Config } from './config.js';
+import { openEgress, egressEnv, type EgressFactory } from './egress-forwarder.js';
 import type { ChatRequest } from './schema.js';
 import type {ProviderUsage as Usage,ProviderTiming,CliLifecycleTiming,AppServerLifecycleTiming} from './provider-types.js';
 
@@ -35,7 +36,10 @@ export interface ProviderThread {
 export interface Provider {
   canResume?(id: string): boolean;
   warmup?(): Promise<void>;
-  start(model: string, effort?: ChatRequest['reasoning_effort'], ephemeral?: boolean): ProviderThread;
+  /** `stateless` marks a request that owns no session; only such threads may be recycled by a provider. */
+  start(model: string, effort?: ChatRequest['reasoning_effort'], ephemeral?: boolean, options?: { stateless?: boolean }): ProviderThread;
+  /** Admin-only metadata about the gateway-owned egress forwarder (hosts, counts, timings), or null. */
+  egress?(): unknown;
   resume(id: string, model: string, effort?: ChatRequest['reasoning_effort']): ProviderThread;
   close(): Promise<void>;
 }
@@ -232,10 +236,10 @@ class CliThread implements ProviderThread {
   }
 }
 
-export async function createProvider(config: Config): Promise<Provider> {
+export async function createProvider(config: Config, hooks: { egress?: EgressFactory } = {}): Promise<Provider> {
   if (config.codexTransport === 'app-server') {
     const { createAppServerProvider } = await import('./app-server-provider.js');
-    return createAppServerProvider(config);
+    return createAppServerProvider(config, hooks);
   }
   const runtime = await mkdtemp(join(tmpdir(), 'codex-gateway-'));
   const require = createRequire(import.meta.url);
@@ -249,13 +253,17 @@ export async function createProvider(config: Config): Promise<Provider> {
     if (process.env[key]) env[key] = process.env[key]!;
   }
   // API keys, caller env, provider overrides and custom proxy endpoints are deliberately not inherited.
+  // The only proxy is the gateway-owned loopback forwarder (see egress-forwarder.ts).
+  const forwarder = await openEgress(config.codexEgressForwarder ?? false, hooks.egress);
+  Object.assign(env, egressEnv(forwarder));
   const make = (model: string, effort?: ChatRequest['reasoning_effort'], id: string | null = null, ephemeral = false) =>
     new CliThread(command, commandPrefix, env, runtime, instructions, model, effort, id, ephemeral);
   return {
     canResume: id => !id.startsWith('app-server:'),
     start: (model, effort, ephemeral) => make(model, effort, null, ephemeral),
     resume: (id, model, effort) => make(model, effort, id),
-    close: () => rm(runtime, { recursive: true, force: true }),
+    egress: () => forwarder ? { enabled: true, ...forwarder.snapshot() } : null,
+    close: async () => { await forwarder?.close(); await rm(runtime, { recursive: true, force: true }); },
   };
 }
 

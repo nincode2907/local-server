@@ -182,7 +182,7 @@ export async function buildServer(config: Config, provider: Provider) {
 
         if (call) { metrics.context(call.id, model, effort,selected.id); metrics.running(call.id); }
         const resumeId = session?.threadId && (selected.adapter as Provider).canResume?.(session.threadId) !== false ? session.threadId : undefined;
-        const thread = resumeId ? selected.adapter.resume(resumeId, model, effort) : selected.adapter.start(model, effort, req?.url.split('?')[0] === '/api/playground/chat');
+        const thread = resumeId ? selected.adapter.resume(resumeId, model, effort) : selected.adapter.start(model, effort, req?.url.split('?')[0] === '/api/playground/chat', {stateless:!session});
         const forwardedMessages = resumeId ? request.messages : history;
         const prompt = promptFor(forwardedMessages, request);
         await captureStep('gateway', 'Gateway generated', { prompt, output_schema: outputSchema, effective_parameters: { model, reasoning_effort: effort },
@@ -363,7 +363,7 @@ export async function buildServer(config: Config, provider: Provider) {
   app.get('/health', async () => ({ ok: true, provider: 'codex', active_requests: scheduler.active,queued_requests:scheduler.queued }));
   app.get('/v1/providers',async()=>({providers:registry.describe()}));
   app.get('/v1/models',async(req)=>{const {provider:id}=z.object({provider:z.enum(['codex','ollama','lmstudio']).default('codex')}).strict().parse(req.query);return {object:'list',data:(await registry.models(id)).map(model=>({...model,object:'model',created:0,owned_by:id==='codex'?'local-codex':id}))};});
-  app.get('/api/resources',async(_req,reply)=>reply.header('Cache-Control','no-store').send({...resources.snapshot(),providers:await registry.resources()}));
+  app.get('/api/resources',async(_req,reply)=>reply.header('Cache-Control','no-store').send({...resources.snapshot(),providers:await registry.resources(),codex_egress:provider.egress?.()??null}));
   app.post('/v1/chat/completions', async (req, reply) => deliver(chatRequest.parse(req.body), req, reply));
   app.post('/api/playground/chat', async (req, reply) => deliver(chatRequest.parse(req.body), req, reply));
   app.post('/chat', async (req, reply) => {

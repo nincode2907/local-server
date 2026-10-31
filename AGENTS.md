@@ -26,6 +26,10 @@ built-in SQLite, and vanilla HTML/CSS/JavaScript. No frontend bundler.
   Preserve ChatGPT auth, read-only sandbox, disabled agent tools/network,
   and rejection of unexpected tool execution. Function calls are proposals
   executed by the caller, never commands executed by this gateway.
+- The only proxy variables a Codex child receives (`HTTPS_PROXY`, `NO_PROXY`)
+  point at the gateway-owned loopback CONNECT forwarder (`src/egress-forwarder.ts`):
+  allowlisted hosts on 443 only, IPv4, TLS end-to-end, metadata-only stats,
+  `CODEX_EGRESS_FORWARDER=false` disables it. Never inherit caller/user proxies.
 - Default bind remains `127.0.0.1`; preserve Host/Origin/Bearer checks. The
   user-authorized Docker integration supports explicit `HOST`/`TRUSTED_HOSTS`;
   non-loopback binds, extra hosts and app keys require `LOCAL_API_KEY`.

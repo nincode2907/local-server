@@ -24,7 +24,7 @@ Browser → Dashboard API ────────────→ metrics SQLite
 | Fastify 5 | HTTP routes, hooks, giới hạn body, error handler |
 | Zod | Xác thực request, session và query |
 | Ajv | Kiểm tra function arguments theo JSON Schema |
-| `@openai/codex-sdk` / Codex CLI 0.160.0 | Kiểu dữ liệu, app-server JSON-RPC qua stdio; adapter exec tùy chọn |
+| `@openai/codex-sdk` / Codex CLI 0.165.0 | Kiểu dữ liệu, app-server JSON-RPC qua stdio; adapter exec tùy chọn |
 | SQLite | Gateway metrics và native usage đã tổng hợp |
 | HTML/CSS/JavaScript thuần | Dashboard; không cần frontend bundler |
 
@@ -67,13 +67,39 @@ agentMessage delta → public content SSE → structured response validation
 
 ### Provider
 
-`src/provider.ts` chọn transport; `src/app-server-provider.ts` gọi native binary từ package Codex đã pin, không qua shell/Node launcher. `CODEX_BIN` có thể thay native executable hoặc Node script (.js/.mjs/.cjs) trong chế độ app-server. Provider chỉ chuyển whitelist environment; API keys, proxy endpoints và phần lớn caller environment không được truyền.
+`src/provider.ts` chọn transport; `src/app-server-provider.ts` gọi native binary từ package Codex đã pin, không qua shell/Node launcher. `CODEX_BIN` có thể thay native executable hoặc Node script (.js/.mjs/.cjs) trong chế độ app-server. Provider chỉ chuyển whitelist environment; API keys, proxy endpoints của caller/người dùng và phần lớn caller environment không được truyền. Ngoại lệ duy nhất: `HTTPS_PROXY`/`NO_PROXY` trỏ tới egress forwarder loopback do gateway sở hữu (xem dưới).
 
-App-server 0.160.0 chưa có cờ ignore-config/rules của exec. Gateway dùng `DATA_DIR/codex-app-server` làm Codex home riêng, cwd tạm `codex-gateway-*`, không nạp config/rules/instruction của home cá nhân. Nếu có config, rules, hooks, skills tùy chỉnh, plugins hoặc environments trong home riêng, startup bị từ chối. Chỉ cho phép `skills/.system` do Codex tự tạo; tính năng skills vẫn tắt. Thread admission kiểm tra sandbox/network/approval và instructionSources trước khi gọi inference; turn ghi đè readOnly/networkAccess=false.
+App-server 0.165.0 chưa có cờ ignore-config/rules của exec. Gateway dùng `DATA_DIR/codex-app-server` làm Codex home riêng, cwd tạm `codex-gateway-*`, không nạp config/rules/instruction của home cá nhân. Nếu có config, rules, hooks, skills tùy chỉnh, plugins hoặc environments trong home riêng, startup bị từ chối. Chỉ cho phép `skills/.system` do Codex tự tạo; tính năng skills vẫn tắt. Thread admission kiểm tra sandbox/network/approval và instructionSources trước khi gọi inference; turn ghi đè readOnly/networkAccess=false.
 
 ChatGPT access token/account ID chỉ được đọc từ `CODEX_HOME/auth.json` (mặc định `~/.codex/auth.json`) rồi gửi qua RPC `account/login/start` kiểu `chatgptAuthTokens`, giữ trong bộ nhớ. Không sao chép refresh token hoặc sửa auth/config/database/rollout nguồn. Refresh RPC chỉ nhận token mới nếu CLI gốc đã cập nhật cho cùng account; nếu không, trả `codex_auth_refresh_required` và yêu cầu chạy `codex login` rồi thử lại. Keyring-only auth chưa được hỗ trợ bởi bridge này. Đổi account yêu cầu restart gateway.
 
-Thread bền vững của adapter mới nằm trong Codex home riêng; gateway lưu ID dạng `app-server:<native-id>`. Khi đổi transport, session được tái tạo từ `sessions.json`, không sửa thread nguồn. Playground gửi ephemeral=true. Kết thúc lượt unsubscribe; shutdown đóng process. Process lỗi không replay inference; lượt tiếp theo tạo process mới. Không fallback ngầm sang exec/API key. Native observer vẫn chỉ đọc NATIVE_CODEX_HOME đã cấu hình và không tự cộng home mới vào totals.
+Thread bền vững của adapter mới nằm trong Codex home riêng; gateway lưu ID dạng `app-server:<native-id>`. Khi đổi transport, session được tái tạo từ `sessions.json`, không sửa thread nguồn. Playground gửi ephemeral=true. Kết thúc lượt unsubscribe (trừ warm thread stateless, xem dưới); shutdown đóng process. Process lỗi không replay inference; lượt tiếp theo tạo process mới. Không fallback ngầm sang exec/API key. Native observer vẫn chỉ đọc NATIVE_CODEX_HOME đã cấu hình và không tự cộng home mới vào totals.
+
+### Egress forwarder loopback
+
+`src/egress-forwarder.ts` chạy trong process gateway, bind `127.0.0.1` cổng ngẫu nhiên (port 0) trước khi spawn Codex. Child app-server và adapter exec nhận `HTTPS_PROXY=http://127.0.0.1:<port>` và `NO_PROXY=localhost,127.0.0.1`; không bao giờ lấy proxy từ env của caller/người dùng (`HTTP_PROXY`, `ALL_PROXY`, biến chữ thường đều không truyền).
+
+- Chỉ nhận `CONNECT host:443`; method khác → 405, header lỗi/quá 8 KiB/quá 5 giây → 400. Host phải khớp chính xác allowlist **`chatgpt.com`** (bằng chứng: log proxy chẩn đoán chỉ thấy `chatgpt.com` cho models, responses WebSocket, `wham/accounts/check`, `wham/settings/user`, remote-control). IP literal, `[IPv6]`, localhost/host lạ, cổng khác 443 → 403.
+- Resolve **chỉ IPv4** (`dns.lookup` family 4), bỏ địa chỉ loopback/private/link-local/CGNAT/multicast/reserved (chống SSRF/DNS rebinding), connect **một lần** tới một địa chỉ (`autoSelectFamily:false`, không đua happy-eyeballs), rồi pipe TCP hai chiều. TLS giữ đầu-cuối giữa Codex và server; forwarder không giải mã, không đọc/ghi nội dung.
+- Timeout connect 10 giây, idle 15 phút, tối đa 64 kết nối đồng thời (vượt → 503); half-close được chuyển tiếp; đóng provider đóng listener và mọi socket.
+- Lúc khởi động, forwarder dial thử một lần tới mỗi host allowlist rồi đóng ngay: kết nối TCP đầu tiên của một process trên máy phát triển mất ~1–1,7 giây, các lần sau ~40 ms (kể cả sau 60 giây nghỉ). Không dùng pool socket dựng sẵn: Cloudflare đóng socket chưa gửi ClientHello sau ~15 giây, nên pool phải dial lại liên tục; đo thấy đóng socket **đã connect** (kể cả chưa gửi dữ liệu) không bị phạt (<1 ms).
+- Thống kê chỉ metadata, giới hạn trong bộ nhớ: số tunnel theo host, lý do từ chối theo `host:port`, mã lỗi, 50 tunnel gần nhất (host, connect ms, thời lượng, số byte). Xem qua `GET /api/resources` (admin) ở trường `codex_egress`.
+- `CODEX_EGRESS_FORWARDER=false` tắt hẳn (spawn trực tiếp như trước). Nếu forwarder không khởi động được, Codex được spawn không proxy và stderr ghi một dòng JSON `codex_egress_forwarder_unavailable` kèm errno.
+
+Lý do: trên máy phát triển, macOS content filter (ESET network extension, `net.cfil.active_count: 1`) chặn đồng bộ ~1 giây khi `close()` một socket chưa trao đổi dữ liệu. Stack HTTP/WebSocket của Codex tạo các socket như vậy ở mỗi kết nối mới (thử IPv6 không có route, socket thua happy-eyeballs), nên mỗi WebSocket mới và mỗi `GET wham/settings/user` (reqwest client mới mỗi thread, timeout 5 giây) bị cộng nhiều giây. Qua forwarder, Codex chỉ dial `127.0.0.1` (close loopback ~0,1 ms). Rủi ro còn lại: một lần dial upstream thất bại/timeout trong forwarder vẫn có thể chặn event loop của gateway ~1 giây khi socket đó bị đóng. Code thuần Node, không phụ thuộc macOS, nhưng mới chỉ kiểm chứng trên macOS.
+
+### Warm thread cho request stateless
+
+Mỗi thread mới của app-server phải trả chi phí "lạnh": TCP connect cho WebSocket `wss://chatgpt.com/backend-api/codex/responses` và, khi dựng world state ở turn đầu, `GET /backend-api/wham/settings/user` bằng một reqwest client mới (log `codex_http_client::custom_ca` rồi im lặng; timeout 5 giây). Trên máy phát triển (31/10/2026) mỗi kết nối mới chậm vì macOS content filter (ESET network extension) chặn đồng bộ ~1 giây khi đóng socket thử IPv6/happy-eyeballs; lượt kế tiếp trong cùng thread CLI/TUI không tạo kết nối mới nên nhanh. Egress forwarder (mục trên) bỏ phần lớn chi phí kết nối; warm thread bỏ thêm WebSocket mới.
+
+Vì vậy request stateless (`/v1/chat/completions`, `/chat`, Performance Lab; không phải session hay playground) được phép dùng lại một thread đã nóng:
+
+1. Request đầu tạo thread như cũ (`thread/start` + kiểm tra admission). Sau khi turn `completed` không lỗi/hủy, provider gọi `thread/revert` với `beforeTurnId` là turn vừa chạy, rồi `thread/turns/list`; chỉ khi lịch sử còn **0 turn** thì thread mới vào pool. Revert lỗi, lịch sử không rỗng, turn lỗi/hủy, process chết hoặc pool đầy → `thread/unsubscribe` như cũ.
+2. Request sau lấy một thread rảnh cùng model/reasoning và cùng process (không chờ): không có thì tạo thread mới như cũ. Mỗi request chạy trên một thread riêng; thread bị khóa đến khi được chứng minh rỗng. Recycle chạy nền, không làm chậm response.
+3. Thread reuse đã qua admission (`approval never`, `readOnly`, `networkAccess false`, `instructionSources` rỗng) khi tạo; mỗi `turn/start` vẫn ghi đè approval/sandbox/environments. Usage baseline của lịch sử rỗng là 0 (không trừ total trước revert).
+4. Giới hạn: `CODEX_WARM_THREADS` thread rảnh (mặc định 2, `0` tắt hẳn và quay về hành vi một thread/request); mỗi thread tối đa 50 lượt hoặc 60 phút rồi được unsubscribe. Đóng provider xóa pool và dừng process.
+
+Đo trên 0.165.0 (31/10/2026, mạng LAN nhiễu, có egress forwarder): request stateless warm 1,5–2,1 giây (trung vị 1,6) so với lượt CLI nóng không proxy 1,1–2,5 giây (trung vị 1,3); request thread mới ngay sau restart 2,4 giây. Không có WebSocket connect trong turn warm. `thread/revert` làm Codex dựng lại world state nên `wham/settings/user` vẫn được gọi lại mỗi request, nhưng qua forwarder chỉ còn 0,3–0,5 giây (CLI nóng ~0,02 giây); trước khi có forwarder khoảng này là 2,3–4,7 giây và request warm mất 3,6–6,8 giây. Ephemeral thread không hỗ trợ `thread/revert`, nên playground giữ một thread/request. Thread tạo sẵn mà chưa có turn không giúp: prewarm WebSocket hết hạn/thất bại trước turn đầu và fetch world state vẫn ở turn đầu. Revert ghi rollout mới trong Codex home riêng (như một thread mới của hành vi cũ), không chạm Codex home nguồn.
 
 Usage mỗi turn lấy chênh lệch cumulative tokenUsage.total với baseline đã biết, bao gồm nhiều lần gọi model trong cùng lượt. tokenUsage.last không đại diện toàn bộ turn. Nếu resume sau restart mà không nhận được baseline trước turn, usage giữ unknown. Cache baseline chỉ giữ metadata số của tối đa 512 thread trong bộ nhớ.
 
@@ -86,7 +112,7 @@ Sandbox giới hạn khả năng ghi và network của agent nhưng không cô l
 | `GET` | `/health` | HTTP status và active requests; không xác nhận Codex login |
 | `GET` | `/v1/models` | Model mặc định và model catalog hỗ trợ Codex |
 | `POST` | `/chat` | Dạng gọn `{prompt, model?, reasoning?}` |
-| `POST` | `/v1/chat/completions` | Chat stateless; mỗi request tạo thread |
+| `POST` | `/v1/chat/completions` | Chat stateless; mỗi request chỉ thấy messages của nó (thread mới hoặc warm thread đã revert về rỗng) |
 | `POST` | `/v1/sessions` | Tạo gateway session, chưa gọi model |
 | `POST` | `/v1/sessions/:id/messages` | Gửi lượt mới vào gateway session |
 | `DELETE` | `/v1/sessions/:id` | Xóa gateway session |
@@ -160,6 +186,8 @@ Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `PO
 | `NATIVE_USAGE_INTERVAL_MS` | `30000` | Chu kỳ đọc; tối thiểu 5000 ms |
 | `CODEX_BIN` | CLI đi cùng package | Executable CLI thay thế |
 | `CODEX_TRANSPORT` | `app-server` | Process thường trú qua stdio; `exec` chọn adapter cũ |
+| `CODEX_WARM_THREADS` | `2` | Số warm thread rảnh (0–8) cho request stateless app-server; `0` tắt |
+| `CODEX_EGRESS_FORWARDER` | `true` | Egress của Codex đi qua CONNECT forwarder loopback của gateway (IPv4, allowlist `chatgpt.com:443`); `false` tắt |
 
 ## 9. Bản đồ mã nguồn
 
@@ -170,6 +198,7 @@ Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `PO
 | `src/server.ts` | Routes, auth, orchestration, timeout |
 | `src/provider.ts` | Chọn transport; adapter exec/JSONL tương thích |
 | `src/app-server-provider.ts` | App-server thường trú, RPC/delta, auth bridge và turn isolation |
+| `src/egress-forwarder.ts` | CONNECT forwarder loopback cho egress của Codex: allowlist host, IPv4 một lần dial, không giải mã TLS, thống kê metadata |
 | `src/schema.ts` | Zod schema và transcript validation |
 | `src/protocol.ts` | Prompt, structured output, tool calls, response format |
 | `src/sessions.ts` | Gateway session lifecycle, atomic JSON write |

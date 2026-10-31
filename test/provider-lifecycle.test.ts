@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createProvider, type Provider } from '../src/provider.js';
 import { readConfig } from '../src/config.js';
+import { startEgressForwarder } from '../src/egress-forwarder.js';
 
 const usage={input_tokens:31,output_tokens:7,cached_input_tokens:2,reasoning_output_tokens:3};
 async function runFake(script:string, options:{execute:(provider:Provider)=>Promise<void>}) {
@@ -12,7 +13,7 @@ async function runFake(script:string, options:{execute:(provider:Provider)=>Prom
   const original=process.cwd();
   await writeFile(join(directory,'exec'),script);
   process.chdir(directory);
-  const provider=await createProvider(readConfig({CODEX_BIN:process.execPath,CODEX_TRANSPORT:'exec'}));
+  const provider=await createProvider(readConfig({CODEX_BIN:process.execPath,CODEX_TRANSPORT:'exec',CODEX_EGRESS_FORWARDER:'false'}));
   try {return await options.execute(provider);}
   finally {process.chdir(original);await provider.close();await rm(directory,{recursive:true,force:true});}
 }
@@ -57,7 +58,8 @@ test('a child that hangs after terminal is cancelled, closed, and never reported
 });
 
 test('a cancelled child that ignores SIGTERM is force-killed after the bounded cleanup grace',async()=>{
-  await runFake(`${emit([event('turn.completed',{usage})])}process.on('SIGTERM',()=>{});setInterval(()=>{},1000);`,{
+  // Install the SIGTERM handler before emitting, so a fast abort cannot race the handler under load.
+  await runFake(`process.on('SIGTERM',()=>{});${emit([event('turn.completed',{usage})])}setInterval(()=>{},1000);`,{
     execute:async provider=>{const controller=new AbortController();let lifecycle:any;
       await assert.rejects(provider.start('fixture').run('synthetic',{signal:controller.signal,onLifecycle:value=>{lifecycle=value;if(value.turn_completed_event_received_ms!==null)controller.abort();}}));
       assert.equal(lifecycle.child_process_signal,'SIGKILL');assert.ok(lifecycle.child_process_closed_ms!==null);}
@@ -113,4 +115,20 @@ test('returnOnTurnCompleted still waits for the exit when usage never arrived',a
     execute:async provider=>{const started=performance.now();const result=await provider.start('fixture').run('synthetic',{returnOnTurnCompleted:true});
       assert.ok(performance.now()-started>=140);assert.equal(result.cliLifecycle?.returned_before_exit,false);}
   });
+});
+
+test('exec adapter passes only the gateway-owned forwarder as proxy, and none when disabled',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'codex-provider-egress-'));const original=process.cwd();
+  const saved=process.env.HTTPS_PROXY;process.env.HTTPS_PROXY='http://caller-proxy.invalid:1';
+  await writeFile(join(directory,'exec'),`const text=JSON.stringify([process.env.HTTPS_PROXY??null,process.env.NO_PROXY??null]);process.stdout.write(JSON.stringify({type:'thread.started',thread_id:'fixture'})+'\\n'+JSON.stringify({type:'item.completed',item:{id:'a',type:'agent_message',text}})+'\\n'+JSON.stringify({type:'turn.completed',usage:${JSON.stringify(usage)}})+'\\n');process.exit(0);`);
+  process.chdir(directory);
+  try {
+    let url='';
+    const enabled=await createProvider(readConfig({CODEX_BIN:process.execPath,CODEX_TRANSPORT:'exec'}),{egress:async()=>{const f=await startEgressForwarder();url=f.url!;return f;}});
+    try {assert.deepEqual(JSON.parse((await enabled.start('fixture').run('synthetic')).finalResponse),[url,'localhost,127.0.0.1']);assert.match(url,/^http:\/\/127\.0\.0\.1:\d+$/);}
+    finally {await enabled.close();}
+    const disabled=await createProvider(readConfig({CODEX_BIN:process.execPath,CODEX_TRANSPORT:'exec',CODEX_EGRESS_FORWARDER:'false'}));
+    try {assert.deepEqual(JSON.parse((await disabled.start('fixture').run('synthetic')).finalResponse),[null,null]);}
+    finally {await disabled.close();}
+  } finally {process.chdir(original);if(saved===undefined)delete process.env.HTTPS_PROXY;else process.env.HTTPS_PROXY=saved;await rm(directory,{recursive:true,force:true});}
 });

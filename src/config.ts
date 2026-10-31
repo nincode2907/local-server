@@ -39,6 +39,10 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     NATIVE_USAGE_INTERVAL_MS: z.coerce.number().int().min(5000).default(30000),
     CODEX_BIN: z.string().optional(),
     CODEX_TRANSPORT: z.enum(['app-server', 'exec']).default('app-server'),
+    // Idle warm app-server threads kept for stateless requests (history reverted to empty after each turn). 0 disables.
+    CODEX_WARM_THREADS: z.coerce.number().int().min(0).max(8).default(2),
+    // Route Codex egress through a gateway-owned loopback CONNECT forwarder (IPv4-only, allowlisted hosts, TLS end-to-end).
+    CODEX_EGRESS_FORWARDER: z.enum(['true', 'false', '1', '0']).default('true').transform(v => v === 'true' || v === '1'),
     INSPECTOR_ENABLED: z.enum(['true', 'false', '1', '0']).default('false').transform(v => v === 'true' || v === '1'),
     INSPECTOR_RETENTION_MS: z.coerce.number().int().min(1000).max(2_592_000_000).default(86_400_000),
     INSPECTOR_MAX_BYTES: z.coerce.number().int().min(4096).max(67_108_864).default(8_388_608),
@@ -59,7 +63,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     model: parsed.DEFAULT_MODEL, reasoningEffort: parsed.DEFAULT_REASONING_EFFORT, timeout: parsed.REQUEST_TIMEOUT_MS,
     concurrency: parsed.MAX_CONCURRENT, maxSessions: parsed.MAX_SESSIONS, sessionTtl: parsed.SESSION_TTL_MS,
     maxQueue:parsed.MAX_QUEUE,queueTimeout:parsed.QUEUE_TIMEOUT_MS,
-    apiKey: parsed.LOCAL_API_KEY, dataDir: resolve(parsed.DATA_DIR), codexBin: parsed.CODEX_BIN, codexTransport: parsed.CODEX_TRANSPORT,
+    apiKey: parsed.LOCAL_API_KEY, dataDir: resolve(parsed.DATA_DIR), codexBin: parsed.CODEX_BIN, codexTransport: parsed.CODEX_TRANSPORT, codexWarmThreads: parsed.CODEX_WARM_THREADS, codexEgressForwarder: parsed.CODEX_EGRESS_FORWARDER,
     nativeCodexHome: resolve(parsed.NATIVE_CODEX_HOME ?? env.CODEX_HOME ?? join(homedir(), '.codex')), nativeUsageInterval: parsed.NATIVE_USAGE_INTERVAL_MS,
     statsDbPath: resolve(parsed.STATS_DB_PATH ?? join(parsed.DATA_DIR, 'stats.sqlite')),
     inspectorEnabled: parsed.INSPECTOR_ENABLED, inspectorRetention: parsed.INSPECTOR_RETENTION_MS, inspectorMaxBytes: parsed.INSPECTOR_MAX_BYTES,

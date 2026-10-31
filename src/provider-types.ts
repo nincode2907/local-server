@@ -7,6 +7,8 @@ export interface ProviderTiming {generation_duration_ms?:number;ttft_ms?:number;
 export interface AppServerLifecycleTiming {
   connection_reused:boolean; shared_process:true; connection_ready_ms:number|null; thread_ready_ms:number|null;
   turn_started_ms:number|null; first_delta_ms:number|null; turn_completed_ms:number|null; provider_returned_ms:number|null;
+  /** True when a stateless request ran on a pooled warm thread whose history was reverted to empty. */
+  thread_reused?:boolean;
 }
 export interface CliLifecycleTiming {
   spawn_requested_ms:number|null;process_spawned_ms:number|null;stdin_finished_ms:number|null;stdin_closed_ms:number|null;

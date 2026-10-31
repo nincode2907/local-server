@@ -6,6 +6,9 @@ import { tmpdir } from 'node:os';
 import { readConfig } from '../src/config.js';
 import { createProvider, gatewayInstructions } from '../src/provider.js';
 import { buildServer } from '../src/server.js';
+import { createAppServerProvider } from '../src/app-server-provider.js';
+import { startEgressForwarder, type EgressFactory } from '../src/egress-forwarder.js';
+import net from 'node:net';
 import { publicContent } from '../src/stream-content.js';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -14,7 +17,7 @@ import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
 
 // A real stdio subprocess, no OpenAI connection or real account data.
-async function fixture() {
+async function fixture(env:Record<string,string>={},hooks?:{egress?:EgressFactory}) {
   const directory=await mkdtemp(join(tmpdir(),'gateway-app-server-test-'));
   const source=join(directory,'source'),data=join(directory,'data'),script=join(directory,'fixture.cjs'),trace=join(directory,'trace.jsonl');
   await mkdir(source);await mkdir(data);
@@ -26,11 +29,12 @@ async function fixture() {
   await writeFile(script,`
 const fs=require('node:fs');const readline=require('node:readline');
 const trace=${JSON.stringify(trace)};
-fs.appendFileSync(trace,JSON.stringify({spawn:true,pid:process.pid,home:process.env.CODEX_HOME,args:process.argv.slice(2),callerKey:process.env.OPENAI_API_KEY??null})+'\\n');
+fs.appendFileSync(trace,JSON.stringify({spawn:true,pid:process.pid,home:process.env.CODEX_HOME,args:process.argv.slice(2),callerKey:process.env.OPENAI_API_KEY??null,proxy:process.env.HTTPS_PROXY??null,noProxy:process.env.NO_PROXY??null,httpProxy:process.env.HTTP_PROXY??null,allProxy:process.env.ALL_PROXY??null,lowerProxy:process.env.https_proxy??null})+'\\n');
 const send=m=>console.log(JSON.stringify(m));
 const notify=(method,params)=>send({method,params});
 const reply=(id,result)=>send({id,result});
-let initialized=false,nextThread=0,nextTurn=0;const turns=new Map(),totals=new Map();
+let initialized=false,nextThread=0,nextTurn=0;const turns=new Map(),totals=new Map(),history=new Map();
+const revertMode=()=>{try{return fs.readFileSync(trace+'.revert','utf8').trim();}catch{return 'ok';}};
 readline.createInterface({input:process.stdin}).on('line',line=>{
 const m=JSON.parse(line);fs.appendFileSync(trace,JSON.stringify(m)+'\\n');
 const p=m.params??{},tid=p.threadId;
@@ -43,12 +47,22 @@ const id=tid??'thread-'+(++nextThread);
 reply(m.id,{thread:{id,ephemeral:p.ephemeral??false},approvalPolicy:'never',sandbox:{type:'readOnly',networkAccess:false},instructionSources:[]});return;
 }
 if(m.method==='thread/unsubscribe'){reply(m.id,{status:'unsubscribed'});return;}
+if(m.method==='thread/revert'){
+const mode=revertMode();
+if(mode==='error'){send({id:m.id,error:{code:-32600,message:'PRIVATE_REVERT_ERROR'}});return;}
+const h=history.get(tid)??[],at=h.findIndex(t=>t.id===p.beforeTurnId);
+// 'noop' simulates a revert that silently keeps history: the gateway must detect it.
+if(mode!=='noop'&&at>=0){h.splice(at);totals.set(tid,h.length);}
+reply(m.id,{thread:{id:tid,turns:[]},turnsBackwardsCursor:null,itemsBackwardsCursor:null});return;
+}
+if(m.method==='thread/turns/list'){reply(m.id,{data:(history.get(tid)??[]).slice(-(p.limit??50)).map(t=>({id:t.id,status:'completed',items:[]})),nextCursor:null,backwardsCursor:null});return;}
 if(m.method==='turn/interrupt'){
 clearTimeout(turns.get(tid));reply(m.id,{});
 setTimeout(()=>notify('turn/completed',{threadId:tid,turn:{id:p.turnId,status:'interrupted',items:[]}}),45);return;
 }
 if(m.method==='turn/start'){
 const input=p.input[0].text,id='turn-'+(++nextTurn),itemId='item-'+id;
+const prior=(history.get(tid)??[]).map(t=>t.input);if(!history.has(tid))history.set(tid,[]);history.get(tid).push({id,input});
 // Notifications before the response exercise the actual app-server race.
 notify('turn/started',{threadId:tid,turn:{id,status:'inProgress'}});
 if(input.includes('start-crash')){process.exit(1);return;}
@@ -65,7 +79,7 @@ if(input.includes('refresh')){send({id:'refresh-request',method:'account/chatgpt
 notify('item/agentMessage/delta',{threadId:tid,turnId:id,itemId,delta:'{"content":"Xin'});
 if(input.includes('partial-exit')){setTimeout(()=>process.exit(1),15);return;}
 turns.set(tid,setTimeout(()=>{
-const text=JSON.stringify({content:input.includes('second')?'Xin second':'Xin chào',tool_calls:[]});
+const text=JSON.stringify({content:input.includes('history?')?'history='+prior.length+(prior.some(x=>x.includes('SECRET'))?' leaked':''):input.includes('second')?'Xin second':'Xin chào',tool_calls:[]});
 notify('item/agentMessage/delta',{threadId:tid,turnId:id,itemId,delta:text.slice('{"content":"Xin'.length)});
 notify('item/completed',{threadId:tid,turnId:id,item:{id:itemId,type:'agentMessage',text}});
 const count=(totals.get(tid)??0)+1;totals.set(tid,count);
@@ -75,9 +89,9 @@ notify('turn/completed',{threadId:tid,turn:{id,status:input.includes('failed')?'
 }
 });
 `);
-  const config=readConfig({DATA_DIR:data,NATIVE_CODEX_HOME:join(directory,'no-native'),CODEX_BIN:script,INSPECTOR_ENABLED:'true'});
-  const provider=await createProvider(config);
-  return {directory,source,data,script,config,provider,login,
+  const config=readConfig({DATA_DIR:data,NATIVE_CODEX_HOME:join(directory,'no-native'),CODEX_BIN:script,INSPECTOR_ENABLED:'true',CODEX_EGRESS_FORWARDER:'false',...env});
+  const provider=hooks?await createAppServerProvider(config,hooks):await createProvider(config);
+  return {directory,source,data,script,config,provider,login,traceFile:trace,
     trace:async()=> (await readFile(trace,'utf8')).trim().split('\n').map(line=>JSON.parse(line)),
     close:async()=>{await provider.close();if(previousHome===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=previousHome;await rm(directory,{recursive:true,force:true});}};
 }
@@ -254,7 +268,9 @@ test('pinned native thread admission enforces read-only, no network and no loade
     }
     assert.equal(checked,true);
     await assert.rejects(readFile(join(directory,'auth.json')),{code:'ENOENT'});
-  }finally{clearTimeout(timer);lines.close();child.kill();await closed;await rm(directory,{recursive:true,force:true});}
+  }finally{clearTimeout(timer);lines.close();child.kill();await closed;
+    // The native CLI may still be finishing a background plugin-catalog clone in its temp dir.
+    await rm(directory,{recursive:true,force:true,maxRetries:10,retryDelay:200});}
 });
 
 test('failed turns retain safe partial output; personal configuration is refused in the gateway home',async()=>{
@@ -300,4 +316,132 @@ test('legacy session migrates from saved gateway messages, then resumes only new
     assert.equal(trace.filter(e=>e.method==='thread/resume').length,1);assert.ok(!starts[1].params.input[0].text.includes('remember-original'));assert.match(starts[1].params.input[0].text,/second/);
     assert.equal((await readFile(join(f.source,'config.toml'),'utf8')),'invalid personal config MUST NOT LOAD');
   }finally{await app.close();await f.close();}
+});
+
+const waitFor=async(check:()=>Promise<boolean>,what:string)=>{for(let i=0;i<200;i++){if(await check())return;await new Promise(r=>setTimeout(r,10));}throw new Error('timeout waiting for '+what);};
+const count=(trace:any[],method:string)=>trace.filter(e=>e.method===method).length;
+const stateless=(f:any,input:string,options:any={})=>f.provider.start('fixture','low',false,{stateless:true}).run(input,options);
+
+test('warm pool reuses a stateless thread only after reverting it to an empty, verified history',async()=>{
+  const f=await fixture();const timings:any[]=[];
+  try {
+    const first=await stateless(f,'SECRET-word history?',{onAppServerLifecycle:(t:any)=>timings.push(t)});
+    assert.equal(JSON.parse(first.finalResponse).content,'history=0');assert.equal(timings.at(-1).thread_reused,false);
+    await waitFor(async()=>count(await f.trace(),'thread/turns/list')===1,'recycle');
+    const second=await stateless(f,'history?',{onAppServerLifecycle:(t:any)=>timings.push(t)});
+    // The reused thread saw no earlier messages, and per-turn usage is not polluted by the reverted turn.
+    assert.equal(JSON.parse(second.finalResponse).content,'history=0');
+    assert.deepEqual(second.usage,{input_tokens:20,output_tokens:4,cached_input_tokens:3,reasoning_output_tokens:1,cache_write_input_tokens:0});
+    assert.equal(timings.at(-1).thread_reused,true);
+    await waitFor(async()=>count(await f.trace(),'thread/turns/list')===2,'second recycle');
+    const trace=await f.trace();
+    assert.equal(count(trace,'thread/start'),1);assert.equal(count(trace,'thread/revert'),2);assert.equal(count(trace,'thread/unsubscribe'),0);
+    const turns=trace.filter(e=>e.method==='turn/start');assert.equal(turns[0].params.threadId,turns[1].params.threadId);
+    // Policy is re-asserted on every turn of a reused thread.
+    for(const turn of turns){assert.equal(turn.params.approvalPolicy,'never');assert.deepEqual(turn.params.sandboxPolicy,{type:'readOnly',networkAccess:false});assert.deepEqual(turn.params.environments,[]);}
+    const reverts=trace.filter(e=>e.method==='thread/revert');assert.deepEqual(reverts.map(e=>e.params.beforeTurnId),['turn-1','turn-2']);
+  }finally{await f.close();}
+});
+
+test('failed or unverifiable revert retires the thread and falls back to a fresh thread',async()=>{
+  for(const mode of ['error','noop']){
+    const f=await fixture();
+    try {
+      await writeFile(f.traceFile+'.revert',mode);
+      await stateless(f,'SECRET-word');
+      await waitFor(async()=>count(await f.trace(),'thread/unsubscribe')===1,'retire '+mode);
+      const next=await stateless(f,'history?');
+      assert.equal(JSON.parse(next.finalResponse).content,'history=0',mode);
+      const trace=await f.trace();assert.equal(count(trace,'thread/start'),2,mode);
+      const turns=trace.filter(e=>e.method==='turn/start');assert.notEqual(turns[0].params.threadId,turns[1].params.threadId);
+    }finally{await f.close();}
+  }
+});
+
+test('parallel stateless requests never wait for the pool; idle warm threads stay within the limit',async()=>{
+  const f=await fixture({CODEX_WARM_THREADS:'1'});
+  try {
+    const results=await Promise.all([1,2,3].map(()=>stateless(f,'slow second')));
+    for(const result of results)assert.equal(JSON.parse(result.finalResponse).content,'Xin second');
+    let trace=await f.trace();
+    assert.equal(count(trace,'thread/start'),3);assert.equal(new Set(trace.filter(e=>e.method==='turn/start').map(e=>e.params.threadId)).size,3);
+    await waitFor(async()=>{const t=await f.trace();return count(t,'thread/turns/list')===3&&count(t,'thread/unsubscribe')===2;},'pool bound');
+    await stateless(f,'second');
+    trace=await f.trace();assert.equal(count(trace,'thread/start'),3);
+  }finally{await f.close();}
+});
+
+test('sessions, playground, cancelled turns and a disabled pool never recycle threads',async()=>{
+  const f=await fixture();
+  try {
+    await f.provider.start('fixture').run('second');
+    await f.provider.start('fixture','low',true,{stateless:true}).run('second');
+    const controller=new AbortController();
+    const cancelled=stateless(f,'slow',{signal:controller.signal,onEvent:(e:any)=>{if(e.type==='output'&&e.text)controller.abort();}});
+    await assert.rejects(cancelled,(e:any)=>e.code==='request_cancelled');
+    await waitFor(async()=>count(await f.trace(),'thread/unsubscribe')===3,'unsubscribe');
+    assert.equal(count(await f.trace(),'thread/revert'),0);
+  }finally{await f.close();}
+  const disabled=await fixture({CODEX_WARM_THREADS:'0'});
+  try {
+    await stateless(disabled,'second');await stateless(disabled,'second');
+    const trace=await disabled.trace();assert.equal(count(trace,'thread/revert'),0);assert.equal(count(trace,'thread/start'),2);
+  }finally{await disabled.close();}
+});
+
+test('warm threads die with their process and provider close leaves nothing reusable',async()=>{
+  const f=await fixture();
+  try {
+    await stateless(f,'second');
+    await waitFor(async()=>count(await f.trace(),'thread/turns/list')===1,'recycle');
+    await assert.rejects(stateless(f,'crash'));
+    const next=await stateless(f,'history?');assert.equal(JSON.parse(next.finalResponse).content,'history=0');
+    const trace=await f.trace();assert.equal(trace.filter(e=>e.spawn).length,2);assert.equal(count(trace,'thread/start'),2);
+    await waitFor(async()=>count(await f.trace(),'thread/turns/list')===2,'recycle after restart');
+    await f.provider.close();
+    await assert.rejects(stateless(f,'second'),(e:any)=>e.code==='codex_app_server_closed');
+  }finally{await f.close();}
+});
+
+test('gateway stateless chat reuses a reverted warm thread while sessions keep their own thread',async()=>{
+  const f=await fixture();const app=await buildServer(f.config,f.provider);
+  try {
+    const ask=async(content:string)=>(await app.inject({method:'POST',url:'/v1/chat/completions',payload:{model:'fixture',messages:[{role:'user',content}]}})).json();
+    assert.equal((await ask('SECRET-word history?')).choices[0].message.content,'history=0');
+    await waitFor(async()=>count(await f.trace(),'thread/turns/list')===1,'recycle');
+    assert.equal((await ask('history?')).choices[0].message.content,'history=0');
+    let trace=await f.trace();assert.equal(count(trace,'thread/start'),1);
+    const session=(await app.inject({method:'POST',url:'/v1/sessions',payload:{model:'fixture'}})).json();
+    assert.equal((await app.inject({method:'POST',url:'/v1/sessions/'+session.session_id+'/messages',payload:{message:'history?'}})).statusCode,200);
+    trace=await f.trace();assert.equal(count(trace,'thread/start'),2);
+    const sessionTurn=trace.filter(e=>e.method==='turn/start').at(-1);
+    assert.notEqual(sessionTurn.params.threadId,trace.find(e=>e.method==='turn/start').params.threadId);
+  }finally{await app.close();await f.close();}
+});
+
+test('app-server egress uses only the gateway-owned loopback forwarder; flag off or forwarder failure spawns direct',async()=>{
+  const saved={HTTPS_PROXY:process.env.HTTPS_PROXY,HTTP_PROXY:process.env.HTTP_PROXY,ALL_PROXY:process.env.ALL_PROXY,https_proxy:process.env.https_proxy};
+  Object.assign(process.env,{HTTPS_PROXY:'http://caller-proxy.invalid:1',HTTP_PROXY:'http://caller-proxy.invalid:2',ALL_PROXY:'socks5://caller-proxy.invalid:3',https_proxy:'http://caller-proxy.invalid:4'});
+  let port=0;
+  try {
+    const f=await fixture({CODEX_EGRESS_FORWARDER:'true'},{egress:async()=>{const fw=await startEgressForwarder();port=fw.port!;return fw;}});
+    try {
+      await f.provider.start('fixture').run('second');
+      const spawn=(await f.trace()).find(e=>e.spawn);
+      assert.equal(spawn.proxy,'http://127.0.0.1:'+port);assert.equal(spawn.noProxy,'localhost,127.0.0.1');
+      assert.equal(spawn.httpProxy,null);assert.equal(spawn.allProxy,null);assert.equal(spawn.lowerProxy,null);
+      const egress:any=f.provider.egress!();assert.equal(egress.enabled,true);assert.equal(egress.port,port);
+    }finally{await f.close();}
+    // Provider close stops the forwarder.
+    await assert.rejects(new Promise((resolve,reject)=>{const s=net.connect(port,'127.0.0.1',()=>{s.destroy();resolve(null);});s.once('error',reject);}));
+    for(const [env,hooks] of [[{CODEX_EGRESS_FORWARDER:'false'},{egress:async()=>{throw new Error('must not start');}}],[{CODEX_EGRESS_FORWARDER:'true'},{egress:async()=>{throw Object.assign(new Error('bind'),{code:'EACCES'});}}]] as const){
+      const write=process.stderr.write;process.stderr.write=(()=>true) as typeof process.stderr.write;
+      const g=await fixture({...env},hooks as any);
+      try {
+        const result=await g.provider.start('fixture').run('second');assert.equal(JSON.parse(result.finalResponse).content,'Xin second');
+        const spawn=(await g.trace()).find(e=>e.spawn);
+        assert.equal(spawn.proxy,null);assert.equal(spawn.noProxy,null);assert.equal(spawn.httpProxy,null);assert.equal(g.provider.egress!(),null);
+      }finally{process.stderr.write=write;await g.close();}
+    }
+  }finally{for(const [key,value] of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
 });

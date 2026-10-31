@@ -75,7 +75,7 @@ cần Bearer token; không đưa token vào tài liệu hay URL.
 khởi tạo app-server trước HTTP listen, không gọi model trong warmup. Restart
 sau build để chạy provider mới. Không đổi port hay tự restart listener đang dùng.
 
-Process native dùng stdio riêng, không mở WebSocket/TCP port. Auth source là
+Process native dùng stdio riêng, không mở port. Gateway mở thêm một egress forwarder CONNECT trên `127.0.0.1` cổng ngẫu nhiên (không cố định, không thuộc block Dev Hub, không phục vụ HTTP) để Codex đi ra `chatgpt.com:443` qua IPv4; tắt bằng `CODEX_EGRESS_FORWARDER=false`. Không đặt `HTTPS_PROXY` của mình cho gateway để đổi đường đi của Codex: biến đó không được truyền xuống child. Auth source là
 CODEX_HOME/auth.json (mặc định ~/.codex/auth.json); home runtime riêng là
 DATA_DIR/codex-app-server. Không trỏ native observer vào home mới để thay totals
 hiện tại. Không đặt config/rules/hooks/plugins hoặc skills tùy chỉnh trong home runtime; gateway sẽ từ chối. `skills/.system` do Codex tự tạo được phép tồn tại, nhưng tính năng skills vẫn tắt.
