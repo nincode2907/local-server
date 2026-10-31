@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { mkdir, mkdtemp, readFile, readdir, lstat, rm, realpath } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, lstat, rm, realpath, rename, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
@@ -47,16 +47,65 @@ function turnUsage(total:ProviderUsage|null,baseline:ProviderUsage|null):Provide
 
 // A separate CODEX_HOME excludes personal config, rules, hooks, MCP and plugins.
 // Defense in depth is repeated at thread/turn admission, including on resume.
-const policy:ObjectValue = {
+const isolationPolicy:ObjectValue = {
   forced_login_method:'chatgpt', cli_auth_credentials_store:'ephemeral', model_provider:'openai',
   project_doc_max_bytes:0, web_search:'disabled', sandbox_mode:'read-only', approval_policy:'never',
   'sandbox_workspace_write.network_access':false, 'apps._default.enabled':false,
   'features.shell_tool':false, 'features.unified_exec':false, 'features.apps':false,
-  'features.plugins':false, 'features.multi_agent':false, 'features.multi_agent_v2':false,
-  'features.computer_use':false, 'features.shell_snapshot':false, 'features.skills':false,
-  'features.memories':false, 'features.hooks':false, 'features.environments':false,
+  'features.plugins':false, 'features.multi_agent':false,
+  'features.computer_use':false, 'features.shell_snapshot':false,
+  'features.memories':false, 'features.hooks':false,
   'features.remote_control':false, 'features.web_search':false, 'analytics.enabled':false,
 };
+// Prompt trimming (CODEX_TRIM_PROMPT): the gateway never executes tools, so each block below is
+// pure input-token overhead on every request; none of them grants a capability. Measured with
+// codex-cli 0.165.0 on "Reply with just: ok": 8,663 -> 5,961 (skills) -> 2,859 (all keys) -> 432
+// (plus the trimmed model catalog). `skills.include_instructions=false` keeps the personal skill
+// list ($HOME/.agents/skills) out of the prompt. Every key is checked against the pinned CLI by
+// the native test: an unknown key makes the app-server report "unrecognized configuration settings".
+const trimPolicy:ObjectValue = {
+  'features.multi_agent_v2.enabled':false, 'features.multi_agent_v2.disable_native_tools':true,
+  'features.multi_agent_v2.multi_agent_mode_hint_text':'', 'features.multi_agent_v2.root_agent_usage_hint_text':'',
+  'features.sleep_tool':false, 'features.goals':false, 'features.image_generation':false,
+  'skills.include_instructions':false, include_permissions_instructions:false, include_apps_instructions:false,
+  include_collaboration_mode_instructions:false, include_environment_context:false,
+};
+export function appServerPolicy(trim:boolean):ObjectValue {
+  // Without trimming, still disable the native multi-agent v2 tools (as `features.multi_agent_v2=false` did).
+  return trim ? {...isolationPolicy,...trimPolicy} : {...isolationPolicy,'features.multi_agent_v2.enabled':false};
+}
+const catalogMaxBytes = 8_388_608;
+const catalogMaxAgeMs = 7*86_400_000;
+/**
+ * The model catalog fixes the tool mode (`code_mode_only` adds a ~14k-character `exec` tool) and
+ * multi-agent tools per model, and no config key overrides it. A catalog file passed at startup does,
+ * but it also stops the app-server from refreshing models, so it is derived from the app-server's own
+ * cache (`models_cache.json`) and only while that cache is recent. Any problem means "no catalog":
+ * the app-server then behaves as before, just with a larger prompt.
+ */
+export async function trimmedCatalog(home:string, now=Date.now()):Promise<string|undefined> {
+  try {
+    const source = join(home,'models_cache.json');
+    const stat = await lstat(source);
+    if (!stat.isFile() || stat.size > catalogMaxBytes) return undefined;
+    const cache = object(JSON.parse(await readFile(source,'utf8')));
+    const fetched = typeof cache.fetched_at === 'string' ? Date.parse(cache.fetched_at) : NaN;
+    if (!Number.isFinite(fetched) || now-fetched > catalogMaxAgeMs || fetched-now > 3_600_000) return undefined;
+    if (!Array.isArray(cache.models) || !cache.models.length) return undefined;
+    const models = cache.models.map(item => {
+      const model = {...object(item)};
+      if (typeof model.slug !== 'string' || !model.slug) throw new Error('model');
+      model.tool_mode = 'direct'; model.experimental_supported_tools = []; model.apply_patch_tool_type = null;
+      delete model.multi_agent_version;
+      return model;
+    });
+    // Only the models array is written: never the cache's identity/etag fields.
+    const target = join(home,'gateway-model-catalog.json'), temporary = `${target}.${process.pid}.tmp`;
+    await writeFile(temporary,JSON.stringify({models}),{mode:0o600});
+    await rename(temporary,target);
+    return target;
+  } catch { return undefined; }
+}
 
 async function sourceTokens(sourceHome:string):Promise<Tokens> {
   // Read the existing CLI login without copying refresh tokens or modifying auth.json.
@@ -310,8 +359,10 @@ class AppServerProvider implements Provider {
       const override = this.config.codexBin ? resolve(this.config.codexBin) : undefined;
       const nodeScript = override && ['.js','.mjs','.cjs'].includes(extname(override));
       const command = nodeScript ? process.execPath : override ?? join(packageRoot(),'vendor',`${architecture}-${target}`,'bin',process.platform==='win32'?'codex.exe':'codex');
+      const trim = this.config.codexTrimPrompt ?? false;
+      const catalog = trim ? await trimmedCatalog(this.home) : undefined;
       const args = [...(nodeScript?[override!]:[]),'app-server','--listen','stdio://',
-        ...Object.entries(policy).flatMap(([key,value]) => ['-c',`${key}=${JSON.stringify(value)}`])];
+        ...Object.entries({...appServerPolicy(trim),...(catalog?{model_catalog_json:catalog}:{})}).flatMap(([key,value]) => ['-c',`${key}=${JSON.stringify(value)}`])];
       const env:Record<string,string> = {PATH:process.env.PATH ?? '',HOME:homedir(),CODEX_HOME:this.home};
       for (const key of ['TMPDIR','TEMP','TMP','LANG','SSL_CERT_FILE','SSL_CERT_DIR','SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','USERPROFILE','APPDATA','LOCALAPPDATA'])
         if (process.env[key]) env[key] = process.env[key]!;
@@ -332,7 +383,7 @@ class AppServerProvider implements Provider {
   }
   settings(model:string,effort?:ChatRequest['reasoning_effort']) {
     return {model,cwd:this.runtime,approvalPolicy:'never',sandbox:'read-only',baseInstructions:gatewayInstructions,
-      developerInstructions:'',config:{...policy,...(effort?{model_reasoning_effort:effort}:{})}};
+      developerInstructions:'',config:{...appServerPolicy(this.config.codexTrimPrompt ?? false),...(effort?{model_reasoning_effort:effort}:{})}};
   }
   lock(id:string) {
     if (this.locks.has(id)) throw failure('codex_thread_busy','A turn is already running for this Codex thread.');

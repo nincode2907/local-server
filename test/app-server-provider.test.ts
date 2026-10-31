@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { readConfig } from '../src/config.js';
 import { createProvider, gatewayInstructions } from '../src/provider.js';
 import { buildServer } from '../src/server.js';
-import { createAppServerProvider } from '../src/app-server-provider.js';
+import { createAppServerProvider, appServerPolicy, trimmedCatalog } from '../src/app-server-provider.js';
 import { startEgressForwarder, type EgressFactory } from '../src/egress-forwarder.js';
 import net from 'node:net';
 import { publicContent } from '../src/stream-content.js';
@@ -444,4 +444,108 @@ test('app-server egress uses only the gateway-owned loopback forwarder; flag off
       }finally{process.stderr.write=write;await g.close();}
     }
   }finally{for(const [key,value] of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
+});
+
+const spawnFlags=(args:string[])=>{const flags=new Map<string,string>();for(let i=0;i<args.length;i++)if(args[i]==='-c'){const [key,...rest]=args[i+1]!.split('=');flags.set(key!,rest.join('='));}return flags;};
+
+test('prompt trimming flags reach the app-server and every new or reused thread; the switch restores the full prompt',async()=>{
+  for(const trim of ['true','false']){
+    const f=await fixture({CODEX_TRIM_PROMPT:trim});
+    try {
+      await stateless(f,'second');
+      await waitFor(async()=>count(await f.trace(),'thread/turns/list')===1,'recycle');
+      await stateless(f,'second');
+      const trace=await f.trace(),flags=spawnFlags(trace.find(e=>e.spawn).args);
+      for(const ignored of ['features.skills','features.environments','features.multi_agent_v2'])assert.equal(flags.has(ignored),false,ignored+' is not a valid 0.165.0 key');
+      assert.equal(flags.get('approval_policy'),'"never"');assert.equal(flags.get('sandbox_mode'),'"read-only"');assert.equal(flags.get('features.shell_tool'),'false');
+      assert.equal(flags.get('features.multi_agent_v2.enabled'),'false');
+      assert.equal(flags.get('skills.include_instructions'),trim==='true'?'false':undefined);
+      assert.equal(flags.get('include_environment_context'),trim==='true'?'false':undefined);
+      assert.equal(flags.get('features.multi_agent_v2.disable_native_tools'),trim==='true'?'true':undefined);
+      assert.equal(flags.has('model_catalog_json'),false,'No fresh model cache, so no trimmed catalog.');
+      // One thread/start served both requests (the second reused the reverted thread) with the same policy.
+      const starts=trace.filter(e=>e.method==='thread/start');assert.equal(starts.length,1);
+      assert.equal(starts[0].params.config['skills.include_instructions'],trim==='true'?false:undefined);
+      assert.equal(starts[0].params.approvalPolicy,'never');
+    }finally{await f.close();}
+  }
+});
+
+test('trimmed model catalog derives from the recent app-server cache only and never copies other data',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'gateway-catalog-'));
+  const cache=(extra:object={})=>JSON.stringify({fetched_at:new Date().toISOString(),etag:'W/"x"',identity:'PRIVATE_IDENTITY',models:[
+    {slug:'m1',tool_mode:'code_mode_only',multi_agent_version:'v2',experimental_supported_tools:['clock'],apply_patch_tool_type:'freeform',context_window:1},
+    {slug:'m2',tool_mode:'code_mode_only',experimental_supported_tools:[]}],...extra});
+  try {
+    assert.equal(await trimmedCatalog(directory),undefined,'missing cache');
+    await writeFile(join(directory,'models_cache.json'),'{not json');
+    assert.equal(await trimmedCatalog(directory),undefined,'malformed cache');
+    await writeFile(join(directory,'models_cache.json'),cache({fetched_at:new Date(Date.now()-8*86_400_000).toISOString()}));
+    assert.equal(await trimmedCatalog(directory),undefined,'stale cache');
+    await writeFile(join(directory,'models_cache.json'),cache({fetched_at:new Date(Date.now()+2*3_600_000).toISOString()}));
+    assert.equal(await trimmedCatalog(directory),undefined,'cache from the future');
+    await writeFile(join(directory,'models_cache.json'),cache({models:[{no_slug:true}]}));
+    assert.equal(await trimmedCatalog(directory),undefined,'model without slug');
+    await writeFile(join(directory,'models_cache.json'),cache({models:[]}));
+    assert.equal(await trimmedCatalog(directory),undefined,'empty catalog');
+    await writeFile(join(directory,'models_cache.json'),JSON.stringify({fetched_at:new Date().toISOString(),models:[{slug:'big',pad:'x'.repeat(8_400_000)}]}));
+    assert.equal(await trimmedCatalog(directory),undefined,'oversized cache');
+    await writeFile(join(directory,'models_cache.json'),cache());
+    const path=await trimmedCatalog(directory);assert.equal(path,join(directory,'gateway-model-catalog.json'));
+    const text=await readFile(path!,'utf8'),catalog=JSON.parse(text);
+    assert.deepEqual(Object.keys(catalog),['models']);assert.ok(!text.includes('PRIVATE_IDENTITY'));
+    assert.deepEqual(catalog.models.map((m:any)=>[m.slug,m.tool_mode,m.experimental_supported_tools,m.apply_patch_tool_type,'multi_agent_version' in m]),
+      [['m1','direct',[],null,false],['m2','direct',[],null,false]]);
+    assert.equal(catalog.models[0].context_window,1);
+  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('a fresh cache makes the app-server start with the trimmed catalog unless the switch is off',async()=>{
+  for(const trim of ['true','false']){
+    const f=await fixture({CODEX_TRIM_PROMPT:trim});
+    try {
+      await mkdir(join(f.data,'codex-app-server'),{recursive:true});
+      await writeFile(join(f.data,'codex-app-server','models_cache.json'),JSON.stringify({fetched_at:new Date().toISOString(),models:[{slug:'fixture-model',tool_mode:'code_mode_only'}]}));
+      await f.provider.start('fixture-model').run('first');
+      const flags=spawnFlags((await f.trace()).find(e=>e.spawn).args);
+      assert.equal(flags.get('model_catalog_json'),trim==='true'?JSON.stringify(join(f.data,'codex-app-server','gateway-model-catalog.json')):undefined);
+    }finally{await f.close();}
+  }
+});
+
+test('pinned native app-server accepts every gateway policy key and reports no ignored settings',async()=>{
+  for(const trim of [true,false]){
+    const directory=await mkdtemp(join(tmpdir(),'gateway-native-policy-'));
+    const require=createRequire(import.meta.url),root=dirname(require.resolve(`@openai/codex-${process.platform}-${process.arch}/package.json`));
+    const arch=process.arch==='x64'?'x86_64':'aarch64';
+    const target=process.platform==='win32'?'pc-windows-msvc':process.platform==='darwin'?'apple-darwin':'unknown-linux-musl';
+    const home=join(directory,'home');await mkdir(home);
+    const policy=appServerPolicy(trim);
+    const child=spawn(join(root,'vendor',arch+'-'+target,'bin',process.platform==='win32'?'codex.exe':'codex'),
+      ['app-server','--listen','stdio://',...Object.entries(policy).flatMap(([key,value])=>['-c',key+'='+JSON.stringify(value)])],
+      {cwd:directory,env:{PATH:process.env.PATH??'',HOME:home,CODEX_HOME:directory},windowsHide:true});
+    const closed=new Promise<void>(done=>child.once('close',()=>done()));
+    child.stderr.resume();const lines=createInterface({input:child.stdout});
+    const send=(id:number,method:string,params:unknown)=>child.stdin.write(JSON.stringify({id,method,params})+'\n');
+    const timer=setTimeout(()=>child.kill(),15000);const warnings:string[]=[];let checked=false;
+    try {
+      send(1,'initialize',{clientInfo:{name:'gateway_policy_test',version:'1'},capabilities:{experimentalApi:true}});
+      for await(const line of lines){
+        const message=JSON.parse(line);
+        if(message.method==='configWarning'||message.method==='warning')warnings.push(String(message.params?.summary??message.params?.message));
+        if(message.id===1){child.stdin.write('{"method":"initialized"}\n');
+          const token='test.'+Buffer.from(JSON.stringify({sub:'synthetic',exp:4102444800,'https://api.openai.com/auth':{chatgpt_account_id:'test-account'}})).toString('base64url')+'.synthetic';
+          send(2,'account/login/start',{type:'chatgptAuthTokens',accessToken:token,chatgptAccountId:'test-account'});
+        } else if(message.id===2){
+          send(3,'thread/start',{model:'gpt-6-luna',cwd:directory,approvalPolicy:'never',sandbox:'read-only',ephemeral:true,baseInstructions:gatewayInstructions,developerInstructions:'',environments:[],dynamicTools:[],config:{...policy}});
+        } else if(message.id===3){
+          assert.ok(message.result,'Native thread admission rejected the gateway policy.');
+          assert.equal(message.result.approvalPolicy,'never');assert.deepEqual(message.result.sandbox,{type:'readOnly',networkAccess:false});assert.deepEqual(message.result.instructionSources,[]);
+          checked=true;break;
+        }
+      }
+      assert.equal(checked,true);
+      assert.deepEqual(warnings.filter(w=>/unrecogni[sz]ed|ignored/i.test(w)),[],'A policy key is unknown to the pinned Codex and has no effect.');
+    }finally{clearTimeout(timer);lines.close();child.kill();await closed;await rm(directory,{recursive:true,force:true,maxRetries:10,retryDelay:300});}
+  }
 });
