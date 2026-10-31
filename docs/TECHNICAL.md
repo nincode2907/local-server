@@ -9,7 +9,12 @@ Codex Local Server là HTTP gateway viết bằng Node.js và TypeScript. Nó nh
 Mặc định server chỉ lắng nghe tại `127.0.0.1:15600`. Đây không phải OpenAI API chính thức, không cần `OPENAI_API_KEY`, và không hỗ trợ toàn bộ tính năng của OpenAI API.
 
 ```text
-Client → Fastify → validation/policy → Provider → Codex CLI → ChatGPT account
+Client → Fastify → validation/policy → Provider ──stdio JSON-RPC──→ codex app-server (0.165.0, thường trú)
+                      │                  └─ warm thread pool (stateless)        │ HTTPS_PROXY
+                      │                                                         ↓
+                      │                             egress forwarder 127.0.0.1 (CONNECT, chatgpt.com:443, IPv4)
+                      │                                                         ↓
+                      │                                              chatgpt.com (ChatGPT account)
                       ├─────────────→ metrics SQLite
 Browser → Dashboard API ────────────→ metrics SQLite
                        └────────────→ native usage collector ← ~/.codex local
@@ -19,12 +24,13 @@ Browser → Dashboard API ────────────→ metrics SQLite
 
 | Thành phần | Trách nhiệm |
 | --- | --- |
-| Node.js 22.13+ | Runtime; dùng `node:sqlite` tích hợp |
+| Node.js 24 (`.nvmrc`; tối thiểu 22.13) | Runtime; dùng `node:sqlite` tích hợp |
 | TypeScript, ESM, NodeNext | Kiểu dữ liệu và module server |
 | Fastify 5 | HTTP routes, hooks, giới hạn body, error handler |
 | Zod | Xác thực request, session và query |
 | Ajv | Kiểm tra function arguments theo JSON Schema |
-| `@openai/codex-sdk` / Codex CLI 0.165.0 | Kiểu dữ liệu, app-server JSON-RPC qua stdio; adapter exec tùy chọn |
+| `@openai/codex-sdk` / Codex CLI 0.165.0 (pin chính xác) | Kiểu dữ liệu, native binary app-server JSON-RPC qua stdio; adapter exec tùy chọn |
+| `node:net`, `node:dns` | Egress forwarder CONNECT loopback cho Codex (`src/egress-forwarder.ts`) |
 | SQLite | Gateway metrics và native usage đã tổng hợp |
 | HTML/CSS/JavaScript thuần | Dashboard; không cần frontend bundler |
 
@@ -34,7 +40,8 @@ Browser → Dashboard API ────────────→ metrics SQLite
 src/index.ts
   ├─ src/config.ts   → đọc/validate biến môi trường
   ├─ src/provider.ts → chọn transport; adapter exec tương thích
-  ├─ src/app-server-provider.ts → process thường trú, RPC và delta
+  ├─ src/app-server-provider.ts → process thường trú, RPC, delta, warm thread, cắt prompt
+  │    └─ src/egress-forwarder.ts → CONNECT forwarder loopback cho egress của Codex
   └─ src/server.ts   → HTTP, session, metrics và dashboard
 ```
 
@@ -45,7 +52,7 @@ src/index.ts
 3. Zod xác thực messages, model, reasoning và tool definitions. Transcript được kiểm tra để mọi function call có kết quả tool tương ứng.
 4. Gateway áp dụng giới hạn concurrency, timeout, session lock và `AbortController`.
 5. `promptFor()` tạo hướng dẫn cho Codex. Function call là JSON đầu ra; server không thực thi function đó.
-6. Provider mặc định tái sử dụng process `codex app-server --listen stdio://`, gọi `thread/start` hoặc `thread/resume`, rồi `turn/start`. JSON-RPC và notifications đi qua stdin/stdout. Sandbox `read-only`, approval `never`, network của sandbox tắt; shell, web, apps, plugins và multi-agent bị tắt. `CODEX_TRANSPORT=exec` chọn adapter spawn từng lượt.
+6. Provider mặc định tái sử dụng process `codex app-server --listen stdio://`. Request stateless lấy một warm thread đã revert về rỗng nếu có, nếu không thì `thread/start`; session dùng `thread/resume`; rồi `turn/start`. JSON-RPC và notifications đi qua stdin/stdout; mọi kết nối mạng của Codex đi qua egress forwarder loopback của gateway. Sandbox `read-only`, approval `never`, network của sandbox tắt; shell, web, apps, plugins và multi-agent bị tắt; khối prompt không cấp năng lực bị cắt khi `CODEX_TRIM_PROMPT=true`. `CODEX_TRANSPORT=exec` chọn adapter spawn từng lượt.
 7. Server kiểm tra structured output và arguments, chặn event tool execution ngoài dự kiến, ghi usage rồi trả response.
 8. Client disconnect hoặc timeout gửi `turn/interrupt` cho đúng thread/turn và đợi terminal event. Nếu không dừng trong 5 giây, process dùng chung bị chấm dứt để tránh tiếp tục inference sau hủy; các lượt cùng process cũng lỗi. Session lỗi bị xóa khỏi gateway để tránh resume transcript có thể đã ghi dở.
 
@@ -58,9 +65,11 @@ Zod + transcript + tool-schema checks
     ↓
 concurrency + timeout + cancellation
     ↓
-Codex app-server thường trú (`thread/start` → `turn/start`)
-    ↓
+Codex app-server thường trú
+  (warm thread rỗng hoặc `thread/start` / `thread/resume` → `turn/start`)
+    ↓  egress: Codex → 127.0.0.1 forwarder → chatgpt.com:443
 agentMessage delta → public content SSE → structured response validation
+    ↓  (stateless) `thread/revert` → `thread/turns/list` = 0 → trả về pool
     ├─ usage/status/duration → stats.sqlite
     └─ Chat Completions JSON → client
 ```
@@ -69,7 +78,17 @@ agentMessage delta → public content SSE → structured response validation
 
 `src/provider.ts` chọn transport; `src/app-server-provider.ts` gọi native binary từ package Codex đã pin, không qua shell/Node launcher. `CODEX_BIN` có thể thay native executable hoặc Node script (.js/.mjs/.cjs) trong chế độ app-server. Provider chỉ chuyển whitelist environment; API keys, proxy endpoints của caller/người dùng và phần lớn caller environment không được truyền. Ngoại lệ duy nhất: `HTTPS_PROXY`/`NO_PROXY` trỏ tới egress forwarder loopback do gateway sở hữu (xem dưới).
 
-App-server 0.165.0 chưa có cờ ignore-config/rules của exec. Gateway dùng `DATA_DIR/codex-app-server` làm Codex home riêng, cwd tạm `codex-gateway-*`, không nạp config/rules/instruction của home cá nhân. Nếu có config, rules, hooks, skills tùy chỉnh, plugins hoặc environments trong home riêng, startup bị từ chối. Chỉ cho phép `skills/.system` do Codex tự tạo; tính năng skills vẫn tắt. Thread admission kiểm tra sandbox/network/approval và instructionSources trước khi gọi inference; turn ghi đè readOnly/networkAccess=false.
+App-server 0.165.0 chưa có cờ ignore-config/rules của exec. Gateway dùng `DATA_DIR/codex-app-server` làm Codex home riêng, cwd tạm `codex-gateway-*`, không nạp config/rules/instruction của home cá nhân. Nếu có config, rules, hooks, skills tùy chỉnh, plugins hoặc environments trong home riêng, startup bị từ chối. Chỉ cho phép `skills/.system` do Codex tự tạo. 0.165.0 không có khóa tắt hẳn tính năng skills; khi `CODEX_TRIM_PROMPT=true`, `skills.include_instructions=false` giữ danh sách skill (kể cả `~/.agents/skills` cá nhân) khỏi prompt. Thread admission kiểm tra sandbox/network/approval và instructionSources trước khi gọi inference; turn ghi đè readOnly/networkAccess=false.
+
+### Cắt prompt (`CODEX_TRIM_PROMPT`)
+
+Gateway không thực thi tool, nên các khối prompt cấp năng lực cho agent chỉ là token đầu vào thừa. Khi `CODEX_TRIM_PROMPT=true` (mặc định), app-server được spawn với các khóa `-c` sau (lặp lại trong `config` của `thread/start`, nên thread mới và warm thread tái dùng sau `thread/revert` dùng cùng chính sách): `skills.include_instructions=false`, `include_permissions_instructions=false`, `include_apps_instructions=false`, `include_collaboration_mode_instructions=false`, `include_environment_context=false`, `features.sleep_tool/goals/image_generation=false`, `features.multi_agent_v2.{enabled=false,disable_native_tools=true}` cùng hint rỗng. Không khóa nào cấp thêm quyền; sandbox/approval/network giữ nguyên. Hai khóa cũ `features.skills` và `features.environments` bị 0.165.0 báo "unrecognized" nên đã xóa; test native kiểm tra mọi khóa không gây cảnh báo này.
+
+Ngoài ra provider dựng `DATA_DIR/codex-app-server/gateway-model-catalog.json` từ `models_cache.json` của chính home app-server (chỉ mảng `models`; `tool_mode=direct`, bỏ `multi_agent_version`, `experimental_supported_tools=[]`, `apply_patch_tool_type=null`) và truyền `model_catalog_json`. Đây là cách duy nhất bỏ tool `exec` (~14k ký tự) của `code_mode_only`. Cache thiếu, hỏng, quá 8 MiB, cũ hơn 7 ngày, có thời điểm ở tương lai hoặc model thiếu `slug` → không dùng catalog. Hệ quả: khi có catalog, app-server không tự làm mới danh sách model đến lần spawn sau; model chưa có trong cache có thể không chạy được cho tới khi restart hoặc tắt cờ.
+
+HOME: giữ HOME thật. Đo (0.165.0, "Reply with just: ok", input tokens): hiện tại 8.663 → thêm `skills.include_instructions=false` 5.961 → mọi khóa trên 2.859 → thêm catalog 432; HOME rỗng do gateway sở hữu cũng ra 432 và không nhanh hơn. Khóa skills đã loại danh sách skill cá nhân (`~/.agents/skills`) khỏi prompt (rollout không còn `skills_instructions`/`.agents/skills`), nên không thêm thư mục HOME riêng. Codex vẫn có thể đọc metadata dưới HOME thật như trước thay đổi này. Còn lại trong prompt: base instructions của gateway, tool `request_user_input` và `view_image` (gọi tool vẫn bị từ chối fail-closed như cũ). `CODEX_TRIM_PROMPT=false` trả về chính sách cũ (trừ hai khóa vô tác dụng), không catalog. Chỉ áp dụng cho adapter app-server; adapter exec giữ nguyên.
+
+Qua gateway thật (31/10/2026), request ngắn còn 676 input token (từ ~8,7k; phần chênh với 432 là khung prompt của gateway). Thời gian không đổi đáng kể: request warm trung vị 1,71 giây so với 1,64 giây trước khi cắt, nằm trong nhiễu đo. Lợi ích chính là ít token/quota hơn và không gửi danh sách skill cá nhân lên model, không phải tốc độ.
 
 ChatGPT access token/account ID chỉ được đọc từ `CODEX_HOME/auth.json` (mặc định `~/.codex/auth.json`) rồi gửi qua RPC `account/login/start` kiểu `chatgptAuthTokens`, giữ trong bộ nhớ. Không sao chép refresh token hoặc sửa auth/config/database/rollout nguồn. Refresh RPC chỉ nhận token mới nếu CLI gốc đã cập nhật cho cùng account; nếu không, trả `codex_auth_refresh_required` và yêu cầu chạy `codex login` rồi thử lại. Keyring-only auth chưa được hỗ trợ bởi bridge này. Đổi account yêu cầu restart gateway.
 
@@ -142,6 +161,8 @@ Hỗ trợ streaming opt-in cho stateless completion/run API; không hỗ trợ 
 
 Quyền riêng tư: `sessions.json` có chứa nội dung messages để tiếp tục chat. SQLite metrics chỉ chứa metadata/usage, không chứa prompt/response. Chat playground tồn tại trong bộ nhớ tab và được gửi lại làm context mỗi lượt.
 
+Ngoài dữ liệu của gateway, app-server tự ghi rollout cho mọi thread không ephemeral vào `DATA_DIR/codex-app-server/sessions/**/rollout-*.jsonl`. Các rollout này chứa nguyên văn prompt và phản hồi của `/v1/chat/completions`, `/chat` và session (mỗi lần `thread/revert` của warm thread cũng tạo rollout mới). Gateway chưa có cơ chế dọn hay giới hạn thời gian giữ; chỉ playground (ephemeral) không để lại rollout. Bảo vệ thư mục này như `sessions.json`.
+
 ## 6. SQLite và usage
 
 `src/metrics.ts` dùng SQLite WAL. Bảng `calls` lưu ID, endpoint, model/reasoning, session ID, start/end/duration, status HTTP, token, số tool call, error code và snapshot giá. Không lưu nội dung chat. Call còn pending/running khi process dừng sẽ được đánh dấu `interrupted` lúc khởi động lại.
@@ -163,6 +184,7 @@ Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `PO
 - Browser đọc dashboard cùng origin. Playground POST cần origin trùng, JSON và `X-Codex-Playground: 1`.
 - Body tối đa 1 MiB, mặc định tối đa 2 lượt Codex đồng thời, timeout 180 giây.
 - HTTP caller không thể chọn working directory, Codex home hoặc executable.
+- Egress của Codex chỉ đi qua forwarder loopback do gateway sở hữu: chỉ `CONNECT chatgpt.com:443`, IPv4, chặn IP literal và địa chỉ loopback/private/link-local/CGNAT sau khi resolve, không giải mã TLS. Proxy từ env của caller/người dùng không bao giờ được truyền cho Codex.
 - `read-only` hạn chế ghi, không ngăn tiến trình đọc dữ liệu người dùng. Chỉ dùng với caller đáng tin; không expose internet.
 - Gateway session lưu messages trong JSON. Bảo vệ `sessions.json` như dữ liệu chat nhạy cảm.
 
@@ -188,6 +210,7 @@ Routes `GET /api/videos`, `GET /api/videos/:id`, `GET /api/videos/sessions`, `PO
 | `CODEX_TRANSPORT` | `app-server` | Process thường trú qua stdio; `exec` chọn adapter cũ |
 | `CODEX_WARM_THREADS` | `2` | Số warm thread rảnh (0–8) cho request stateless app-server; `0` tắt |
 | `CODEX_EGRESS_FORWARDER` | `true` | Egress của Codex đi qua CONNECT forwarder loopback của gateway (IPv4, allowlist `chatgpt.com:443`); `false` tắt |
+| `CODEX_TRIM_PROMPT` | `true` | Cắt khối prompt không cấp năng lực và dùng catalog model đã cắt cho app-server; `false` tắt |
 
 ## 9. Bản đồ mã nguồn
 
