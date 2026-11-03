@@ -40,7 +40,10 @@ const options = {
   stream: z.boolean().optional(), n: z.literal(1).optional(),
   stream_options: z.object({include_usage:z.boolean().default(false)}).strict().optional(),
 };
-export const chatRequest = z.object({ ...options, messages: z.array(message).min(1).max(512) }).strict();
+// Opt-in to the owner-enabled web search (CODEX_WEB_SEARCH). Only the empty object is accepted: search
+// options such as context size or location are not supported, and stateless chat routes are the only users.
+export const webSearchOptions = z.object({}).strict();
+export const chatRequest = z.object({ ...options, web_search_options: webSearchOptions.optional(), messages: z.array(message).min(1).max(512) }).strict();
 export const sessionRequest = z.object({
   model: options.model, reasoning_effort: options.reasoning_effort, reasoning: options.reasoning,
   messages: z.array(message).max(512).default([]),

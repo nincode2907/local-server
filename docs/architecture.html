@@ -61,6 +61,7 @@
         <aside class="panel flow-panel"><h3>Ranh giới thực thi</h3><p>Gateway đặt cấu hình cố định trước khi chạy model.</p><div class="security-grid" style="grid-template-columns:1fr">
           <div class="security-item"><b>Sandbox: read-only</b><p>Agent không được ghi file theo policy này.</p></div>
           <div class="security-item"><b>Tools bị tắt</b><p>Shell, unified exec, apps, plugins, computer use, multi-agent và web search.</p></div>
+          <div class="security-item"><b>Web search: owner bật, từng request</b><p>Mặc định tắt. Khi owner đặt CODEX_WEB_SEARCH=cached|live, chỉ request có web_search_options: {} (không streaming, không session) chạy trên process app-server riêng chỉ bật công cụ tìm kiếm của Codex; thread này không vào warm pool. Response bỏ marker trích dẫn và trả web_search.sources; metrics chỉ ghi mode và số lần tìm.</p></div>
           <div class="security-item"><b>Approval: never</b><p>Không có luồng xác nhận interactive; vì vậy chỉ nhận input từ caller tin cậy.</p></div>
           <div class="security-item"><b>Egress: chỉ chatgpt.com:443</b><p>Codex chỉ dial forwarder loopback của gateway; forwarder chặn host khác, IP literal và địa chỉ nội bộ, không giải mã TLS.</p></div>
         </div><p class="callout" style="margin:14px 0 0"><strong>Giới hạn quan trọng:</strong> read-only hạn chế ghi, không phải cô lập quyền đọc dữ liệu trên máy.</p></aside>

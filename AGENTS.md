@@ -26,6 +26,11 @@ built-in SQLite, and vanilla HTML/CSS/JavaScript. No frontend bundler.
   Preserve ChatGPT auth, read-only sandbox, disabled agent tools/network,
   and rejection of unexpected tool execution. Function calls are proposals
   executed by the caller, never commands executed by this gateway.
+- Web search is the one owner-gated exception (`CODEX_WEB_SEARCH`, default off):
+  only a stateless, non-streaming request with `web_search_options: {}` runs on
+  a separate app-server lane/exec turn with Codex's hosted search; it is never
+  pooled, other requests still reject web_search items, metrics stay counts only
+  (`src/web-search.ts`, `docs/TECHNICAL.md`).
 - The only proxy variables a Codex child receives (`HTTPS_PROXY`, `NO_PROXY`)
   point at the gateway-owned loopback CONNECT forwarder (`src/egress-forwarder.ts`):
   allowlisted hosts on 443 only, IPv4, TLS end-to-end, metadata-only stats,

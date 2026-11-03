@@ -96,6 +96,22 @@ Ngày 30/10/2026: check/build và 97 test qua; server đã restart sau khi xác 
 idle, health HTTP 200, /v1/providers báo app-server-stdio/content_deltas.
 Không gọi inference thật; health không chứng minh token còn hiệu lực ở backend.
 
+## Bật web search (owner, 03/11/2026)
+
+Mặc định `CODEX_WEB_SEARCH=off`: request có `web_search_options: {}` nhận
+`400 web_search_disabled`, không gọi model. Owner bật bằng cách thêm
+`CODEX_WEB_SEARCH=live` (hoặc `cached`) vào `.env`, rồi restart khi gateway
+idle: listener foreground (`npm start` trong terminal) → Ctrl+C rồi
+`npm run build && npm start`; chế độ nền → `npm run build && npm stop && npm start --silent -- -d`.
+Kiểm tra không tốn quota:
+`GET /v1/providers` → `capabilities.web_search` của Codex là `live`/`cached`,
+và `GET /api/resources` có process scope `codex_app_server_web_search_process`.
+Tắt lại: bỏ dòng hoặc đặt `off`, restart. Chi tiết contract/cách ly:
+`docs/TECHNICAL.md` mục "Web search theo request".
+
+Mỗi request search tốn quota thật (lượt live ngày 03/11/2026: 12 giây,
+~10,5k prompt token). Test tự động dùng fixture, không gửi turn thật.
+
 ## Port và Dev Hub
 
 | Nguồn | Trạng thái kiểm tra ngày 06/10/2026 |

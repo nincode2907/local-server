@@ -11,6 +11,7 @@ import type { Config } from './config.js';
 import { openEgress, egressEnv, type EgressFactory } from './egress-forwarder.js';
 import type { ChatRequest } from './schema.js';
 import type {ProviderUsage as Usage,ProviderTiming,CliLifecycleTiming,AppServerLifecycleTiming} from './provider-types.js';
+import { maxWebSearchCalls, webSearchCall, webSearchInstructions, type WebSearchCall, type WebSearchMode } from './web-search.js';
 
 export interface ProviderTurn {
   timing?:ProviderTiming;
@@ -19,6 +20,8 @@ export interface ProviderTurn {
   items: ThreadItem[];
   finalResponse: string;
   usage: Usage | null;
+  /** Web search calls of a search-enabled turn (owner gate + per-request opt-in); absent otherwise. */
+  webSearch?: WebSearchCall[];
 }
 
 export const gatewayInstructions = 'You are a text assistant for a local chat gateway. Respond to the provided conversation using the requested JSON schema. Do not use local tools, read files, modify files, run shell commands, search the web, or contact integrations. Function calls in your final JSON are proposals for the caller to execute.';
@@ -36,8 +39,11 @@ export interface ProviderThread {
 export interface Provider {
   canResume?(id: string): boolean;
   warmup?(): Promise<void>;
-  /** `stateless` marks a request that owns no session; only such threads may be recycled by a provider. */
-  start(model: string, effort?: ChatRequest['reasoning_effort'], ephemeral?: boolean, options?: { stateless?: boolean }): ProviderThread;
+  /**
+   * `stateless` marks a request that owns no session; only such threads may be recycled by a provider.
+   * `webSearch` runs this one thread with the owner-enabled web search (CODEX_WEB_SEARCH); it is never recycled.
+   */
+  start(model: string, effort?: ChatRequest['reasoning_effort'], ephemeral?: boolean, options?: { stateless?: boolean; webSearch?: boolean }): ProviderThread;
   /** Admin-only metadata about the gateway-owned egress forwarder (hosts, counts, timings), or null. */
   egress?(): unknown;
   resume(id: string, model: string, effort?: ChatRequest['reasoning_effort']): ProviderThread;
@@ -66,6 +72,7 @@ class CliThread implements ProviderThread {
     private readonly effort?: ChatRequest['reasoning_effort'],
     id: string | null = null,
     private readonly ephemeral = false,
+    private readonly webSearch: WebSearchMode | null = null,
   ) { this.#id = id; }
 
   get id() { return this.#id; }
@@ -88,7 +95,7 @@ class CliThread implements ProviderThread {
       ...config('forced_login_method', 'chatgpt'),
       ...config('model_instructions_file', this.instructions),
       ...config('project_doc_max_bytes', 0),
-      ...config('web_search', 'disabled'),
+      ...config('web_search', this.webSearch ?? 'disabled'),
       ...config('features.shell_tool', false),
       ...config('features.unified_exec', false),
       ...config('features.apps', false),
@@ -112,9 +119,9 @@ class CliThread implements ProviderThread {
 
     let result:ProviderTurn|undefined;
     try {
-      await options.observe?.({ stdin: input, instructions: gatewayInstructions, output_schema: options.outputSchema ?? null,
+      await options.observe?.({ stdin: input, instructions: this.webSearch ? webSearchInstructions : gatewayInstructions, output_schema: options.outputSchema ?? null,
         model: this.model, reasoning_effort: this.effort ?? null, thread_id: this.#id, ephemeral: this.ephemeral,
-        policy: { sandbox: 'read-only', approval: 'never', network: false, agent_tools: false, ignore_user_config: true, ignore_rules: true },
+        policy: { sandbox: 'read-only', approval: 'never', network: false, agent_tools: false, web_search: this.webSearch ?? 'disabled', ignore_user_config: true, ignore_rules: true },
         internal_context: { provenance: 'Internal / unavailable', available: false, description: 'Provider-internal prompt and resumed CLI history are not exposed by this gateway.' } });
       mark('spawn_requested_ms');
       const child = spawn(this.command, args, { env: this.env, signal: options.signal });
@@ -152,6 +159,7 @@ class CliThread implements ProviderThread {
       void exited.catch(() => {});
       child.stdin.end(input);
       const items: ThreadItem[] = [];
+      const searches = new Map<string, WebSearchCall>();
       let finalResponse = '';
       let usage: Usage | null = null;
       let failure: string | undefined;
@@ -173,7 +181,13 @@ class CliThread implements ProviderThread {
             lifecycle.last_post_turn_event_ms=performance.now()-lifecycleStarted;
           }
           if (event.item) {
-            assertNoAgentTools([event.item]);
+            assertNoAgentTools([event.item], Boolean(this.webSearch));
+            if (event.item.type === 'web_search') {
+              const call = webSearchCall(event.item);
+              if (!call) throw new ApiError(502, 'provider_protocol', 'Invalid web search item.');
+              if (!searches.has(call.id) && searches.size >= maxWebSearchCalls) throw new ApiError(502, 'provider_event_limit', 'Provider web search activity exceeds limit.');
+              searches.set(call.id, call);
+            }
             if (['item.started','item.updated','item.completed'].includes(event.type) && event.item.type === 'agent_message')
               options.onEvent?.({type:'output',item_id:event.item.id,text:event.item.text});
           }
@@ -223,7 +237,7 @@ class CliThread implements ProviderThread {
         mark('response_observer_finished_ms');
       }
       if (failure) throw new Error(failure);
-      result={items,finalResponse,usage,cliLifecycle:lifecycle};
+      result={items,finalResponse,usage,cliLifecycle:lifecycle,...(this.webSearch?{webSearch:[...searches.values()]}:{})};
     } finally {
       if (schemaPath) {mark('schema_cleanup_started_ms');await rm(schemaPath, { force: true });mark('schema_cleanup_finished_ms');}
       options.onLifecycle?.({...lifecycle});
@@ -246,6 +260,9 @@ export async function createProvider(config: Config, hooks: { egress?: EgressFac
   const bundledCli = require.resolve('@openai/codex/bin/codex.js');
   const instructions = join(runtime, 'instructions.md');
   await writeFile(instructions, gatewayInstructions);
+  // Separate instructions file for search-enabled turns; every other turn keeps the no-search instructions.
+  const searchInstructions = join(runtime, 'instructions-web-search.md');
+  await writeFile(searchInstructions, webSearchInstructions);
   const command = config.codexBin ? resolve(config.codexBin) : process.execPath;
   const commandPrefix = config.codexBin ? [] : [bundledCli];
   const env: Record<string, string> = { PATH: process.env.PATH ?? '', HOME: homedir() };
@@ -256,19 +273,28 @@ export async function createProvider(config: Config, hooks: { egress?: EgressFac
   // The only proxy is the gateway-owned loopback forwarder (see egress-forwarder.ts).
   const forwarder = await openEgress(config.codexEgressForwarder ?? false, hooks.egress);
   Object.assign(env, egressEnv(forwarder));
-  const make = (model: string, effort?: ChatRequest['reasoning_effort'], id: string | null = null, ephemeral = false) =>
-    new CliThread(command, commandPrefix, env, runtime, instructions, model, effort, id, ephemeral);
+  const make = (model: string, effort?: ChatRequest['reasoning_effort'], id: string | null = null, ephemeral = false, webSearch: WebSearchMode | null = null) =>
+    new CliThread(command, commandPrefix, env, runtime, webSearch ? searchInstructions : instructions, model, effort, id, ephemeral, webSearch);
   return {
     canResume: id => !id.startsWith('app-server:'),
-    start: (model, effort, ephemeral) => make(model, effort, null, ephemeral),
+    start: (model, effort, ephemeral, options) => make(model, effort, null, ephemeral, options?.webSearch ? webSearchMode(config) : null),
     resume: (id, model, effort) => make(model, effort, id),
     egress: () => forwarder ? { enabled: true, ...forwarder.snapshot() } : null,
     close: async () => { await forwarder?.close(); await rm(runtime, { recursive: true, force: true }); },
   };
 }
 
-export function assertNoAgentTools(items: { type: string }[]) {
-  if (items.some(i => ['command_execution', 'file_change', 'mcp_tool_call', 'web_search'].includes(i.type))) {
+/** The gate mode for a search-enabled thread; a provider refuses the opt-in while the owner gate is off. */
+export function webSearchMode(config: Pick<Config, 'codexWebSearch'>): WebSearchMode {
+  const gate = config.codexWebSearch ?? 'off';
+  if (gate === 'off') throw new ApiError(400, 'web_search_disabled', 'Web search is disabled on this gateway. The owner enables it with CODEX_WEB_SEARCH=cached or live and a restart.');
+  return gate;
+}
+
+/** Shell, file and MCP items are always rejected; web_search items only on a search-enabled turn. */
+export function assertNoAgentTools(items: { type: string }[], allowWebSearch = false) {
+  const blocked = allowWebSearch ? ['command_execution', 'file_change', 'mcp_tool_call'] : ['command_execution', 'file_change', 'mcp_tool_call', 'web_search'];
+  if (items.some(i => blocked.includes(i.type))) {
     throw new ApiError(502, 'unexpected_agent_tool', 'Codex attempted an agent tool. Request rejected.');
   }
 }

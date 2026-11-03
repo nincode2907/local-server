@@ -19,6 +19,7 @@ import {Resources} from './resources.js';
 import type {BenchmarkTag} from './activity.js';
 import { Scheduler } from './scheduler.js';
 import { publicContent, withoutSecretPrefix } from './stream-content.js';
+import { requestedWebSearch, stripCitations, summarize, type WebSearchSummary } from './web-search.js';
 
 export async function buildServer(config: Config, provider: Provider) {
   const app = Fastify({ logger: { redact: ['req.headers.authorization'] }, bodyLimit: 1_048_576 });
@@ -134,6 +135,8 @@ export async function buildServer(config: Config, provider: Provider) {
     if (request.stream_options && !request.stream) throw new ApiError(400,'invalid_stream_options','stream_options requires stream: true.');
     if (session && request.stream) throw new ApiError(400,'session_stream_unsupported','Streaming session routes are not supported yet.');
     prepareTools(request);
+    // Owner gate + per-request opt-in; null keeps web search disabled for this request.
+    const webSearch = requestedWebSearch(config.codexWebSearch ?? 'off', request, Boolean(session));
     if (request.reasoning && request.reasoning_effort && request.reasoning !== request.reasoning_effort) throw new ApiError(400, 'invalid_reasoning', 'reasoning and reasoning_effort conflict.');
     const history = session ? [...session.messages, ...request.messages] : request.messages;
     validateTranscript(history);
@@ -157,6 +160,8 @@ export async function buildServer(config: Config, provider: Provider) {
     metrics.context(call.id,model,effort,selected.id);
     const run = activities.create(call.id, identity.owner, model, call.ephemeral, call.start, idempotency, idempotency ? digest(JSON.stringify(request)) : undefined,queued,selected.id,benchmark,request.stream??false,call.createdAt);
     call.run = run; call.detached = detached;
+    // Metadata only: that the request used web search, its mode and later the number of searches; never queries or sources.
+    if (webSearch) { run.reportWebSearch(webSearch,null); metrics.webSearch(call.id,webSearch,null); }
     reply?.header('X-Codex-Run-Id',run.id);
     const controller = run.controller;
     running.set(controller,run); if (session) sessions.busy.add(session.id);
@@ -182,7 +187,7 @@ export async function buildServer(config: Config, provider: Provider) {
 
         if (call) { metrics.context(call.id, model, effort,selected.id); metrics.running(call.id); }
         const resumeId = session?.threadId && (selected.adapter as Provider).canResume?.(session.threadId) !== false ? session.threadId : undefined;
-        const thread = resumeId ? selected.adapter.resume(resumeId, model, effort) : selected.adapter.start(model, effort, req?.url.split('?')[0] === '/api/playground/chat', {stateless:!session});
+        const thread = resumeId ? selected.adapter.resume(resumeId, model, effort) : selected.adapter.start(model, effort, req?.url.split('?')[0] === '/api/playground/chat', {stateless:!session,...(webSearch?{webSearch:true}:{})});
         const forwardedMessages = resumeId ? request.messages : history;
         const prompt = promptFor(forwardedMessages, request);
         await captureStep('gateway', 'Gateway generated', { prompt, output_schema: outputSchema, effective_parameters: { model, reasoning_effort: effort },
@@ -201,7 +206,7 @@ export async function buildServer(config: Config, provider: Provider) {
           onEvent: event => {
             if (controller.signal.aborted) throw new ApiError(499,'request_cancelled','Request cancelled.');
             if (event.type === 'output') {
-              const text = publicContent(event.text);
+              const raw = publicContent(event.text), text = webSearch && raw !== null ? stripCitations(raw).text : raw;
               if (text !== null) run.content(String(redact(withoutSecretPrefix(text,config.inspectorSecrets),config.inspectorSecrets)));
             } else if(event.type==='usage'){ run.reportUsage(event.usage); metrics.usage(run.id,event.usage); }else run.reportTiming(event.timing);
           },
@@ -218,9 +223,16 @@ export async function buildServer(config: Config, provider: Provider) {
           internal_reasoning: { provenance: 'Internal / unavailable', available: false, reason: 'Private reasoning items are never recorded.' } });
         if (call) metrics.usage(call.id, turn.usage);
         if(turn.timing)run.reportTiming(turn.timing);
-        assertNoAgentTools(turn.items);
-        const result = completion(turn.finalResponse, model, request, turn.usage);
+        assertNoAgentTools(turn.items, Boolean(webSearch));
+        const result:ReturnType<typeof completion>&{web_search?:WebSearchSummary} = completion(turn.finalResponse, model, request, turn.usage);
         result.id = `chatcmpl-local-${run.id}`;
+        if (webSearch) {
+          // Private-use citation markers never reach the caller; sources are the URLs the answer cites.
+          const message = result.choices[0]!.message, cleaned = typeof message.content === 'string' ? stripCitations(message.content) : {text:message.content,removed:0};
+          message.content = cleaned.text ?? null;
+          result.web_search = summarize(webSearch, turn.webSearch ?? [], cleaned.text ?? '', cleaned.removed);
+          run.reportWebSearch(webSearch,result.web_search.searches); if (call) metrics.webSearch(call.id,webSearch,result.web_search.searches);
+        }
         if(turn.finishReason==='length')result.choices[0]!.finish_reason='length';
         const safeResult = redact(result,config.inspectorSecrets) as typeof result;
         const toolsUnchanged = JSON.stringify(result.choices[0]!.message.tool_calls) === JSON.stringify(safeResult.choices[0]!.message.tool_calls);

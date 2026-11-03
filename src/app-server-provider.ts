@@ -7,7 +7,8 @@ import { StringDecoder } from 'node:string_decoder';
 import type { ThreadItem } from '@openai/codex-sdk';
 import type { Config } from './config.js';
 import { ApiError } from './errors.js';
-import { gatewayInstructions, type Provider, type ProviderThread, type ProviderTurn, type ObservedTurnOptions } from './provider.js';
+import { gatewayInstructions, webSearchMode, type Provider, type ProviderThread, type ProviderTurn, type ObservedTurnOptions } from './provider.js';
+import { maxWebSearchCalls, webSearchCall, webSearchInstructions, type WebSearchCall, type WebSearchMode } from './web-search.js';
 import type { AppServerLifecycleTiming, ProviderUsage } from './provider-types.js';
 import type { ChatRequest } from './schema.js';
 import { openEgress, egressEnv, type EgressFactory, type EgressForwarder } from './egress-forwarder.js';
@@ -25,6 +26,12 @@ const interruptTimeout = 5_000;
 const warmMaxUses = 50;
 const warmMaxAgeMs = 3_600_000;
 type WarmThread = {connection:Connection; id:string; key:string; uses:number; created:number};
+/**
+ * Each lane is its own app-server process. `search` exists only while the owner gate CODEX_WEB_SEARCH is on and
+ * runs only requests that opted in; `default` keeps web search disabled at process and thread level. A search
+ * thread is never pooled, so warm threads never mix configurations.
+ */
+type Lane = 'default'|'search';
 const object = (value:unknown):ObjectValue => value && typeof value === 'object' && !Array.isArray(value) ? value as ObjectValue : {};
 const failure = (code:string, message:string) => new ApiError(502, code, message);
 const aborted = () => new ApiError(499, 'request_cancelled', 'Request cancelled.');
@@ -70,9 +77,14 @@ const trimPolicy:ObjectValue = {
   'skills.include_instructions':false, include_permissions_instructions:false, include_apps_instructions:false,
   include_collaboration_mode_instructions:false, include_environment_context:false,
 };
-export function appServerPolicy(trim:boolean):ObjectValue {
+export function appServerPolicy(trim:boolean, webSearch?:WebSearchMode):ObjectValue {
   // Without trimming, still disable the native multi-agent v2 tools (as `features.multi_agent_v2=false` did).
-  return trim ? {...isolationPolicy,...trimPolicy} : {...isolationPolicy,'features.multi_agent_v2.enabled':false};
+  const policy:ObjectValue = trim ? {...isolationPolicy,...trimPolicy} : {...isolationPolicy,'features.multi_agent_v2.enabled':false};
+  if (!webSearch) return policy;
+  // Search lane only: the hosted web search tool in the gate's mode. The deprecated `features.web_search`
+  // alias is dropped so it cannot override `web_search`; every other isolation key is unchanged.
+  const {['features.web_search']:_legacy, ...rest} = policy;
+  return {...rest, web_search:webSearch};
 }
 const catalogMaxBytes = 8_388_608;
 const catalogMaxAgeMs = 7*86_400_000;
@@ -136,7 +148,7 @@ class Connection {
   private processUsers = 0;
   readonly ready:Promise<void>;
 
-  constructor(command:string, args:string[], env:Record<string,string>, cwd:string, private sourceHome:string) {
+  constructor(command:string, args:string[], env:Record<string,string>, cwd:string, private sourceHome:string, private scope='codex_app_server_shared_process') {
     this.child = spawn(command, args, {env, cwd, windowsHide:true});
     this.closed = new Promise(done => this.child.once('close', done));
     // Drain stderr without retaining or exposing it.
@@ -169,8 +181,8 @@ class Connection {
   get alive() { return !this.dead; }
   get pid() { return this.child.pid; }
   watchProcess(callback:ObservedTurnOptions['onProcess']) {
-    if (this.pid && this.processUsers++ === 0) callback?.(this.pid,true,'codex_app_server_shared_process');
-    return () => { if (this.pid && --this.processUsers === 0) callback?.(this.pid,false,'codex_app_server_shared_process'); };
+    if (this.pid && this.processUsers++ === 0) callback?.(this.pid,true,this.scope);
+    return () => { if (this.pid && --this.processUsers === 0) callback?.(this.pid,false,this.scope); };
   }
   async waitClosed() { await this.closed; }
   private send(message:ObjectValue) {
@@ -259,8 +271,7 @@ class Connection {
 }
 
 class AppServerProvider implements Provider {
-  private connection?:Connection;
-  private connecting?:Promise<Connection>;
+  private lanes:Record<Lane,{connection?:Connection; connecting?:Promise<Connection>}> = {default:{},search:{}};
   private closed = false;
   private connections = new Set<Connection>();
   private locks = new Set<string>();
@@ -272,14 +283,15 @@ class AppServerProvider implements Provider {
   private egressHandle:EgressForwarder|null = null;
   egress() { return this.egressHandle ? {enabled:true,...this.egressHandle.snapshot()} : null; }
   canResume(id:string) { return id.startsWith(prefix); }
-  start(model:string, effort?:ChatRequest['reasoning_effort'], ephemeral=false, options:{stateless?:boolean}={}):ProviderThread {
-    // Only stateless, non-ephemeral threads are recyclable: sessions own their thread
-    // and Codex refuses thread/revert on ephemeral (playground) threads.
-    return new AppServerThread(this,model,effort,null,ephemeral,Boolean(options.stateless)&&!ephemeral&&this.warmLimit>0);
+  start(model:string, effort?:ChatRequest['reasoning_effort'], ephemeral=false, options:{stateless?:boolean; webSearch?:boolean}={}):ProviderThread {
+    const webSearch = options.webSearch ? webSearchMode(this.config) : null;
+    // Only stateless, non-ephemeral threads without web search are recyclable: sessions own their thread,
+    // Codex refuses thread/revert on ephemeral (playground) threads, and search threads never join the pool.
+    return new AppServerThread(this,model,effort,null,ephemeral,Boolean(options.stateless)&&!ephemeral&&!webSearch&&this.warmLimit>0,webSearch);
   }
   resume(id:string,model:string,effort?:ChatRequest['reasoning_effort']):ProviderThread {
     if (!this.canResume(id)) throw failure('codex_transport_mismatch', 'Restore saved gateway history before changing the Codex transport.');
-    return new AppServerThread(this,model,effort,id.slice(prefix.length),false,false);
+    return new AppServerThread(this,model,effort,id.slice(prefix.length),false,false,null);
   }
   get warmLimit() { return this.config.codexWarmThreads ?? 0; }
   warmKey(model:string,effort?:ChatRequest['reasoning_effort']) { return JSON.stringify([model,effort??null]); }
@@ -287,6 +299,8 @@ class AppServerProvider implements Provider {
   takeWarm(key:string,connection:Connection):WarmThread|undefined {
     const now=Date.now();
     for (const entry of [...this.warm]) {
+      // Another live lane's thread is skipped, never retired or taken: pools never cross processes.
+      if (entry.connection!==connection && entry.connection.alive) continue;
       const usable=entry.connection===connection&&connection.alive&&entry.uses<warmMaxUses&&now-entry.created<warmMaxAgeMs;
       if (!usable) { this.warm.splice(this.warm.indexOf(entry),1); void this.retire(entry); continue; }
       if (entry.key!==key || this.locks.has(entry.id)) continue;
@@ -319,13 +333,19 @@ class AppServerProvider implements Provider {
     // Unsubscribe bounds loaded thread lifetimes. It never archives/deletes native data.
     try { await entry.connection.request('thread/unsubscribe',{threadId:entry.id}); } catch {/* best effort */}
   }
-  async warmup() { await this.connect(); }
-  get reused() { return Boolean(this.connection?.alive); }
-  async connect():Promise<Connection> {
+  async warmup() {
+    await this.connect('default');
+    // The search lane is started only when the owner gate is on; its failure surfaces on the first search request.
+    if ((this.config.codexWebSearch ?? 'off') !== 'off') await this.connect('search').catch(() => {});
+  }
+  reused(lane:Lane='default') { return Boolean(this.lanes[lane].connection?.alive); }
+  async connect(lane:Lane='default'):Promise<Connection> {
     if (this.closed) throw failure('codex_app_server_closed','Codex provider is closed.');
-    if (this.connection?.alive) return this.connection;
-    if (this.connecting) return this.connecting;
-    this.connecting = (async () => {
+    const slot = this.lanes[lane];
+    if (slot.connection?.alive) return slot.connection;
+    if (slot.connecting) return slot.connecting;
+    const webSearch = lane === 'search' ? webSearchMode(this.config) : undefined;
+    slot.connecting = (async () => {
       await mkdir(this.home,{recursive:true,mode:0o700});
       const sourceHome=resolve(process.env.CODEX_HOME ?? join(homedir(),'.codex'));
       if ((await lstat(this.home)).isSymbolicLink() || (await realpath(this.home)).toLowerCase() === (await realpath(sourceHome).catch(()=>sourceHome)).toLowerCase())
@@ -362,7 +382,7 @@ class AppServerProvider implements Provider {
       const trim = this.config.codexTrimPrompt ?? false;
       const catalog = trim ? await trimmedCatalog(this.home) : undefined;
       const args = [...(nodeScript?[override!]:[]),'app-server','--listen','stdio://',
-        ...Object.entries({...appServerPolicy(trim),...(catalog?{model_catalog_json:catalog}:{})}).flatMap(([key,value]) => ['-c',`${key}=${JSON.stringify(value)}`])];
+        ...Object.entries({...appServerPolicy(trim,webSearch),...(catalog?{model_catalog_json:catalog}:{})}).flatMap(([key,value]) => ['-c',`${key}=${JSON.stringify(value)}`])];
       const env:Record<string,string> = {PATH:process.env.PATH ?? '',HOME:homedir(),CODEX_HOME:this.home};
       for (const key of ['TMPDIR','TEMP','TMP','LANG','SSL_CERT_FILE','SSL_CERT_DIR','SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','USERPROFILE','APPDATA','LOCALAPPDATA'])
         if (process.env[key]) env[key] = process.env[key]!;
@@ -370,20 +390,20 @@ class AppServerProvider implements Provider {
       const forwarder = await this.forwarder();
       this.egressHandle = forwarder;
       Object.assign(env, egressEnv(forwarder));
-      const connection = new Connection(command,args,env,this.runtime,sourceHome);
+      const connection = new Connection(command,args,env,this.runtime,sourceHome,lane==='search'?'codex_app_server_web_search_process':'codex_app_server_shared_process');
       this.connections.add(connection);
       void connection.waitClosed().then(()=>this.connections.delete(connection));
       try { await connection.ready; }
       catch(error) { await connection.close(); this.connections.delete(connection); throw error; }
       if (this.closed) {await connection.close(); throw failure('codex_app_server_closed','Codex provider is closed.');}
-      this.connection = connection;
+      slot.connection = connection;
       return connection;
     })();
-    try {return await this.connecting;} finally {this.connecting=undefined;}
+    try {return await slot.connecting;} finally {slot.connecting=undefined;}
   }
-  settings(model:string,effort?:ChatRequest['reasoning_effort']) {
-    return {model,cwd:this.runtime,approvalPolicy:'never',sandbox:'read-only',baseInstructions:gatewayInstructions,
-      developerInstructions:'',config:{...appServerPolicy(this.config.codexTrimPrompt ?? false),...(effort?{model_reasoning_effort:effort}:{})}};
+  settings(model:string,effort?:ChatRequest['reasoning_effort'],webSearch:WebSearchMode|null=null) {
+    return {model,cwd:this.runtime,approvalPolicy:'never',sandbox:'read-only',baseInstructions:webSearch?webSearchInstructions:gatewayInstructions,
+      developerInstructions:'',config:{...appServerPolicy(this.config.codexTrimPrompt ?? false,webSearch??undefined),...(effort?{model_reasoning_effort:effort}:{})}};
   }
   lock(id:string) {
     if (this.locks.has(id)) throw failure('codex_thread_busy','A turn is already running for this Codex thread.');
@@ -393,7 +413,7 @@ class AppServerProvider implements Provider {
   async close() {
     this.closed = true;
     this.warm = [];
-    await this.connecting?.catch(() => {});
+    await Promise.all(Object.values(this.lanes).map(slot => slot.connecting?.catch(() => {})));
     await Promise.all([...this.connections].map(connection=>connection.close()));
     this.connections.clear();
     await (await this.egressJob?.catch(() => null))?.close();
@@ -403,7 +423,7 @@ class AppServerProvider implements Provider {
 
 class AppServerThread implements ProviderThread {
   private busy = false;
-  constructor(private provider:AppServerProvider, private model:string, private effort:ChatRequest['reasoning_effort']|undefined, private rawId:string|null, private ephemeral:boolean, private recyclable:boolean) {}
+  constructor(private provider:AppServerProvider, private model:string, private effort:ChatRequest['reasoning_effort']|undefined, private rawId:string|null, private ephemeral:boolean, private recyclable:boolean, private webSearch:WebSearchMode|null) {}
   get id() { return this.rawId ? prefix+this.rawId : null; }
   async run(input:string,options:ObservedTurnOptions={}):Promise<ProviderTurn> {
     if (this.busy) throw failure('codex_thread_busy','A turn is already running for this Codex thread.');
@@ -422,24 +442,26 @@ class AppServerThread implements ProviderThread {
     let usage:ProviderUsage|null = null;
     const texts = new Map<string,string>();
     const items = new Map<string,ThreadItem>();
+    const searches = new Map<string,WebSearchCall>();
     let finalResponse = '';
     const started = performance.now();
-    const timing:AppServerLifecycleTiming = {connection_reused:this.provider.reused,shared_process:true,connection_ready_ms:null,thread_ready_ms:null,turn_started_ms:null,first_delta_ms:null,turn_completed_ms:null,provider_returned_ms:null};
+    const lane:Lane = this.webSearch ? 'search' : 'default';
+    const timing:AppServerLifecycleTiming = {connection_reused:this.provider.reused(lane),shared_process:true,connection_ready_ms:null,thread_ready_ms:null,turn_started_ms:null,first_delta_ms:null,turn_completed_ms:null,provider_returned_ms:null};
     const mark = (key:'connection_ready_ms'|'thread_ready_ms'|'turn_started_ms'|'first_delta_ms'|'turn_completed_ms'|'provider_returned_ms') => {timing[key] = performance.now()-started;options.onAppServerLifecycle?.({...timing});};
     try {
       if (options.signal?.aborted) throw aborted();
       if (this.rawId) unlock = this.provider.lock(this.rawId);
-      await options.observe?.({stdin:input,instructions:gatewayInstructions,output_schema:options.outputSchema??null,
+      await options.observe?.({stdin:input,instructions:this.webSearch?webSearchInstructions:gatewayInstructions,output_schema:options.outputSchema??null,
         model:this.model,reasoning_effort:this.effort??null,thread_id:this.id,ephemeral:this.ephemeral,transport:'app-server-stdio',
-        policy:{sandbox:'read-only',approval:'never',network:false,agent_tools:false,ignore_user_config:true,ignore_rules:true,isolation:'dedicated_codex_home'},
+        policy:{sandbox:'read-only',approval:'never',network:false,agent_tools:false,web_search:this.webSearch??'disabled',ignore_user_config:true,ignore_rules:true,isolation:'dedicated_codex_home'},
         internal_context:{provenance:'Internal / unavailable',available:false,description:'Private provider context and resumed history are not exposed.'}});
-      connection = await this.provider.connect();
+      connection = await this.provider.connect(lane);
       if (options.signal?.aborted) throw aborted();
       await connection.authenticate();
       mark('connection_ready_ms');
       if (options.signal?.aborted) throw aborted();
       releaseProcess=connection.watchProcess(options.onProcess);
-      const settings = this.provider.settings(this.model,this.effort);
+      const settings = this.provider.settings(this.model,this.effort,this.webSearch);
       const resuming=Boolean(this.rawId);
       const key=this.provider.warmKey(this.model,this.effort);
       // A warm thread passed the same admission checks below when it was created and
@@ -487,9 +509,17 @@ class AppServerThread implements ProviderThread {
       };
       const publicItem = (value:unknown) => {
         const item = object(value);
-        const allowed = ['userMessage','agentMessage','reasoning'];
+        // webSearch items are accepted only on a search lane thread; shell/file/MCP/apps stay rejected everywhere.
+        const allowed = this.webSearch ? ['userMessage','agentMessage','reasoning','webSearch'] : ['userMessage','agentMessage','reasoning'];
         if (typeof item.type !== 'string' || !allowed.includes(item.type))
           throw failure('unexpected_agent_tool','Codex attempted an agent tool. Request rejected.');
+        if (item.type === 'webSearch') {
+          const call = webSearchCall(item);
+          if (!call) throw failure('codex_app_server_protocol','Invalid web search item.');
+          if (!searches.has(call.id) && searches.size >= maxWebSearchCalls) throw failure('provider_event_limit','Provider web search activity exceeds limit.');
+          searches.set(call.id,call);
+          return;
+        }
         if (item.type !== 'agentMessage') return;
         if (typeof item.id !== 'string' || typeof item.text !== 'string') throw failure('codex_app_server_protocol','Invalid public assistant message.');
         rememberText(item.id,item.text);
@@ -563,7 +593,7 @@ class AppServerThread implements ProviderThread {
       await terminal;
       if(options.signal?.aborted)throw aborted();
       if(turnError)throw turnError;
-      return {items:[...items.values()],finalResponse,usage};
+      return {items:[...items.values()],finalResponse,usage,...(this.webSearch?{webSearch:[...searches.values()]}:{})};
     } catch(error) {
       turnError=error as Error;
       // If turn admission failed after turn/started, do not leave inference alive

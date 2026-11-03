@@ -51,6 +51,8 @@ export class ActivityRun {
   clientDisconnectAt:number|null=null;
   gatewayTimeoutAt:number|null=null;
   providerFailure:{reason:'provider_timeout'|'provider_error'|'unknown';origin:'provider'}|null=null;
+  /** Metadata only: the request opted in to web search (mode) and how many search calls the turn made (null until known). */
+  webSearch:{mode:string;searches:number|null}|null=null;
   constructor(readonly id: string, readonly owner: string, readonly model: string,
     readonly ephemeral: boolean, readonly store: Activities, readonly acceptedAt: number, queued=false,readonly provider:ProviderId='codex',readonly benchmark?:BenchmarkTag,
     readonly stream:boolean|null=null,readonly acceptedAtWall=Date.now()) { if(queued){this.status='queued';this.queuedAt=this.elapsed();} }
@@ -61,13 +63,14 @@ export class ActivityRun {
     if(this.samples.length>256)this.samples.splice(1,1);
   }
   reportUsage(usage:Usage) {if(JSON.stringify(this.usage)===JSON.stringify(usage))return;this.usage=usage;this.sample('usage');this.emit('usage.updated',{usage,sample:this.samples.at(-1)},'provider_reported');}
+  reportWebSearch(mode:string,searches:number|null) {this.webSearch={mode,searches};this.store.save(this);}
   reportTiming(timing:ProviderTiming) {if(JSON.stringify({...this.timing,...timing})===JSON.stringify(this.timing))return;this.timing={...this.timing,...timing};this.emit('provider.timing',{timing:this.timing},'provider_reported');}
   elapsed() { return performance.now() - this.acceptedAt; }
   snapshot() {
     const metric = (input: number | null, unit: string, source: string, reason: string | null = null) => {const value=input!==null&&Number.isFinite(input)?input:null;return {value,unit,source,reason:value===null?reason??'Metric unavailable.':null};};
     return { run_id: this.id, call_id: this.id, model: this.model, provider: this.provider, status: this.status,...(this.benchmark?{benchmark:this.benchmark}:{}),
       workflow:this.store.workflows.snapshot(this.id),history:{samples:[...this.samples],sample_count:this.sampleCount,truncated:this.sampleCount>this.samples.length,available:true},
-      created_at: this.createdAt, seq: this.seq, ephemeral: this.ephemeral, error_code: this.error, capabilities:providerCapabilities(this.provider,this.store.codexTransport),
+      created_at: this.createdAt, seq: this.seq, ephemeral: this.ephemeral, error_code: this.error, capabilities:providerCapabilities(this.provider,this.store.codexTransport),web_search:this.webSearch,
       diagnostics:{stream:this.stream,request_accepted_at:this.acceptedAtWall,provider_started_at:this.providerStarted===null?null:this.acceptedAtWall+this.providerStarted,
         first_public_output_at:this.firstOutput===null?null:this.acceptedAtWall+this.firstOutput,first_content_sent_at:this.firstSent===null?null:this.acceptedAtWall+this.firstSent,
         client_disconnect_at:this.clientDisconnectAt,gateway_timeout_at:this.gatewayTimeoutAt,

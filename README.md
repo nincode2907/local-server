@@ -131,6 +131,48 @@ curl http://localhost:15600/chat \
   -d '{"prompt":"Giải thích closure trong JavaScript", "reasoning":"high"}'
 ```
 
+### Web search (owner bật, từng request)
+
+Mặc định gateway **không** tìm kiếm web. Owner bật cổng bằng `CODEX_WEB_SEARCH=cached|live` trong `.env` (mặc định `off`) rồi restart. Khi cổng bật, chỉ request stateless, không streaming, provider Codex có trường `web_search_options: {}` mới được dùng công cụ tìm kiếm có sẵn của Codex (chạy ở backend OpenAI, không thêm host egress). Mọi request khác vẫn tắt web search và vẫn bị từ chối `502 unexpected_agent_tool` nếu Codex cố tìm; shell/file/MCP/apps tắt trong mọi trường hợp.
+
+```bash
+curl http://localhost:15600/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "gpt-6-luna",
+    "reasoning_effort": "low",
+    "web_search_options": {},
+    "messages": [{"role": "user", "content": "Phiên bản PHP ổn định mới nhất là gì? Trả lời một câu, kèm nguồn."}]
+  }'
+```
+
+```json
+{
+  "id": "chatcmpl-local-...",
+  "object": "chat.completion",
+  "choices": [{
+    "index": 0,
+    "message": {"role": "assistant", "content": "Phiên bản PHP ổn định mới nhất là PHP 8.5.12 ... (https://www.php.net/downloads.php)."},
+    "finish_reason": "stop"
+  }],
+  "usage": {"prompt_tokens": 10503, "completion_tokens": 89, "total_tokens": 10592},
+  "web_search": {
+    "mode": "live",
+    "searches": 1,
+    "queries": ["site:php.net latest stable PHP version downloads"],
+    "sources": [{"url": "https://www.php.net/downloads.php", "title": "PHP: Downloads"}],
+    "citation_markers_removed": 0
+  }
+}
+```
+
+- `web_search_options` chỉ nhận object rỗng; tùy chọn khác (`search_context_size`, `user_location`) và `tools: [{"type":"web_search"}]` trả `400 invalid_request`.
+- Cổng tắt → `400 web_search_disabled`; `stream: true` → `400 web_search_stream_unsupported`; session → `400`; provider local → `400 web_search_unsupported_provider`. `GET /v1/providers` báo cổng ở `capabilities.web_search` (`off|cached|live`), không gọi model.
+- `content` đã bỏ marker trích dẫn private-use của Codex (`\uE200cite\uE202turn0search6\uE201`, dạng mất ký tự `citeturn0search6`, `【…†…】`); entity giữ tên hiển thị. Instructions yêu cầu dẫn nguồn bằng URL thuần trong ngoặc.
+- `web_search.sources`: URL http(s) mà câu trả lời trích (Markdown link hoặc URL thuần), theo thứ tự xuất hiện, tối đa 20, không credential; `title` lấy từ text link hoặc từ kết quả tìm kiếm Codex báo, không có thì `null`. `searches` là số lệnh công cụ web (search/open page/find in page), `queries` là câu tìm Codex dùng. Kết quả web là dữ liệu không tin cậy.
+- Thống kê/activity chỉ lưu metadata: `calls.web_search`/`web_searches` và `web_search: {mode, searches}` trong run, không lưu câu tìm, nguồn hay nội dung.
+- Đo thật ngày 03/11/2026 (`gpt-6-luna`, low, `live`): 12,1 giây, ~10,5k prompt token (công cụ + kết quả tìm kiếm), egress chỉ `chatgpt.com`.
+
 ### Python: đổi provider bằng base_url
 
 ```bash
@@ -371,7 +413,7 @@ Query `model` là tùy chọn; thêm header `Authorization: Bearer ...` nếu b�
 
 - Bind cứng `127.0.0.1`; từ chối Host không phải localhost; browser chỉ được đọc dashboard và thống kê từ cùng origin, không bật CORS.
 - Tùy chọn `LOCAL_API_KEY`: API chat, session, health, models và thống kê yêu cầu `Authorization: Bearer <token>`. Dashboard shell có thể tải để nhập token. Token này bảo vệ gateway local, không phải API key OpenAI.
-- Provider chạy trong thư mục tạm riêng, thay agent instructions, không nạp AGENTS.md, tắt shell/unified exec, apps/plugins, multi-agent, computer use và web search. App-server dùng Codex home riêng để loại config/rules cá nhân; exec dùng ignore-user-config/ignore-rules.
+- Provider chạy trong thư mục tạm riêng, thay agent instructions, không nạp AGENTS.md, tắt shell/unified exec, apps/plugins, multi-agent, computer use và web search. Ngoại lệ duy nhất: khi owner bật `CODEX_WEB_SEARCH`, request có `web_search_options: {}` chạy trên một process app-server riêng (hoặc lượt exec riêng) chỉ bật công cụ tìm kiếm web của Codex (xem "Web search"). App-server dùng Codex home riêng để loại config/rules cá nhân; exec dùng ignore-user-config/ignore-rules.
 - Sandbox `read-only`, approvals `never`, command networking tắt. HTTP request không được chọn working directory, Codex home, executable hoặc nâng quyền.
 - Gateway không thực thi tool do caller cung cấp. Không kế thừa biến môi trường bí mật của app; dùng auth store Codex hiện có để tiếp tục refresh login như CLI.
 - Read-only bảo vệ việc ghi file; **không phải sandbox bảo mật đầy đủ để cô lập quyền đọc dữ liệu**. Chỉ dùng cho app local tin cậy. Không expose ra internet; nếu cần chạy prompt không tin cậy, dùng user/container riêng với dữ liệu và auth tách biệt.

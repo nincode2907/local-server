@@ -7,6 +7,7 @@ import { readConfig } from '../src/config.js';
 import { createProvider, gatewayInstructions } from '../src/provider.js';
 import { buildServer } from '../src/server.js';
 import { createAppServerProvider, appServerPolicy, trimmedCatalog } from '../src/app-server-provider.js';
+import { webSearchInstructions } from '../src/web-search.js';
 import { startEgressForwarder, type EgressFactory } from '../src/egress-forwarder.js';
 import net from 'node:net';
 import { publicContent } from '../src/stream-content.js';
@@ -36,7 +37,7 @@ const reply=(id,result)=>send({id,result});
 let initialized=false,nextThread=0,nextTurn=0;const turns=new Map(),totals=new Map(),history=new Map();
 const revertMode=()=>{try{return fs.readFileSync(trace+'.revert','utf8').trim();}catch{return 'ok';}};
 readline.createInterface({input:process.stdin}).on('line',line=>{
-const m=JSON.parse(line);fs.appendFileSync(trace,JSON.stringify(m)+'\\n');
+const m=JSON.parse(line);fs.appendFileSync(trace,JSON.stringify({...m,_pid:process.pid})+'\\n');
 const p=m.params??{},tid=p.threadId;
 if(m.method==='initialize'){reply(m.id,{userAgent:'fixture'});return;}
 if(m.method==='initialized'){initialized=true;return;}
@@ -74,6 +75,8 @@ notify('item/agentMessage/delta',{threadId:'other-thread',turnId:id,itemId,delta
 notify('item/agentMessage/delta',{threadId:tid,turnId:'stale-turn',itemId,delta:'CROSS_TURN'});
 if(input.includes('crash')){process.stderr.write('PRIVATE_STDERR');process.exit(1);return;}
 if(input.includes('tool-item')){notify('item/started',{threadId:tid,turnId:id,item:{id:'bad',type:'commandExecution'}});return;}
+if(input.includes('web-search-item')){notify('item/started',{threadId:tid,turnId:id,item:{id:'ws-'+id,type:'webSearch',query:'',action:null,results:null}});
+notify('item/completed',{threadId:tid,turnId:id,item:{id:'ws-'+id,type:'webSearch',query:'gold price',action:{type:'search',query:'gold price',queries:['gold price today']},results:null}});}
 if(input.includes('tool-request')){send({id:'tool-request',method:'item/commandExecution/requestApproval',params:{threadId:tid,turnId:id}});return;}
 if(input.includes('refresh')){send({id:'refresh-request',method:'account/chatgptAuthTokens/refresh',params:{previousAccountId:'test-account'}});return;}
 notify('item/agentMessage/delta',{threadId:tid,turnId:id,itemId,delta:'{"content":"Xin'});
@@ -514,13 +517,13 @@ test('a fresh cache makes the app-server start with the trimmed catalog unless t
 });
 
 test('pinned native app-server accepts every gateway policy key and reports no ignored settings',async()=>{
-  for(const trim of [true,false]){
+  for(const [trim,search] of [[true,undefined],[false,undefined],[true,'live']] as const){
     const directory=await mkdtemp(join(tmpdir(),'gateway-native-policy-'));
     const require=createRequire(import.meta.url),root=dirname(require.resolve(`@openai/codex-${process.platform}-${process.arch}/package.json`));
     const arch=process.arch==='x64'?'x86_64':'aarch64';
     const target=process.platform==='win32'?'pc-windows-msvc':process.platform==='darwin'?'apple-darwin':'unknown-linux-musl';
     const home=join(directory,'home');await mkdir(home);
-    const policy=appServerPolicy(trim);
+    const policy=appServerPolicy(trim,search);
     const child=spawn(join(root,'vendor',arch+'-'+target,'bin',process.platform==='win32'?'codex.exe':'codex'),
       ['app-server','--listen','stdio://',...Object.entries(policy).flatMap(([key,value])=>['-c',key+'='+JSON.stringify(value)])],
       {cwd:directory,env:{PATH:process.env.PATH??'',HOME:home,CODEX_HOME:directory},windowsHide:true});
@@ -548,4 +551,77 @@ test('pinned native app-server accepts every gateway policy key and reports no i
       assert.deepEqual(warnings.filter(w=>/unrecogni[sz]ed|ignored/i.test(w)),[],'A policy key is unknown to the pinned Codex and has no effect.');
     }finally{clearTimeout(timer);lines.close();child.kill();await closed;await rm(directory,{recursive:true,force:true,maxRetries:10,retryDelay:300});}
   }
+});
+
+test('web search runs on its own app-server process; search threads are never pooled and default threads never search',async()=>{
+  const f=await fixture({CODEX_WEB_SEARCH:'live'}),processes:any[]=[];
+  try {
+    await f.provider.warmup!();
+    let trace=await f.trace();
+    const spawns=trace.filter(e=>e.spawn);assert.equal(spawns.length,2);
+    const [plain,search]=[spawns.find(e=>e.args.includes('web_search="disabled"')),spawns.find(e=>e.args.includes('web_search="live"'))];
+    assert.ok(plain&&search&&plain.pid!==search.pid);
+    assert.ok(plain.args.includes('features.web_search=false'));assert.ok(!search.args.some((a:string)=>a.startsWith('features.web_search')));
+    assert.ok(!plain.args.includes('web_search="live"'));
+    for(const spawn of [plain,search])for(const key of ['features.shell_tool=false','features.apps=false','features.plugins=false','features.unified_exec=false','sandbox_workspace_write.network_access=false','approval_policy="never"','sandbox_mode="read-only"'])assert.ok(spawn.args.includes(key),key);
+    const searched=await f.provider.start('fixture','low',false,{stateless:true,webSearch:true}).run('web-search-item first',{onProcess:(...args:any[])=>processes.push(args)});
+    assert.equal(JSON.parse(searched.finalResponse).content,'Xin chào');
+    assert.deepEqual(searched.webSearch,[{id:'ws-turn-1',kind:'search',queries:['gold price','gold price today'],url:null,results:[]}]);
+    assert.deepEqual(processes.map(p=>[p[0],p[2]]),[[search.pid,'codex_app_server_web_search_process'],[search.pid,'codex_app_server_web_search_process']]);
+    // A default stateless request after it never reuses the search thread and runs on the default process.
+    const second=await stateless(f,'second');assert.equal(second.webSearch,undefined);
+    await waitFor(async()=>count(await f.trace(),'thread/turns/list')===1,'default recycle');
+    trace=await f.trace();
+    const starts=trace.filter(e=>e.method==='thread/start');assert.equal(starts.length,2);
+    assert.equal(starts[0]._pid,search.pid);assert.equal(starts[0].params.baseInstructions,webSearchInstructions);
+    assert.equal(starts[0].params.config.web_search,'live');assert.equal(starts[0].params.config['features.web_search'],undefined);
+    assert.equal(starts[1]._pid,plain.pid);assert.equal(starts[1].params.baseInstructions,gatewayInstructions);
+    assert.equal(starts[1].params.config.web_search,'disabled');assert.equal(starts[1].params.config['features.web_search'],false);
+    for(const turn of trace.filter(e=>e.method==='turn/start'))assert.deepEqual(turn.params.sandboxPolicy,{type:'readOnly',networkAccess:false});
+    // The search thread was unsubscribed, never reverted into the pool; only the default thread was recycled.
+    assert.deepEqual(trace.filter(e=>e.method==='thread/revert').map(e=>e._pid),[plain.pid]);
+    assert.deepEqual(trace.filter(e=>e.method==='thread/unsubscribe').map(e=>e._pid),[search.pid]);
+    // Two more default requests reuse only default threads; a third search request starts a fresh search thread.
+    await stateless(f,'second');
+    await f.provider.start('fixture','low',false,{stateless:true,webSearch:true}).run('web-search-item again');
+    trace=await f.trace();
+    const searchTurns=trace.filter(e=>e.method==='turn/start'&&e._pid===search.pid),defaultTurns=trace.filter(e=>e.method==='turn/start'&&e._pid===plain.pid);
+    assert.equal(searchTurns.length,2);assert.notEqual(searchTurns[0].params.threadId,undefined);
+    assert.equal(trace.filter(e=>e.method==='thread/start'&&e._pid===search.pid).length,2);
+    assert.equal(defaultTurns.length,2);assert.equal(defaultTurns[0].params.threadId,defaultTurns[1].params.threadId);
+    // A search request between two default requests neither takes nor retires the idle default thread.
+    await waitFor(async()=>count(await f.trace(),'thread/turns/list')===2,'second default recycle');
+    await f.provider.start('fixture','low',false,{stateless:true,webSearch:true}).run('web-search-item between');
+    await stateless(f,'second');
+    trace=await f.trace();
+    const reused=trace.filter(e=>e.method==='turn/start'&&e._pid===plain.pid);assert.equal(reused.length,3);assert.equal(reused[2].params.threadId,reused[0].params.threadId);
+    assert.equal(trace.filter(e=>e.method==='thread/unsubscribe'&&e._pid===plain.pid).length,0);
+    // A web search item on a default thread is still an unexpected agent tool: fail closed.
+    await assert.rejects(stateless(f,'web-search-item sneaky'),(e:any)=>e.code==='unexpected_agent_tool');
+    // The search lane is unaffected by the default process stopping.
+    const again=await f.provider.start('fixture','low',false,{stateless:true,webSearch:true}).run('web-search-item fourth');
+    assert.equal(again.webSearch?.length,1);
+    trace=await f.trace();assert.equal(trace.filter(e=>e.spawn&&e.args.includes('web_search="live"')).length,1);
+  }finally{await f.close();}
+});
+
+test('with the web search gate off no search process starts and the opt-in is refused before any thread exists',async()=>{
+  const f=await fixture();
+  try {
+    await f.provider.warmup!();
+    assert.throws(()=>f.provider.start('fixture','low',false,{stateless:true,webSearch:true}),(e:any)=>e.code==='web_search_disabled'&&e.status===400);
+    const trace=await f.trace();assert.equal(trace.filter(e=>e.spawn).length,1);assert.equal(count(trace,'thread/start'),0);
+    assert.ok(trace.find(e=>e.spawn).args.includes('web_search="disabled"'));
+  }finally{await f.close();}
+});
+
+test('gateway search request over the app-server returns the cleaned answer with search metadata',async()=>{
+  const f=await fixture({CODEX_WEB_SEARCH:'cached'});const app=await buildServer(f.config,f.provider);
+  try {
+    const r=await app.inject({method:'POST',url:'/v1/chat/completions',payload:{model:'fixture',web_search_options:{},messages:[{role:'user',content:'web-search-item gold?'}]}});
+    assert.equal(r.statusCode,200);
+    assert.equal(r.json().choices[0].message.content,'Xin chào');
+    assert.deepEqual(r.json().web_search,{mode:'cached',searches:1,queries:['gold price','gold price today'],sources:[],citation_markers_removed:0});
+    const trace=await f.trace();assert.ok(trace.some(e=>e.spawn&&e.args.includes('web_search="cached"')));
+  }finally{await app.close();await f.close();}
 });

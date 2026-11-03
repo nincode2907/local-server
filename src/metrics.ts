@@ -30,7 +30,7 @@ export class Metrics {
 
     `);
     const columns = new Set(this.db.prepare('PRAGMA table_info(calls)').all().map(r => r.name));
-    for (const [name, type] of Object.entries({ provider:"TEXT NOT NULL DEFAULT 'codex'",cost_usd: 'REAL', input_cost_usd: 'REAL', output_cost_usd: 'REAL', cached_cost_usd: 'REAL', input_rate: 'REAL', output_rate: 'REAL', cached_rate: 'REAL', price_checked_on: 'TEXT', price_source: 'TEXT' })) {
+    for (const [name, type] of Object.entries({ provider:"TEXT NOT NULL DEFAULT 'codex'",web_search:'TEXT',web_searches:'INTEGER',cost_usd: 'REAL', input_cost_usd: 'REAL', output_cost_usd: 'REAL', cached_cost_usd: 'REAL', input_rate: 'REAL', output_rate: 'REAL', cached_rate: 'REAL', price_checked_on: 'TEXT', price_source: 'TEXT' })) {
       if (!columns.has(name)) this.db.exec(`ALTER TABLE calls ADD COLUMN ${name} ${type}`);
     }
     this.db.exec('PRAGMA user_version=3');
@@ -47,6 +47,10 @@ export class Metrics {
   }
   context(id: string, model: string, reasoning: string,provider:ProviderId='codex') {
     this.db.prepare('UPDATE calls SET model=?, reasoning=?,provider=? WHERE id=?').run(model, reasoning,provider, id);
+  }
+  /** Web search metadata only: mode for an opted-in request and, once known, the number of search calls. */
+  webSearch(id: string, mode: string, searches: number | null) {
+    this.db.prepare('UPDATE calls SET web_search=?, web_searches=? WHERE id=?').run(mode, searches, id);
   }
   running(id: string) {
     this.db.prepare("UPDATE calls SET codex_started=1, status='running' WHERE id=?").run(id);

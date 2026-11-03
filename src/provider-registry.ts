@@ -11,7 +11,8 @@ export class ProviderRegistry {
   constructor(private config:Config,readonly codex:Provider) {
     for(const id of ['ollama','lmstudio'] as const){const settings=config.localProviders[id];if(settings)this.local.set(id,new LocalProvider(id,settings,config.localProviderTimeout));}
   }
-  describe() {return (['codex','ollama','lmstudio'] as const).map(id=>({id,enabled:id==='codex'||this.local.has(id),capabilities:providerCapabilities(id,this.config.codexTransport)}));}
+  // web_search: the owner gate (off|cached|live); a request opts in with web_search_options:{} only when it is not off.
+  describe() {return (['codex','ollama','lmstudio'] as const).map(id=>({id,enabled:id==='codex'||this.local.has(id),capabilities:{...providerCapabilities(id,this.config.codexTransport),web_search:id==='codex'?this.config.codexWebSearch??'off':'unsupported'}}));}
   resolve(request:ChatRequest) {
     const id=request.provider??'codex';
     if(id==='codex') {if(request.max_tokens!==undefined||request.seed!==undefined)throw new ApiError(400,'unsupported_provider_option','Codex does not support max_tokens or seed.');return {id,adapter:this.codex};}

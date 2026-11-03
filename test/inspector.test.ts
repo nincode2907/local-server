@@ -139,7 +139,7 @@ test('real CLI boundary exposes only safe gateway settings before spawn; no acco
   try {
     await assert.rejects(provider.start('model-test','low').run('exact stdin',{outputSchema:{type:'object'},observe:async context=>{observed=context;throw new Error('stop-before-spawn');}}),/stop-before-spawn/);
     assert.equal(observed.stdin,'exact stdin');assert.equal(observed.instructions,gatewayInstructions);assert.equal(observed.model,'model-test');
-    assert.deepEqual(observed.policy,{sandbox:'read-only',approval:'never',network:false,agent_tools:false,ignore_user_config:true,ignore_rules:true});
+    assert.deepEqual(observed.policy,{sandbox:'read-only',approval:'never',network:false,agent_tools:false,web_search:'disabled',ignore_user_config:true,ignore_rules:true});
     assert.equal(observed.internal_context.available,false);
   } finally {await provider.close();}
 });
